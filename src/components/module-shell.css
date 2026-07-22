@@ -1,0 +1,113 @@
+/* Shared chrome for the redesigned modules: topbar, sound toggle, toast, alert. */
+
+@keyframes duFadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes duScaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+@keyframes duToastIn { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes duAlertIn { 0% { opacity: 0; transform: scale(0.85); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes duPulseLime { 0%, 100% { box-shadow: 0 0 0 0 rgba(204,255,0,0.35); } 50% { box-shadow: 0 0 0 10px rgba(204,255,0,0); } }
+@keyframes duSpin { to { transform: rotate(360deg); } }
+
+.du-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 22px;
+  background: var(--primary);
+  color: #fff;
+}
+.du-topbar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255,255,255,0.75);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+.du-topbar-back:hover { background: rgba(255,255,255,0.08); color: #fff; }
+
+.du-sound-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.du-sound-btn:hover { background: rgba(255,255,255,0.14); transform: scale(1.05); }
+.du-sound-btn[data-off="true"] { color: rgba(255,255,255,0.4); }
+
+.du-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  z-index: 950;
+  background: var(--primary-deep, var(--primary));
+  color: #fff;
+  padding: 14px 24px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  border: 1px solid rgba(204,255,0,0.25);
+  animation: duToastIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
+  white-space: nowrap;
+}
+
+.du-alert-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26,21,53,0.72);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 900;
+  animation: duFadeUp 0.3s ease;
+}
+.du-alert-card {
+  background: linear-gradient(160deg, var(--primary), var(--primary-deep, var(--primary)));
+  padding: 48px 56px;
+  border-radius: 32px;
+  text-align: center;
+  max-width: 420px;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+  border: 1px solid rgba(204,255,0,0.2);
+  animation: duAlertIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+.du-alert-icon {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: rgba(204,255,0,0.15);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 22px;
+  animation: duPulseLime 1.6s infinite;
+}
+.du-alert-eyebrow { color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: 2px; margin-bottom: 8px; }
+.du-alert-title { color: #fff; font-size: 22px; font-weight: 800; margin-bottom: 10px; letter-spacing: -0.3px; }
+.du-alert-msg { color: rgba(255,255,255,0.65); font-size: 14px; font-weight: 500; margin-bottom: 26px; line-height: 1.5; }
+.du-alert-btn {
+  background: var(--accent);
+  color: var(--primary-deep, var(--primary));
+  padding: 13px;
+  border-radius: 14px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  transition: transform 0.2s;
+}
+.du-alert-btn:hover { transform: scale(1.02); }
+.du-alert-btn:active { transform: scale(0.97); }

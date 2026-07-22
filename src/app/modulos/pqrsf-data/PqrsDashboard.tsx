@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { buscarAction } from "./actions";
 import type { ModoBusqueda, OpcionResultado } from "@/lib/pqrs";
+import { useModuleSound } from "@/lib/use-module-sound";
+import { SoundToggleButton } from "@/components/module-shell";
 
 const REGLAS_ORO = [
   "Garantizar claridad absoluta antes de radicar.",
@@ -25,9 +27,11 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
   const [rulesShown, setRulesShown] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [accordionOpen, setAccordionOpen] = useState(false);
+  const { soundOn, toggleSound, playClick, playNotify } = useModuleSound();
 
   async function search() {
     if (!query.trim()) return;
+    playClick();
     setLoading(true);
     setError(null);
     setOptions(null);
@@ -38,6 +42,7 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
     if (res.error) {
       setError(res.error);
     } else if (res.options && res.options.length > 0) {
+      playNotify();
       setOptions(res.options);
       setCurrentIdx(0);
       if (!rulesShown && mode === "PQRSF") {
@@ -81,9 +86,12 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
               <div className="user-chip">ID: {nombre}</div>
             </div>
           </div>
-          <Link href="/" className="btn-outline">
-            Volver al inicio
-          </Link>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <SoundToggleButton soundOn={soundOn} toggleSound={toggleSound} />
+            <Link href="/" className="btn-outline">
+              Volver al inicio
+            </Link>
+          </div>
         </div>
 
         <div className="card" style={{ padding: 25 }}>

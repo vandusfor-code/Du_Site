@@ -31,6 +31,8 @@ import {
   ModalAsignacion,
   HistorySidebar,
 } from "./QuizViews";
+import { useModuleSound } from "@/lib/use-module-sound";
+import { SoundToggleButton } from "@/components/module-shell";
 
 type Vista = "dashboard" | "modulo" | "examen" | "resultado" | "simulacion" | "admin";
 
@@ -47,6 +49,7 @@ export default function QuizDashboard({
   rol: string;
 }) {
   const esAdmin = rol.trim().toLowerCase() === "admin";
+  const { soundOn, toggleSound, playClick, playNotify } = useModuleSound();
 
   const [vista, setVista] = useState<Vista>(esAdmin ? "admin" : "dashboard");
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -122,6 +125,7 @@ export default function QuizDashboard({
   }
 
   function abrirModulo(curso: FilaObjeto) {
+    playClick();
     setCursoActualId(curso.ID_MODULO);
     setVista("modulo");
   }
@@ -138,6 +142,7 @@ export default function QuizDashboard({
   }
 
   function seleccionarRespuesta(letra: string) {
+    playClick();
     setRespuestasUsuario((prev) => {
       const copia = [...prev];
       copia[indicePregunta] = letra;
@@ -174,12 +179,14 @@ export default function QuizDashboard({
     mostrarNotificacion("Enviando resultados...");
 
     await guardarResultadoAction(cursoActualId, nota, descErrores.join(", "));
+    playNotify();
     setNotaFinal(nota);
     setVista("resultado");
     cargarDashboard();
   }
 
   function abrirSimulacion(sim: FilaObjeto) {
+    playClick();
     setSimActualId(sim.ID_SIMULACION);
     setSimTitulo(sim.TITULO || "Simulación");
     setChatHistorial([]);
@@ -195,6 +202,7 @@ export default function QuizDashboard({
   async function enviarMensajeChat() {
     const msg = chatInput.trim();
     if (!msg) return;
+    playClick();
     setChatInput("");
     setChatBubbles((prev) => [...prev, { role: "user", content: msg }]);
     const nuevoHistorial = [...chatHistorial, { role: "user" as const, content: msg }];
@@ -203,6 +211,7 @@ export default function QuizDashboard({
 
     try {
       const respuesta = await hablarConIAAction(msg, simActualId, nuevoHistorial);
+      playNotify();
       setChatHistorial((h) => [...h, { role: "assistant", content: respuesta }]);
       setChatBubbles((prev) => [...prev, { role: "bot", content: respuesta }]);
     } catch {
@@ -269,6 +278,8 @@ export default function QuizDashboard({
           theme={theme}
           onToggleTheme={toggleTheme}
           onIrDashboard={() => setVista(esAdmin ? "admin" : "dashboard")}
+          soundOn={soundOn}
+          onToggleSound={toggleSound}
         />
 
         <main className="flex-grow overflow-y-auto p-8 custom-scrollbar relative">
@@ -396,6 +407,8 @@ function Sidebar({
   theme,
   onToggleTheme,
   onIrDashboard,
+  soundOn,
+  onToggleSound,
 }: {
   esAdmin: boolean;
   collapsed: boolean;
@@ -403,6 +416,8 @@ function Sidebar({
   theme: "light" | "dark";
   onToggleTheme: () => void;
   onIrDashboard: () => void;
+  soundOn: boolean;
+  onToggleSound: () => void;
 }) {
   return (
     <aside className={`sidebar-main flex flex-col p-7 shrink-0 relative z-20 ${collapsed ? "collapsed" : ""}`}>
@@ -438,6 +453,11 @@ function Sidebar({
         <div className="sidebar-nav-item flex items-center gap-3 p-3 rounded-xl transition-all">
           <div className={`theme-toggle ${theme === "dark" ? "active" : ""}`} onClick={onToggleTheme} />
           <span className="sidebar-text text-[10px] font-bold text-slate-400 uppercase tracking-widest">Modo Oscuro</span>
+        </div>
+
+        <div className="sidebar-nav-item flex items-center gap-3 p-3 rounded-xl transition-all">
+          <SoundToggleButton soundOn={soundOn} toggleSound={onToggleSound} />
+          <span className="sidebar-text text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sonido</span>
         </div>
 
         <div className="sidebar-text bg-slate-50/50 p-5 rounded-2xl border border-slate-100/50">

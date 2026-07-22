@@ -29,6 +29,7 @@ import type {
   MensajeChat,
   HorarioHoy,
 } from "@/lib/radicaciones";
+import { SoundToggleButton } from "@/components/module-shell";
 
 type Vista = "dashboard" | "registry" | "snc" | "search" | "notifications" | "chat";
 
@@ -60,6 +61,7 @@ function parseTimeClient(str: string | undefined): Date | null {
 export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
   const [vista, setVista] = useState<Vista>("dashboard");
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
+  const [soundOn, setSoundOn] = useState(true);
 
   const [asesores, setAsesores] = useState<Asesor[]>([]);
   const [resumen, setResumen] = useState<ResumenHoy>({ efectivos: 0, devueltos: 0, total: 0 });
@@ -114,9 +116,10 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
   }, []);
 
   const playAlert = useCallback(() => {
+    if (!soundOn) return;
     audioRef.current?.play().catch(() => {});
     if (audioRef.current) audioRef.current.currentTime = 0;
-  }, []);
+  }, [soundOn]);
 
   const stopAlertLoop = useCallback(() => {
     if (alertIntervalRef.current) clearInterval(alertIntervalRef.current);
@@ -323,6 +326,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
             <h4>{nombre}</h4>
             <p>Funcionario Activo</p>
           </div>
+          <SoundToggleButton soundOn={soundOn} toggleSound={() => setSoundOn((v) => !v)} />
         </div>
         <Link href="/" className="btn-primary" style={{ background: "rgba(255,255,255,0.05)", color: "white", padding: 12, fontSize: 13, textDecoration: "none" }}>
           Volver al inicio
@@ -489,7 +493,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                     <div className="form-box">
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
                         <h3>Radicado: {sncResult.radicado}</h3>
-                        <span className="status-pill" style={{ background: "var(--primary)", color: "white" }}>
+                        <span className="status-pill" style={{ background: "var(--primary)", color: "var(--primary-text)" }}>
                           {sncResult.estado}
                         </span>
                       </div>
