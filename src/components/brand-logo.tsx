@@ -70,3 +70,36 @@ export function BrandLogo({
     </div>
   );
 }
+
+/**
+ * Compact brand mark (tile only) whose size is controlled via className.
+ * Useful in tight spaces like a collapsible sidebar.
+ */
+export function BrandMark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "relative grid place-items-center rounded-md shadow-[var(--shadow-brand)]",
+        className
+      )}
+      style={{
+        background: "linear-gradient(145deg, var(--brand-mid), var(--brand-deep))",
+      }}
+      aria-hidden="true"
+    >
+      <svg
+        className="size-[56%]"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth={2.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M3 14.5 8 9l4 4 5-6 3 3.5" />
+        <circle cx="8" cy="9" r="0.6" fill="var(--accent)" />
+        <circle cx="17" cy="7" r="0.6" fill="var(--accent)" />
+      </svg>
+    </span>
+  );
+}

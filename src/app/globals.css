@@ -48,6 +48,15 @@
   --sidebar-foreground: rgba(255, 255, 255, 0.55);
   --sidebar-foreground-active: #ffffff;
   --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-accent-foreground: #ffffff;
+
+  /* Aliases (map friendly names used across components) */
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+  --danger: var(--error);
+  --danger-bg: var(--error-bg);
+  --shimmer: rgba(255, 255, 255, 0.65);
 
   /* Radii scale */
   --radius-sm: 8px;
