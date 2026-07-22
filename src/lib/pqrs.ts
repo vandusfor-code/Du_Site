@@ -94,12 +94,15 @@ export async function clasificarConIA(
     });
 
     resultsCasos.forEach((r) => {
+      const aplicaPqrsf = texto(r, 2);
       options.push({
         tipo: texto(r, 3) || "PQRSF",
         dirigido: texto(r, 4) || "ÁREA INTERNA",
         clasificacion: "Guía CASOS",
         accion: texto(r, 1) || "Consultar manual de procesos",
-        recordatorio: texto(r, 2) || "Seguir lineamientos de la hoja CASOS.",
+        recordatorio: aplicaPqrsf
+          ? `¿Aplica PQRSF?: ${aplicaPqrsf}`
+          : "Seguir lineamientos de la hoja CASOS.",
         fuente: "Base CASOS",
         resumen_caso: texto(r, 0) || "Sin descripción",
       });
@@ -114,12 +117,13 @@ export async function clasificarConIA(
   } else {
     const resultsGeneral = await buscarEnHoja("GENERAL", 0, caso, 6);
     resultsGeneral.forEach((r) => {
+      const queHacer = texto(r, 2);
       options.push({
         tipo: "RESPUESTA DIRECTA",
-        dirigido: texto(r, 2) || "GENERAL",
+        dirigido: texto(r, 4) || "GENERAL",
         clasificacion: "CONOCIMIENTO ACADEMIA",
         accion: texto(r, 1) || "No hay una respuesta definida para este tema.",
-        recordatorio: "Basado estrictamente en la base GENERAL.",
+        recordatorio: queHacer || "Basado estrictamente en la base GENERAL.",
         fuente: "Hoja GENERAL",
         resumen_caso: texto(r, 0) || "Tema de consulta",
       });
