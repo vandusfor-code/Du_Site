@@ -44,6 +44,7 @@ import type {
   HorarioHoy,
   PQRSFEncontrado,
 } from "@/lib/lineaAmiga";
+import { SoundToggleButton } from "@/components/module-shell";
 
 const CLASIFICACIONES = [
   "(Felicitaciones) - FELICITACIONES",
@@ -165,6 +166,7 @@ export default function LineaAmigaDashboard({
 }) {
   const [panel, setPanel] = useState<Panel>(null);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
+  const [soundOn, setSoundOn] = useState(true);
 
   const [radicado, setRadicado] = useState("");
   const [caso, setCaso] = useState("");
@@ -208,11 +210,12 @@ export default function LineaAmigaDashboard({
   }, [panel]);
 
   const playSound = useCallback((ref: React.RefObject<HTMLAudioElement | null>) => {
+    if (!soundOn) return;
     if (ref.current) {
       ref.current.currentTime = 0;
       ref.current.play().catch(() => {});
     }
-  }, []);
+  }, [soundOn]);
 
   const mostrarToast = useCallback((msg: string, error = false) => {
     setToast({ msg, error });
@@ -447,9 +450,12 @@ export default function LineaAmigaDashboard({
             <div style={{ fontSize: 10, fontWeight: 800, color: "var(--brand-lime)", textTransform: "uppercase", marginBottom: 8 }}>
               Network Status
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 8, height: 8, background: "#10b981", borderRadius: "50%", boxShadow: "0 0 10px #10b981" }} />
-              <span style={{ fontSize: 12, fontWeight: 700 }}>Secure Node Online</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 8, height: 8, background: "#10b981", borderRadius: "50%", boxShadow: "0 0 10px #10b981" }} />
+                <span style={{ fontSize: 12, fontWeight: 700 }}>Secure Node Online</span>
+              </div>
+              <SoundToggleButton soundOn={soundOn} toggleSound={() => setSoundOn((v) => !v)} />
             </div>
           </div>
 
@@ -612,7 +618,7 @@ export default function LineaAmigaDashboard({
           <X size={20} style={{ cursor: "pointer" }} onClick={cerrarPanel} />
         </div>
         <div className="overlay-body">
-          <p style={{ fontSize: 11, color: "var(--brand-purple)", fontWeight: 700, background: "rgba(190, 220, 22, 0.2)", padding: 12, borderRadius: 10, marginBottom: 24, lineHeight: 1.4 }}>
+          <p style={{ fontSize: 11, color: "var(--brand-purple)", fontWeight: 700, background: "rgba(204, 255, 0, 0.2)", padding: 12, borderRadius: 10, marginBottom: 24, lineHeight: 1.4 }}>
             👉 Estos son los radicados con mayor similitud a tu búsqueda. Valida cuál se ajusta mejor a tu caso y copia el radicado.
           </p>
 

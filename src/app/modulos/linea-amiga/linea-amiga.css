@@ -1,9 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@700;800&display=swap');
 
 .linea-scope {
-  --brand-purple: #312B50;
-  --brand-lime: #BEDC16;
-  --brand-lime-hover: #acc814;
+  --brand-purple: #2B234F;
+  --brand-purple-deep: #1A1535;
+  --brand-lime: #CCFF00;
+  --brand-lime-hover: #b8e600;
   --bg-main: #f0f2f5;
   --bg-card: #ffffff;
   --text-dark: #0f172a;
@@ -27,6 +28,8 @@
 
 .linea-scope * { box-sizing: border-box; }
 
+.linea-scope .du-sound-btn { color: var(--brand-lime); }
+
 .linea-scope .bg-blobs { position: fixed; inset: 0; z-index: 0; overflow: hidden; filter: blur(100px); opacity: 0.4; pointer-events: none; }
 .linea-scope .blob { position: absolute; border-radius: 50%; }
 .linea-scope .blob-1 { width: 500px; height: 500px; background: var(--brand-purple); top: -100px; left: -100px; }
@@ -36,7 +39,7 @@
 
 .linea-scope .sidebar {
   width: 300px;
-  background: var(--brand-purple);
+  background: linear-gradient(160deg, var(--brand-purple), var(--brand-purple-deep));
   display: flex;
   flex-direction: column;
   padding: 40px 24px;
@@ -198,7 +201,7 @@
 }
 @keyframes linea-slideIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
 
-.linea-scope .overlay-header { padding: 32px; background: var(--brand-purple); color: white; display: flex; justify-content: space-between; align-items: center; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.linea-scope .overlay-header { padding: 32px; background: linear-gradient(135deg, var(--brand-purple), var(--brand-purple-deep)); color: white; display: flex; justify-content: space-between; align-items: center; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 .linea-scope .overlay-body { flex: 1; overflow-y: auto; padding: 32px; background: #f8fafc; }
 
 .linea-scope .search-results {
@@ -238,7 +241,7 @@
   position: fixed;
   inset: 0;
   z-index: 20000;
-  background: var(--brand-purple);
+  background: linear-gradient(160deg, var(--brand-purple), var(--brand-purple-deep));
   color: white;
   display: flex;
   flex-direction: column;

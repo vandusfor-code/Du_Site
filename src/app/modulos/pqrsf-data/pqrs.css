@@ -2,15 +2,15 @@
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 
 .pqrs-scope {
-  --lima: #B6E300;
-  --morado-profundo: #1A0B2E;
-  --morado-claro: #2E1A47;
-  --accent: #D4FF00;
+  --lima: #CCFF00;
+  --morado-profundo: #1A1535;
+  --morado-claro: #2B234F;
+  --accent: #CCFF00;
   --glass: rgba(255, 255, 255, 0.04);
   --glass-border: rgba(255, 255, 255, 0.08);
 
   font-family: 'Poppins', sans-serif;
-  background: radial-gradient(circle at top right, #24143a, #0f061b);
+  background: radial-gradient(circle at top right, #2B234F, #1A1535);
   color: #FFFFFF;
   min-height: 100vh;
   padding: 20px 0;
@@ -37,7 +37,7 @@
 }
 
 .pqrs-scope .card:hover {
-  border-color: rgba(182, 227, 0, 0.2);
+  border-color: rgba(204, 255, 0, 0.2);
   box-shadow: 0 50px 120px rgba(0,0,0,0.6);
 }
 
@@ -80,7 +80,7 @@
 .pqrs-scope input:focus {
   background: rgba(255, 255, 255, 0.1);
   border-color: var(--lima);
-  box-shadow: 0 0 20px rgba(182, 227, 0, 0.15);
+  box-shadow: 0 0 20px rgba(204, 255, 0, 0.15);
 }
 
 .pqrs-scope .btn-primary {
@@ -96,13 +96,13 @@
   transition: all 0.3s ease;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  box-shadow: 0 15px 30px rgba(182, 227, 0, 0.2);
+  box-shadow: 0 15px 30px rgba(204, 255, 0, 0.2);
 }
 
 .pqrs-scope .btn-primary:hover {
   transform: translateY(-2px);
   background: var(--accent);
-  box-shadow: 0 20px 40px rgba(182, 227, 0, 0.3);
+  box-shadow: 0 20px 40px rgba(204, 255, 0, 0.3);
 }
 
 .pqrs-scope .btn-primary:disabled {
@@ -245,7 +245,7 @@
 }
 
 .pqrs-scope .source-badge {
-  background: rgba(182, 227, 0, 0.15);
+  background: rgba(204, 255, 0, 0.15);
   color: var(--lima);
   padding: 6px 14px;
   border-radius: 8px;
@@ -253,7 +253,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
-  border: 1px solid rgba(182, 227, 0, 0.3);
+  border: 1px solid rgba(204, 255, 0, 0.3);
 }
 
 .pqrs-scope .banner-smart {
@@ -366,7 +366,7 @@
 
 .pqrs-scope .tab-btn.active {
   color: var(--lima);
-  background: rgba(182, 227, 0, 0.1);
+  background: rgba(204, 255, 0, 0.1);
 }
 
 .pqrs-scope .tab-btn:hover:not(.active) {

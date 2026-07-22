@@ -22,6 +22,9 @@ import {
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { cargarAuditoriasAction, guardarCompromisoAction } from "./actions";
 import type { AuditoriaConEstado, MetricasAsesor } from "@/lib/metricas";
+import { useModuleSound } from "@/lib/use-module-sound";
+import { useToast } from "@/lib/use-toast";
+import { ModuleTopbar, Toast } from "@/components/module-shell";
 
 Chart.register(
   BarController,
@@ -91,6 +94,8 @@ export default function MetricasDashboard({
   const [guardandoId, setGuardandoId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const { soundOn, toggleSound, playClick, playNotify } = useModuleSound();
+  const { toast, showToast } = useToast();
 
   const barraRef = useRef<HTMLDivElement>(null);
   const chartMainRef = useRef<HTMLCanvasElement>(null);
@@ -147,14 +152,14 @@ export default function MetricasDashboard({
             backgroundColor: (c) => {
               const ctx = c.chart.ctx;
               const area = c.chart.chartArea;
-              if (!area) return "#B9E22B";
+              if (!area) return "#CCFF00";
               const gradient = ctx.createLinearGradient(0, area.bottom, 0, area.top);
               if ((c.dataIndex ?? 0) % 2 === 0) {
-                gradient.addColorStop(0, "#1E1B4B");
-                gradient.addColorStop(1, "#2D2852");
+                gradient.addColorStop(0, "#1A1535");
+                gradient.addColorStop(1, "#3D3470");
               } else {
-                gradient.addColorStop(0, "#9bc220");
-                gradient.addColorStop(1, "#B9E22B");
+                gradient.addColorStop(0, "#9FCC00");
+                gradient.addColorStop(1, "#CCFF00");
               }
               return gradient;
             },
@@ -174,7 +179,7 @@ export default function MetricasDashboard({
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: "#1E1B4B",
+            backgroundColor: "#2B234F",
             titleFont: { weight: "bold", size: 12 },
             bodyFont: { weight: "bold", size: 11 },
             padding: 12,
@@ -185,7 +190,7 @@ export default function MetricasDashboard({
           datalabels: {
             anchor: "end",
             align: "top",
-            color: "#1E1B4B",
+            color: "#2B234F",
             font: { weight: "bold", size: 11 },
             formatter: (v: number) => `${v.toFixed(1)}%`,
           },
@@ -230,7 +235,7 @@ export default function MetricasDashboard({
         datasets: [
           {
             data: [creados, devueltos],
-            backgroundColor: ["#B9E22B", "#1E1B4B"],
+            backgroundColor: ["#CCFF00", "#2B234F"],
             borderWidth: 0,
           },
         ],
@@ -245,7 +250,7 @@ export default function MetricasDashboard({
             } = chart;
             ctx.save();
             ctx.font = "800 28px 'Inter', sans-serif";
-            ctx.fillStyle = "#1E1B4B";
+            ctx.fillStyle = "#2B234F";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(String(total), left + width / 2, top + height / 2 - 8);
@@ -264,11 +269,11 @@ export default function MetricasDashboard({
         plugins: {
           legend: {
             position: "bottom",
-            labels: { font: { weight: "bold", size: 11 }, color: "#1E1B4B", usePointStyle: true, pointStyle: "rectRounded", padding: 20 },
+            labels: { font: { weight: "bold", size: 11 }, color: "#2B234F", usePointStyle: true, pointStyle: "rectRounded", padding: 20 },
           },
-          tooltip: { backgroundColor: "#1E1B4B", padding: 12, cornerRadius: 10 },
+          tooltip: { backgroundColor: "#2B234F", padding: 12, cornerRadius: 10 },
           datalabels: {
-            color: (c) => (c.dataIndex === 0 ? "#1E1B4B" : "#fff"),
+            color: (c) => (c.dataIndex === 0 ? "#2B234F" : "#fff"),
             font: { weight: "bold", size: 13 },
             formatter: (v: number) => v,
           },
@@ -297,17 +302,21 @@ export default function MetricasDashboard({
     startTransition(async () => {
       const resultado = await guardarCompromisoAction(item.idGestion, item.fecha, comentario);
       if (resultado === "OK" || resultado === "YA_EXISTE") {
+        playNotify();
+        showToast("Compromiso firmado correctamente");
         const actualizadas = await cargarAuditoriasAction();
         setAuditorias(actualizadas);
       } else {
-        alert("Error al guardar. Intenta de nuevo.");
+        showToast("Error al guardar. Intenta de nuevo.");
       }
       setGuardandoId(null);
     });
   }
 
   return (
-    <div className="metricas-scope app-layout">
+    <div className="metricas-scope">
+      <ModuleTopbar moduleName="Métricas" soundOn={soundOn} toggleSound={toggleSound} />
+      <div className="app-layout">
       <aside className="sidebar">
         <div className="sidebar-brand">
           <span className="brand-text-main">People BPO</span>
@@ -316,13 +325,19 @@ export default function MetricasDashboard({
         <nav className="sidebar-menu">
           <div
             className={`menu-item ${seccion === "panel" ? "active" : ""}`}
-            onClick={() => setSeccion("panel")}
+            onClick={() => {
+              playClick();
+              setSeccion("panel");
+            }}
           >
             <i className="ph ph-squares-four" /> Panel Principal
           </div>
           <div
             className={`menu-item ${seccion === "auditorias" ? "active" : ""}`}
-            onClick={() => setSeccion("auditorias")}
+            onClick={() => {
+              playClick();
+              setSeccion("auditorias");
+            }}
           >
             <i className="ph ph-clipboard-text" /> Auditorías
             {pendientes > 0 && <span className="badge-pendientes">{pendientes}</span>}
@@ -631,6 +646,8 @@ export default function MetricasDashboard({
           </div>
         )}
       </main>
+      </div>
+      <Toast message={toast} />
     </div>
   );
 }
