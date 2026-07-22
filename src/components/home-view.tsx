@@ -17,9 +17,12 @@ function LiveClock() {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
-    setNow(new Date());
+    const initial = setTimeout(() => setNow(new Date()), 0);
     const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(id);
+    };
   }, []);
 
   if (!now) {
@@ -62,7 +65,8 @@ export function HomeView({
   const primerNombre = nombre.split(" ")[0] || nombre;
 
   useEffect(() => {
-    setSaludo(saludoPorHora(new Date().getHours()));
+    const id = setTimeout(() => setSaludo(saludoPorHora(new Date().getHours())), 0);
+    return () => clearTimeout(id);
   }, []);
 
   return (

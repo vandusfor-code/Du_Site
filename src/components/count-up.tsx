@@ -38,8 +38,10 @@ export function CountUp({
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     if (reduce) {
-      setDisplay(value);
-      return;
+      frame.current = requestAnimationFrame(() => setDisplay(value));
+      return () => {
+        if (frame.current) cancelAnimationFrame(frame.current);
+      };
     }
 
     const start = performance.now();
