@@ -122,11 +122,11 @@ export default function QuizDashboard({
   }
 
   function abrirModulo(curso: FilaObjeto) {
-    setCursoActualId(curso.ID_CURSO);
+    setCursoActualId(curso.ID_MODULO);
     setVista("modulo");
   }
 
-  const cursoActual = userData?.todosLosCursos.find((c) => c.ID_CURSO === cursoActualId);
+  const cursoActual = userData?.todosLosCursos.find((c) => c.ID_MODULO === cursoActualId);
   const notaPreviaModulo = userData?.historial.find((h) => h.idItem === cursoActualId);
 
   async function cargarExamen() {
@@ -161,12 +161,12 @@ export default function QuizDashboard({
     let aciertos = 0;
     const descErrores: string[] = [];
     preguntas.forEach((p, i) => {
-      const correcta = (p.CORRECTA || "").trim().toUpperCase();
+      const correcta = (p.RESPUESTA_CORRECTA || "").trim().toUpperCase();
       const dada = (respuestasUsuario[i] || "").toUpperCase();
       if (correcta === dada) {
         aciertos++;
       } else {
-        descErrores.push(`P${i + 1}:${respuestasUsuario[i]} (Correcta: ${p.CORRECTA})`);
+        descErrores.push(`P${i + 1}:${respuestasUsuario[i]} (Correcta: ${p.RESPUESTA_CORRECTA})`);
       }
     });
 
@@ -240,7 +240,9 @@ export default function QuizDashboard({
   const cursosAsignados = useMemo(() => {
     if (!userData) return [];
     const set = new Set(userData.asignadosCursos.map((id) => id.trim()));
-    return userData.todosLosCursos.filter((c) => set.has((c.ID_CURSO || "").trim()));
+    return userData.todosLosCursos
+      .filter((c) => set.has((c.ID_MODULO || "").trim()))
+      .sort((a, b) => (parseFloat(a.ORDEN) || 0) - (parseFloat(b.ORDEN) || 0));
   }, [userData]);
 
   const simsAsignadas = useMemo(() => {
@@ -250,7 +252,7 @@ export default function QuizDashboard({
   }, [userData]);
 
   const filtro = searchQuery.toLowerCase();
-  const cursosFiltrados = cursosAsignados.filter((c) => `${c.ID_CURSO} ${c.TITULO}`.toLowerCase().includes(filtro));
+  const cursosFiltrados = cursosAsignados.filter((c) => `${c.ID_MODULO} ${c.TITULO}`.toLowerCase().includes(filtro));
   const simsFiltradas = simsAsignadas.filter((s) => `${s.ID_SIMULACION} ${s.TITULO}`.toLowerCase().includes(filtro));
 
   const promedio = userData && userData.historial.length > 0

@@ -128,19 +128,19 @@ export function DashboardView({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {cursos.map((curso) => {
-            const notaData = historial.find((h) => h.idItem === (curso.ID_CURSO || "").trim());
+            const notaData = historial.find((h) => h.idItem === (curso.ID_MODULO || "").trim());
             const completado = !!notaData;
             const notaPct = notaData ? notaData.nota * 100 : 0;
             const aprobado = notaPct >= 70;
             return (
-              <div key={curso.ID_CURSO} onClick={() => onAbrirModulo(curso)} className="course-card p-6 flex gap-6 cursor-pointer group">
+              <div key={curso.ID_MODULO} onClick={() => onAbrirModulo(curso)} className="course-card p-6 flex gap-6 cursor-pointer group">
                 <div className="w-32 h-32 rounded-[1.5rem] overflow-hidden shrink-0 bg-slate-100 shadow-inner">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={curso.IMAGEN || "https://via.placeholder.com/150"} alt={curso.TITULO} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                  <img src={curso.URL_IMAGEN || "https://via.placeholder.com/150"} alt={curso.TITULO} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 </div>
                 <div className="flex-grow py-1">
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-[8px] font-extrabold text-indigo-500 uppercase tracking-widest">{curso.ID_CURSO}</span>
+                    <span className="text-[8px] font-extrabold text-indigo-500 uppercase tracking-widest">{curso.ID_MODULO}</span>
                     {completado && (
                       <span className={`${aprobado ? "badge-aprobado" : "badge-reprobado"} text-[7px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest`}>
                         {aprobado ? "Aprobado" : "No Aprobado"}
@@ -221,8 +221,8 @@ export function ModuloView({
       <BotonVolver onClick={onVolver} />
       <div className="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-slate-100" style={{ background: "var(--bg-card)" }}>
         <div className="aspect-video bg-[#0A0D14] shadow-2xl relative overflow-hidden">
-          {curso.LINK_CONTENIDO ? (
-            <iframe src={curso.LINK_CONTENIDO} className="w-full h-full border-none" />
+          {curso.URL_VIDEO ? (
+            <iframe src={curso.URL_VIDEO} className="w-full h-full border-none" />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
               <span className="text-white font-extrabold text-[180px] tracking-tighter">DU</span>
@@ -241,9 +241,14 @@ export function ModuloView({
             <h2 className="text-2xl md:text-3xl font-extrabold mb-3 tracking-tighter" style={{ color: "var(--primary)" }}>
               {curso.TITULO}
             </h2>
-            <div className="text-sm md:text-base mb-8 font-medium leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+            <div className="text-sm md:text-base mb-4 font-medium leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               {curso.DESCRIPCION}
             </div>
+            {curso.CONTENIDO_TEXTO && (
+              <div className="text-sm mb-8 font-medium leading-relaxed text-left bg-slate-50 rounded-2xl p-6 whitespace-pre-line" style={{ color: "var(--text-secondary)" }}>
+                {curso.CONTENIDO_TEXTO}
+              </div>
+            )}
             {!notaPrevia && (
               <button onClick={onIniciarEvaluacion} className="btn-primary btn-shimmer px-10 py-4 rounded-2xl text-[10px] uppercase tracking-[0.2em] shadow-xl mx-auto">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -482,7 +487,7 @@ export function HistorySidebar({
 
       <div className="space-y-3">
         {recientes.map((h, i) => {
-          const item = todosLosCursos.find((c) => (c.ID_CURSO || "").trim() === h.idItem) || todasLasSims.find((s) => (s.ID_SIMULACION || "").trim() === h.idItem);
+          const item = todosLosCursos.find((c) => (c.ID_MODULO || "").trim() === h.idItem) || todasLasSims.find((s) => (s.ID_SIMULACION || "").trim() === h.idItem);
           if (!item) return null;
           const aprobado = h.nota * 100 >= 70;
           return (
