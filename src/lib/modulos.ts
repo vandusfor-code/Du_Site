@@ -1,0 +1,51 @@
+export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz";
+
+export interface Modulo {
+  id: ModuloId;
+  nombre: string;
+  descripcion: string;
+  href: string;
+  color: string;
+}
+
+export const MODULOS: Modulo[] = [
+  {
+    id: "metricas",
+    nombre: "Métricas",
+    descripcion: "Indicadores y reportes de gestión.",
+    href: "/modulos/metricas",
+    color: "#2563eb",
+  },
+  {
+    id: "pqrsf-data",
+    nombre: "PQRSF DATA",
+    descripcion: "Clasificación y búsqueda inteligente de casos PQRSF.",
+    href: "/modulos/pqrsf-data",
+    color: "#16a34a",
+  },
+  {
+    id: "linea-amiga",
+    nombre: "Línea Amiga",
+    descripcion: "Radicación de PQRSF, chat y notificaciones de turno.",
+    href: "/modulos/linea-amiga",
+    color: "#0891b2",
+  },
+  {
+    id: "radicaciones",
+    nombre: "Radicaciones",
+    descripcion: "Registro y control de radicaciones.",
+    href: "/modulos/radicaciones",
+    color: "#d97706",
+  },
+  {
+    id: "quiz",
+    nombre: "DuAcademy",
+    descripcion: "Formación, evaluaciones y simulaciones con IA.",
+    href: "/modulos/quiz",
+    color: "#9333ea",
+  },
+];
+
+export function modulosPermitidos(ids: string[]): Modulo[] {
+  return MODULOS.filter((m) => ids.includes(m.id));
+}
