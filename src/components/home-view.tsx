@@ -1,17 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, Bell, CheckCircle2, ChevronDown, ClipboardCheck, GraduationCap, LogOut, Search } from "lucide-react";
-import type { Modulo } from "@/lib/modulos";
+import { useEffect, useRef, useState } from "react";
+import { ArrowUpRight, Bell, ChevronDown, Clock3, LogOut } from "lucide-react";
+import type { Modulo, ModuloId } from "@/lib/modulos";
 import { MODULO_VISUALS } from "@/components/module-icons";
-import { CountUp } from "@/components/count-up";
 
-export interface Pendientes {
-  /** Auditorías del mes sin compromiso de mejora firmado (undefined = módulo Métricas no asignado) */
-  auditorias?: number;
-  /** Cursos/simulaciones de DuAcademy asignados sin nota registrada (undefined = módulo no asignado) */
-  duacademy?: number;
+export interface TareaPendiente {
+  id: string;
+  titulo: string;
+  moduloId: ModuloId;
+  moduloNombre: string;
+  moduloHref: string;
+  /** Vacío cuando el origen no tiene una fecha asociada (ej. formación pendiente) */
+  fecha: string;
+  prioridad: "Alta" | "Media" | "Baja";
 }
 
 function saludoPorHora(h: number): string {
@@ -34,7 +37,7 @@ function useNow() {
 }
 
 function useSaludo() {
-  const [saludo, setSaludo] = useState("Bienvenido");
+  const [saludo, setSaludo] = useState("Bienvenida");
   useEffect(() => {
     const id = setTimeout(() => setSaludo(saludoPorHora(new Date().getHours())), 0);
     return () => clearTimeout(id);
@@ -42,354 +45,341 @@ function useSaludo() {
   return saludo;
 }
 
+function FlowGraphic() {
+  return (
+    <div className="relative hidden h-[150px] lg:block">
+      <div
+        className="absolute inset-0"
+        style={{ background: "radial-gradient(circle, rgba(114,87,255,0.08), transparent 65%)" }}
+        aria-hidden="true"
+      />
+      <svg viewBox="0 0 600 180" className="absolute inset-0 h-full w-full" fill="none" aria-hidden="true">
+        <path
+          d="M20 110 C120 30, 160 155, 260 80 S420 45, 580 105"
+          stroke="var(--home-purple)"
+          strokeWidth="1.5"
+          opacity="0.55"
+        />
+        <path
+          d="M40 130 C150 150, 170 40, 290 105 S440 150, 570 45"
+          stroke="var(--home-lime)"
+          strokeWidth="1.4"
+          opacity="0.5"
+        />
+        <path
+          d="M70 90 C180 45, 220 130, 330 70 S470 65, 560 110"
+          stroke="#2bb9a7"
+          strokeWidth="1"
+          opacity="0.25"
+        />
+        <circle cx="160" cy="85" r="4" fill="var(--home-purple)" />
+        <circle cx="290" cy="105" r="4" fill="var(--home-lime)" />
+        <circle cx="445" cy="74" r="3" fill="var(--home-purple)" />
+      </svg>
+    </div>
+  );
+}
+
+function UserMenu({ nombre, logoutAction }: { nombre: string; logoutAction: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const inicial = (nombre.trim().charAt(0) || "?").toUpperCase();
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-3">
+        <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-[var(--home-indigo)] text-[13px] font-bold text-white">
+          {inicial}
+          <span
+            className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-white bg-[var(--home-green)]"
+            aria-hidden="true"
+          />
+        </span>
+        <span className="hidden text-left sm:block">
+          <span className="block text-[13px] font-semibold text-[var(--home-ink)]">{nombre}</span>
+        </span>
+        <ChevronDown size={15} className={`hidden text-[var(--home-ink-muted)] transition-transform sm:block ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-52 overflow-hidden rounded-[14px] border border-[var(--home-border)] bg-white shadow-[var(--home-shadow-md)]">
+          <div className="border-b border-[var(--home-border)] px-4 py-3">
+            <p className="truncate text-[13px] font-bold text-[var(--home-ink)]">{nombre}</p>
+          </div>
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-semibold text-[#e11d48] transition-colors hover:bg-[#fff1f2]"
+            >
+              <LogOut size={15} />
+              Cerrar sesión
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PRIORIDAD_STYLE: Record<TareaPendiente["prioridad"], string> = {
+  Alta: "bg-red-50 text-red-500",
+  Media: "bg-amber-50 text-amber-600",
+  Baja: "bg-emerald-50 text-emerald-600",
+};
+
+function TaskItem({ tarea, last }: { tarea: TareaPendiente; last: boolean }) {
+  const visual = MODULO_VISUALS[tarea.moduloId];
+  const Icon = visual.icon;
+  return (
+    <Link
+      href={tarea.moduloHref}
+      className={`flex gap-3 px-6 py-4 text-left transition-colors hover:bg-[var(--home-surface-soft)] ${!last ? "border-b border-[var(--home-border)]" : ""}`}
+    >
+      <span
+        className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-[12px]"
+        style={{ backgroundColor: visual.accentBg, color: visual.accentFg }}
+      >
+        <Icon size={17} strokeWidth={1.9} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <p className="truncate text-[13px] font-semibold text-[var(--home-ink)]">{tarea.titulo}</p>
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide ${PRIORIDAD_STYLE[tarea.prioridad]}`}>
+            {tarea.prioridad}
+          </span>
+        </div>
+        <p className="mt-1 text-[11px] text-[var(--home-ink-muted)]">{tarea.moduloNombre}</p>
+        {tarea.fecha && (
+          <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-[var(--home-ink-muted)]">
+            <Clock3 size={11} />
+            {tarea.fecha}
+          </div>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+function ModuleCard({ modulo }: { modulo: Modulo }) {
+  const visual = MODULO_VISUALS[modulo.id];
+  const Icon = visual.icon;
+  return (
+    <Link
+      href={modulo.href}
+      className="group relative flex min-h-[190px] flex-col overflow-hidden rounded-[22px] border border-[var(--home-border)] bg-white/80 p-6 shadow-[var(--home-shadow-sm)] transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(90,70,200,0.15)] hover:shadow-[0_16px_40px_rgba(30,35,60,0.08)]"
+    >
+      <span
+        className="grid size-12 place-items-center rounded-[14px]"
+        style={{ backgroundColor: visual.accentBg, color: visual.accentFg }}
+      >
+        <Icon size={22} strokeWidth={1.9} />
+      </span>
+
+      <h4 className="mt-5 text-[17px] font-bold tracking-tight text-[var(--home-ink)]">{modulo.nombre}</h4>
+      <p className="mt-2 max-w-[290px] text-[13px] leading-5 text-[var(--home-ink-secondary)]">{modulo.descripcion}</p>
+
+      <span className="absolute bottom-5 right-5 grid size-9 place-items-center rounded-full border border-[var(--home-border)] bg-white text-[var(--home-purple)] transition-transform duration-200 group-hover:translate-x-0.5">
+        <ArrowUpRight size={16} />
+      </span>
+    </Link>
+  );
+}
+
+function MetricasFeaturedCard({ modulo }: { modulo: Modulo }) {
+  const visual = MODULO_VISUALS.metricas;
+  const Icon = visual.icon;
+  return (
+    <Link
+      href={modulo.href}
+      className="group relative flex min-h-[190px] flex-col overflow-hidden rounded-[22px] p-6 text-white shadow-[0_18px_45px_rgba(35,25,75,0.16)] transition duration-200 hover:-translate-y-0.5"
+      style={{ background: "linear-gradient(145deg, var(--home-indigo), var(--home-indigo-deep))" }}
+    >
+      <span className="grid size-12 place-items-center rounded-[14px] bg-white/10" style={{ color: visual.accentFg }}>
+        <Icon size={22} strokeWidth={1.9} />
+      </span>
+
+      <h4 className="mt-5 text-[18px] font-bold tracking-tight">{modulo.nombre}</h4>
+      <p className="mt-2 max-w-[260px] text-[13px] leading-5 text-white/65">{modulo.descripcion}</p>
+
+      <svg viewBox="0 0 200 60" className="pointer-events-none absolute bottom-7 right-6 h-[64px] w-[160px]" aria-hidden="true">
+        <path
+          d="M5 50 C35 45,45 35,70 38 S105 25,125 30 S160 15,195 8"
+          fill="none"
+          stroke="var(--home-lime)"
+          strokeWidth="2"
+          opacity="0.9"
+        />
+      </svg>
+
+      <span
+        className="absolute bottom-5 left-6 grid size-9 place-items-center rounded-full text-[var(--home-indigo-deep)] transition-transform duration-200 group-hover:translate-x-0.5"
+        style={{ backgroundColor: "var(--home-lime)" }}
+      >
+        <ArrowUpRight size={16} />
+      </span>
+    </Link>
+  );
+}
+
 export function HomeView({
   nombre,
   modulos,
   logoutAction,
-  pendientes,
+  tareas,
 }: {
   nombre: string;
   modulos: Modulo[];
   logoutAction: () => void;
-  pendientes?: Pendientes;
+  tareas: TareaPendiente[];
 }) {
   const saludo = useSaludo();
   const now = useNow();
   const primerNombre = nombre.split(" ")[0] || nombre;
-  const inicial = (nombre.trim().charAt(0) || "?").toUpperCase();
-
-  const [query, setQuery] = useState("");
-  const searchRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  const modulosFiltrados = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return modulos;
-    return modulos.filter(
-      (m) => m.nombre.toLowerCase().includes(q) || m.descripcion.toLowerCase().includes(q)
-    );
-  }, [modulos, query]);
 
   const hora = now
-    ? new Intl.DateTimeFormat("es-CO", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }).format(now)
-    : "--:--:--";
+    ? new Intl.DateTimeFormat("es-CO", { hour: "2-digit", minute: "2-digit", hour12: true }).format(now)
+    : "--:--";
   const fecha = now
     ? new Intl.DateTimeFormat("es-CO", { weekday: "long", day: "numeric", month: "long" }).format(now)
     : "";
 
+  const metricas = modulos.find((m) => m.id === "metricas");
+  const otrosModulos = modulos.filter((m) => m.id !== "metricas");
+  const alertas = tareas.filter((t) => t.prioridad === "Alta").length;
+
   return (
-    <div className="min-h-screen bg-white">
-      <div className="mx-auto max-w-[1600px]">
-        {/* Top bar */}
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#eef0f5] px-6 py-4 lg:px-12">
-          <div className="relative w-full max-w-xs">
-            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9aa0ac]" />
-            <input
-              ref={searchRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar módulos, reportes..."
-              className="w-full rounded-full border border-[#eef0f5] bg-[#f5f6fa] py-2.5 pl-9 pr-14 text-[13px] font-medium text-[#14142b] outline-none transition-colors placeholder:text-[#9aa0ac] focus:border-[#d8d9e6] focus:bg-white"
-            />
-            <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-[#9aa0ac]">
-              ⌘K
-            </kbd>
+    <div className="min-h-screen bg-[var(--home-bg)] text-[var(--home-ink)]">
+      {/* Header */}
+      <header className="h-[78px] border-b border-[var(--home-border)] bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-full max-w-[1500px] items-center justify-between px-6 sm:px-8 xl:px-12">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex size-11 items-center justify-center rounded-[14px] text-lg font-bold text-white shadow-sm"
+              style={{ background: "var(--home-indigo-deep)" }}
+            >
+              Du
+            </div>
+            <div>
+              <div className="text-[18px] font-bold tracking-tight text-[var(--home-ink)]">Du Site</div>
+              <div className="text-[11px] font-medium text-[var(--home-ink-muted)]">Portal de Gestión</div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-5">
-            <div className="hidden items-center gap-2 sm:flex">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa0ac" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7v5l3 3" />
-              </svg>
-              <div className="leading-tight">
-                <p className="font-mono text-[13px] font-bold tabular-nums text-[#14142b]">{hora}</p>
-                <p className="text-[11px] font-medium capitalize text-[#9aa0ac]">{fecha}</p>
-              </div>
+          <div className="flex items-center gap-5 sm:gap-6">
+            <div className="hidden text-right md:block">
+              <div className="text-[13px] font-semibold text-[var(--home-ink)]">{hora}</div>
+              <div className="text-[11px] capitalize text-[var(--home-ink-muted)]">{fecha}</div>
             </div>
 
-            <button
-              type="button"
-              title="Notificaciones"
-              className="grid size-9 shrink-0 place-items-center rounded-full text-[#6b7280] transition-colors hover:bg-[#f5f6fa] hover:text-[#2b234f]"
+            <Link
+              href="#pendientes"
+              title="Tareas de prioridad alta"
+              className="relative grid size-10 place-items-center rounded-full text-[var(--home-ink-secondary)] transition-colors hover:bg-[var(--home-surface-soft)]"
             >
-              <Bell size={17} />
-            </button>
-
-            <div className="hidden items-center gap-2 sm:flex">
-              <span className="relative grid size-9 shrink-0 place-items-center rounded-full bg-[#2b234f] text-[13px] font-bold text-white">
-                {inicial}
+              <Bell size={18} strokeWidth={1.8} />
+              {alertas > 0 && (
                 <span
-                  className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-white bg-[#22c55e]"
+                  className="absolute right-1.5 top-1.5 size-2 rounded-full"
+                  style={{ background: "var(--home-lime)" }}
                   aria-hidden="true"
                 />
-              </span>
-              <div className="leading-tight">
-                <p className="text-[13px] font-bold text-[#14142b]">{nombre}</p>
-              </div>
-              <ChevronDown size={14} className="text-[#9aa0ac]" />
-            </div>
+              )}
+            </Link>
 
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="flex items-center gap-2 rounded-full border border-[#e5e7ef] bg-white px-4 py-2 text-[13px] font-semibold text-[#14142b] transition-colors hover:border-[#fda4af] hover:bg-[#fff1f2] hover:text-[#e11d48]"
-              >
-                <LogOut size={15} />
-                <span className="hidden md:inline">Cerrar sesión</span>
-              </button>
-            </form>
+            <UserMenu nombre={nombre} logoutAction={logoutAction} />
           </div>
-        </header>
+        </div>
+      </header>
 
-        <main className="px-6 py-9 sm:px-9 sm:py-11 lg:px-12">
-          {/* Greeting */}
-          <div className="relative animate-enter overflow-hidden">
-            <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[#6d5fd4]">
+      <main className="mx-auto max-w-[1500px] px-6 pb-16 pt-10 sm:px-8 xl:px-12" style={{ paddingLeft: "clamp(24px, 5vw, 80px)", paddingRight: "clamp(24px, 5vw, 80px)" }}>
+        {/* Welcome */}
+        <section className="grid min-h-[190px] grid-cols-1 items-center gap-8 pb-6 pt-4 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="animate-enter">
+            <span className="mb-3 block text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--home-purple)]">
               Portal de Gestión
-            </p>
-            <h1 className="mt-2 text-balance text-3xl font-extrabold tracking-tight text-[#14142b] lg:text-[36px]">
-              {saludo}, {primerNombre} <span aria-hidden="true">👋</span>
+            </span>
+            <h1 className="text-[38px] font-bold leading-[0.98] tracking-[-0.04em] text-[var(--home-ink)] sm:text-[48px]">
+              {saludo}, {primerNombre}
+              <span style={{ color: "var(--home-lime)", WebkitTextStroke: "0.5px rgba(0,0,0,0.15)" }}>.</span>
             </h1>
-            <p className="mt-2 max-w-xl text-pretty text-[15px] leading-relaxed text-[#6b7280]">
-              Selecciona el módulo con el que deseas trabajar hoy. Tu acceso está
-              personalizado según tu rol en la operación.
+            <h2 className="mt-3 text-[17px] font-semibold text-[var(--home-ink-secondary)]">¿Qué deseas hacer hoy?</h2>
+            <p className="mt-2 max-w-[440px] text-[14px] leading-6 text-[var(--home-ink-muted)]">
+              Accede a tus herramientas y continúa impulsando tus resultados.
             </p>
-
-            <svg
-              className="pointer-events-none absolute -right-2 -top-4 hidden opacity-80 sm:block"
-              width="200"
-              height="100"
-              viewBox="0 0 200 100"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M4 72C32 72 32 26 58 26C84 26 84 56 110 56C136 56 136 10 162 10C174 10 180 15 190 20"
-                stroke="#16a34a"
-                strokeWidth="3"
-                strokeLinecap="round"
-                opacity="0.6"
-              />
-              <circle cx="190" cy="20" r="14" fill="#f0fdf4" />
-              <svg x="180" y="10" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth={2.2} strokeLinecap="round">
-                <path d="M4 20V10" />
-                <path d="M12 20V4" />
-                <path d="M20 20v-7" />
-              </svg>
-            </svg>
           </div>
 
-          {/* Module grid + pending tasks */}
-          <div className="mt-9 lg:grid lg:grid-cols-[1fr_300px] lg:items-start lg:gap-6">
-          {modulos.length === 0 ? (
-            <div className="animate-enter rounded-2xl border border-dashed border-[#e5e7ef] bg-[#f9fafb] p-10 text-center" style={{ animationDelay: "0.1s" }}>
-              <p className="text-[15px] font-semibold text-[#14142b]">No tienes módulos asignados</p>
-              <p className="mt-1 text-[13px] text-[#6b7280]">Contacta a un administrador para habilitar tus accesos.</p>
+          <FlowGraphic />
+        </section>
+
+        {/* Workspace */}
+        <section className="mt-4 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+          {/* Modules */}
+          <div>
+            <div className="mb-5 flex items-center gap-3">
+              <span className="h-5 w-[3px] rounded-full" style={{ background: "var(--home-purple)" }} />
+              <h3 className="text-[15px] font-bold text-[var(--home-ink)]">Tus módulos</h3>
             </div>
-          ) : modulosFiltrados.length === 0 ? (
-            <div className="animate-enter rounded-2xl border border-dashed border-[#e5e7ef] bg-[#f9fafb] p-10 text-center">
-              <p className="text-[15px] font-semibold text-[#14142b]">Sin resultados para &quot;{query}&quot;</p>
-              <p className="mt-1 text-[13px] text-[#6b7280]">Prueba con otro término de búsqueda.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              {modulosFiltrados.map((modulo, i) => {
-                const visual = MODULO_VISUALS[modulo.id];
-                const Icon = visual.icon;
-                return (
-                  <Link
-                    key={modulo.id}
-                    href={modulo.href}
-                    className="group animate-enter relative flex flex-col overflow-hidden rounded-2xl border bg-white p-6 transition-all duration-300 hover:-translate-y-1"
-                    style={{
-                      animationDelay: `${0.08 + i * 0.07}s`,
-                      borderColor: `color-mix(in srgb, ${visual.tint} 28%, #eef0f5)`,
-                      boxShadow: "0 1px 3px rgba(43,35,79,0.04), 0 10px 30px rgba(43,35,79,0.05)",
-                    }}
-                  >
-                    <div className="flex items-start justify-between">
-                      <span
-                        className="grid size-12 place-items-center rounded-xl transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-105"
-                        style={{
-                          backgroundColor: `color-mix(in srgb, ${visual.tint} 16%, white)`,
-                          color: visual.tint,
-                        }}
-                      >
-                        <Icon size={24} strokeWidth={2.1} />
-                      </span>
-                      <span
-                        className="grid size-8 place-items-center rounded-full border transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-                        style={{
-                          borderColor: `color-mix(in srgb, ${visual.tint} 40%, transparent)`,
-                          color: visual.tint,
-                        }}
-                      >
-                        <ArrowUpRight size={15} />
-                      </span>
-                    </div>
 
-                    <h2 className="mt-5 text-[16px] font-bold tracking-tight text-[#14142b]">{modulo.nombre}</h2>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-[#6b7280]">{modulo.descripcion}</p>
-
-                    <div className="mt-5 flex items-center gap-2">
-                      <span className="relative flex size-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22c55e] opacity-75" />
-                        <span className="relative inline-flex size-2 rounded-full bg-[#22c55e]" />
-                      </span>
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-[#6b7280]">Disponible</span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-
-          {pendientes && (pendientes.auditorias !== undefined || pendientes.duacademy !== undefined) && (
-            <aside
-              className="animate-enter mt-5 rounded-2xl border border-[#eef0f5] bg-[#f9fafb] p-5 lg:mt-0"
-              style={{ animationDelay: "0.2s" }}
-            >
-              <h2 className="text-[13px] font-bold text-[#14142b]">Tareas pendientes</h2>
-              <div className="mt-4 flex flex-col gap-3">
-                {pendientes.auditorias !== undefined && (
-                  <Link
-                    href="/modulos/metricas"
-                    className="flex items-start gap-3 rounded-xl border border-[#eef0f5] bg-white p-3.5 transition-colors hover:border-[#d8d9e6]"
-                  >
-                    <span
-                      className="grid size-9 shrink-0 place-items-center rounded-lg"
-                      style={{
-                        backgroundColor: pendientes.auditorias > 0 ? "#fef3c7" : "#dcfce7",
-                        color: pendientes.auditorias > 0 ? "#b45309" : "#16a34a",
-                      }}
-                    >
-                      {pendientes.auditorias > 0 ? <ClipboardCheck size={17} /> : <CheckCircle2 size={17} />}
-                    </span>
-                    <div className="leading-tight">
-                      <p className="text-[13px] font-bold text-[#14142b]">
-                        {pendientes.auditorias > 0
-                          ? `${pendientes.auditorias} auditoría${pendientes.auditorias === 1 ? "" : "s"} pendiente${pendientes.auditorias === 1 ? "" : "s"}`
-                          : "Auditorías al día"}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-[#6b7280]">
-                        {pendientes.auditorias > 0 ? "Firma tu compromiso de mejora" : "Sin compromisos por firmar"}
-                      </p>
-                    </div>
-                  </Link>
-                )}
-
-                {pendientes.duacademy !== undefined && (
-                  <Link
-                    href="/modulos/quiz"
-                    className="flex items-start gap-3 rounded-xl border border-[#eef0f5] bg-white p-3.5 transition-colors hover:border-[#d8d9e6]"
-                  >
-                    <span
-                      className="grid size-9 shrink-0 place-items-center rounded-lg"
-                      style={{
-                        backgroundColor: pendientes.duacademy > 0 ? "#fce7f3" : "#dcfce7",
-                        color: pendientes.duacademy > 0 ? "#e11d48" : "#16a34a",
-                      }}
-                    >
-                      {pendientes.duacademy > 0 ? <GraduationCap size={17} /> : <CheckCircle2 size={17} />}
-                    </span>
-                    <div className="leading-tight">
-                      <p className="text-[13px] font-bold text-[#14142b]">
-                        {pendientes.duacademy > 0
-                          ? `${pendientes.duacademy} módulo${pendientes.duacademy === 1 ? "" : "s"} de DuAcademy`
-                          : "DuAcademy al día"}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-[#6b7280]">
-                        {pendientes.duacademy > 0 ? "Tienes formación por completar" : "Sin formación pendiente"}
-                      </p>
-                    </div>
-                  </Link>
-                )}
+            {modulos.length === 0 ? (
+              <div className="rounded-[22px] border border-dashed border-[var(--home-border-strong)] bg-[var(--home-surface-soft)] p-10 text-center">
+                <p className="text-[15px] font-semibold text-[var(--home-ink)]">No tienes módulos asignados</p>
+                <p className="mt-1 text-[13px] text-[var(--home-ink-secondary)]">
+                  Contacta a un administrador para habilitar tus accesos.
+                </p>
               </div>
-            </aside>
-          )}
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {metricas && <MetricasFeaturedCard modulo={metricas} />}
+                {otrosModulos.map((modulo) => (
+                  <ModuleCard key={modulo.id} modulo={modulo} />
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Quick summary — only real, honest data */}
-          {modulos.length > 0 && (
-            <div
-              className="animate-enter mt-8 flex flex-wrap items-center gap-x-8 gap-y-4 rounded-2xl bg-[#f7f8fb] px-7 py-5"
-              style={{ animationDelay: "0.35s" }}
-            >
-              <div className="flex items-center gap-3">
-                <span className="grid size-10 place-items-center rounded-xl bg-[#dcfce7] text-[#16a34a]">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 20V10" />
-                    <path d="M12 20V4" />
-                    <path d="M20 20v-7" />
-                  </svg>
+          {/* Pending tasks */}
+          <aside
+            id="pendientes"
+            className="self-start overflow-hidden rounded-[22px] border border-[var(--home-border)] bg-white shadow-[var(--home-shadow-md)]"
+          >
+            <div className="px-6 py-6">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--home-ink-muted)]">
+                Tu agenda
+              </span>
+              <div className="mt-1 flex items-center gap-2">
+                <h3 className="text-[19px] font-bold tracking-tight text-[var(--home-ink)]">Pendientes</h3>
+                <span
+                  className="flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-bold"
+                  style={{ backgroundColor: "#ede9fe", color: "var(--home-purple)" }}
+                >
+                  {tareas.length}
                 </span>
-                <div className="leading-tight">
-                  <p className="text-lg font-extrabold text-[#14142b]">
-                    <CountUp value={modulos.length} duration={900} />
-                  </p>
-                  <p className="text-[11px] font-semibold text-[#6b7280]">Módulos asignados</p>
-                </div>
-              </div>
-
-              <div className="hidden h-9 w-px bg-[#e5e7ef] sm:block" aria-hidden="true" />
-
-              <div className="flex items-center gap-3">
-                <span className="grid size-10 place-items-center rounded-xl bg-[#ede9fe] text-[#7c3aed]">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 7v5l3 3" />
-                  </svg>
-                </span>
-                <div className="leading-tight">
-                  <p className="text-[15px] font-extrabold tabular-nums text-[#14142b]">{hora.slice(0, 5)}</p>
-                  <p className="text-[11px] font-semibold capitalize text-[#6b7280]">{fecha}</p>
-                </div>
-              </div>
-
-              <div className="hidden h-9 w-px bg-[#e5e7ef] sm:block" aria-hidden="true" />
-
-              <div className="flex items-center gap-3">
-                <span className="grid size-10 place-items-center rounded-xl bg-[#ecfdf5] text-[#22c55e]">
-                  <span className="relative flex size-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22c55e] opacity-75" />
-                    <span className="relative inline-flex size-2.5 rounded-full bg-[#22c55e]" />
-                  </span>
-                </span>
-                <div className="leading-tight">
-                  <p className="text-[13px] font-extrabold text-[#14142b]">Sesión activa</p>
-                  <p className="text-[11px] font-medium text-[#6b7280]">{nombre}</p>
-                </div>
-              </div>
-
-              <div className="hidden h-9 w-px bg-[#e5e7ef] sm:block" aria-hidden="true" />
-
-              <div className="ml-auto flex items-center gap-3">
-                <span className="grid size-10 place-items-center rounded-xl bg-[#fff7ed] text-[#ea580c]">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2l2.9 6.3 6.9.9-5 4.9 1.2 6.9-6-3.2-6 3.2 1.2-6.9-5-4.9 6.9-.9L12 2z" />
-                  </svg>
-                </span>
-                <div className="leading-tight">
-                  <p className="text-[13px] font-extrabold text-[#14142b]">People BPO</p>
-                  <p className="text-[11px] font-medium text-[#6b7280]">Portal v4.0</p>
-                </div>
               </div>
             </div>
-          )}
-        </main>
-      </div>
+
+            {tareas.length === 0 ? (
+              <div className="border-t border-[var(--home-border)] px-6 py-8 text-center">
+                <p className="text-[13px] font-semibold text-[var(--home-ink)]">Sin pendientes por ahora</p>
+                <p className="mt-1 text-[12px] text-[var(--home-ink-muted)]">Estás al día con tus módulos.</p>
+              </div>
+            ) : (
+              <div className="max-h-[520px] overflow-y-auto border-t border-[var(--home-border)]">
+                {tareas.map((tarea, i) => (
+                  <TaskItem key={tarea.id} tarea={tarea} last={i === tareas.length - 1} />
+                ))}
+              </div>
+            )}
+          </aside>
+        </section>
+      </main>
     </div>
   );
 }

@@ -66,6 +66,25 @@
   /* Easing */
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── Home screen tokens — fixed, never flip with system dark mode ── */
+  --home-bg: #f6f7fb;
+  --home-surface: #ffffff;
+  --home-surface-soft: #fafbfc;
+  --home-ink: #17152f;
+  --home-ink-secondary: #62677b;
+  --home-ink-muted: #9297a8;
+  --home-indigo: #2b205c;
+  --home-indigo-deep: #211747;
+  --home-purple: #7257ff;
+  --home-lime: #baff00;
+  --home-green: #16b978;
+  --home-border: rgba(25, 28, 50, 0.07);
+  --home-border-strong: rgba(25, 28, 50, 0.11);
+  --home-shadow-sm: 0 1px 2px rgba(20, 20, 40, 0.02), 0 8px 24px rgba(30, 35, 60, 0.04);
+  --home-shadow-md: 0 12px 35px rgba(30, 35, 60, 0.07);
+  --home-radius-md: 16px;
+  --home-radius-lg: 22px;
 }
 
 @media (prefers-color-scheme: dark) {
