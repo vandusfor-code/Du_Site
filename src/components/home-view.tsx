@@ -2,10 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, Bell, ChevronDown, LogOut, Search } from "lucide-react";
+import { ArrowUpRight, Bell, CheckCircle2, ChevronDown, ClipboardCheck, GraduationCap, LogOut, Search } from "lucide-react";
 import type { Modulo } from "@/lib/modulos";
 import { MODULO_VISUALS } from "@/components/module-icons";
 import { CountUp } from "@/components/count-up";
+
+export interface Pendientes {
+  /** Auditorías del mes sin compromiso de mejora firmado (undefined = módulo Métricas no asignado) */
+  auditorias?: number;
+  /** Cursos/simulaciones de DuAcademy asignados sin nota registrada (undefined = módulo no asignado) */
+  duacademy?: number;
+}
 
 function saludoPorHora(h: number): string {
   if (h < 12) return "Buenos días";
@@ -39,10 +46,12 @@ export function HomeView({
   nombre,
   modulos,
   logoutAction,
+  pendientes,
 }: {
   nombre: string;
   modulos: Modulo[];
   logoutAction: () => void;
+  pendientes?: Pendientes;
 }) {
   const saludo = useSaludo();
   const now = useNow();
@@ -182,19 +191,20 @@ export function HomeView({
             </svg>
           </div>
 
-          {/* Module grid */}
+          {/* Module grid + pending tasks */}
+          <div className="mt-9 lg:grid lg:grid-cols-[1fr_300px] lg:items-start lg:gap-6">
           {modulos.length === 0 ? (
-            <div className="animate-enter mt-10 rounded-2xl border border-dashed border-[#e5e7ef] bg-[#f9fafb] p-10 text-center" style={{ animationDelay: "0.1s" }}>
+            <div className="animate-enter rounded-2xl border border-dashed border-[#e5e7ef] bg-[#f9fafb] p-10 text-center" style={{ animationDelay: "0.1s" }}>
               <p className="text-[15px] font-semibold text-[#14142b]">No tienes módulos asignados</p>
               <p className="mt-1 text-[13px] text-[#6b7280]">Contacta a un administrador para habilitar tus accesos.</p>
             </div>
           ) : modulosFiltrados.length === 0 ? (
-            <div className="animate-enter mt-10 rounded-2xl border border-dashed border-[#e5e7ef] bg-[#f9fafb] p-10 text-center">
+            <div className="animate-enter rounded-2xl border border-dashed border-[#e5e7ef] bg-[#f9fafb] p-10 text-center">
               <p className="text-[15px] font-semibold text-[#14142b]">Sin resultados para &quot;{query}&quot;</p>
               <p className="mt-1 text-[13px] text-[#6b7280]">Prueba con otro término de búsqueda.</p>
             </div>
           ) : (
-            <div className="mt-9 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {modulosFiltrados.map((modulo, i) => {
                 const visual = MODULO_VISUALS[modulo.id];
                 const Icon = visual.icon;
@@ -245,6 +255,71 @@ export function HomeView({
               })}
             </div>
           )}
+
+          {pendientes && (pendientes.auditorias !== undefined || pendientes.duacademy !== undefined) && (
+            <aside
+              className="animate-enter mt-5 rounded-2xl border border-[#eef0f5] bg-[#f9fafb] p-5 lg:mt-0"
+              style={{ animationDelay: "0.2s" }}
+            >
+              <h2 className="text-[13px] font-bold text-[#14142b]">Tareas pendientes</h2>
+              <div className="mt-4 flex flex-col gap-3">
+                {pendientes.auditorias !== undefined && (
+                  <Link
+                    href="/modulos/metricas"
+                    className="flex items-start gap-3 rounded-xl border border-[#eef0f5] bg-white p-3.5 transition-colors hover:border-[#d8d9e6]"
+                  >
+                    <span
+                      className="grid size-9 shrink-0 place-items-center rounded-lg"
+                      style={{
+                        backgroundColor: pendientes.auditorias > 0 ? "#fef3c7" : "#dcfce7",
+                        color: pendientes.auditorias > 0 ? "#b45309" : "#16a34a",
+                      }}
+                    >
+                      {pendientes.auditorias > 0 ? <ClipboardCheck size={17} /> : <CheckCircle2 size={17} />}
+                    </span>
+                    <div className="leading-tight">
+                      <p className="text-[13px] font-bold text-[#14142b]">
+                        {pendientes.auditorias > 0
+                          ? `${pendientes.auditorias} auditoría${pendientes.auditorias === 1 ? "" : "s"} pendiente${pendientes.auditorias === 1 ? "" : "s"}`
+                          : "Auditorías al día"}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-[#6b7280]">
+                        {pendientes.auditorias > 0 ? "Firma tu compromiso de mejora" : "Sin compromisos por firmar"}
+                      </p>
+                    </div>
+                  </Link>
+                )}
+
+                {pendientes.duacademy !== undefined && (
+                  <Link
+                    href="/modulos/quiz"
+                    className="flex items-start gap-3 rounded-xl border border-[#eef0f5] bg-white p-3.5 transition-colors hover:border-[#d8d9e6]"
+                  >
+                    <span
+                      className="grid size-9 shrink-0 place-items-center rounded-lg"
+                      style={{
+                        backgroundColor: pendientes.duacademy > 0 ? "#fce7f3" : "#dcfce7",
+                        color: pendientes.duacademy > 0 ? "#e11d48" : "#16a34a",
+                      }}
+                    >
+                      {pendientes.duacademy > 0 ? <GraduationCap size={17} /> : <CheckCircle2 size={17} />}
+                    </span>
+                    <div className="leading-tight">
+                      <p className="text-[13px] font-bold text-[#14142b]">
+                        {pendientes.duacademy > 0
+                          ? `${pendientes.duacademy} módulo${pendientes.duacademy === 1 ? "" : "s"} de DuAcademy`
+                          : "DuAcademy al día"}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-[#6b7280]">
+                        {pendientes.duacademy > 0 ? "Tienes formación por completar" : "Sin formación pendiente"}
+                      </p>
+                    </div>
+                  </Link>
+                )}
+              </div>
+            </aside>
+          )}
+          </div>
 
           {/* Quick summary — only real, honest data */}
           {modulos.length > 0 && (
