@@ -15,9 +15,9 @@ export interface ModuloVisual {
 }
 
 export const MODULO_VISUALS: Record<ModuloId, ModuloVisual> = {
-  metricas: { icon: ChartColumnBig, tint: "#2b234f" },
-  "pqrsf-data": { icon: ScanSearch, tint: "#2563eb" },
+  metricas: { icon: ChartColumnBig, tint: "#16a34a" },
+  "pqrsf-data": { icon: ScanSearch, tint: "#7c3aed" },
   "linea-amiga": { icon: Headset, tint: "#0d9488" },
-  radicaciones: { icon: FolderKanban, tint: "#d97706" },
+  radicaciones: { icon: FolderKanban, tint: "#ea580c" },
   quiz: { icon: GraduationCap, tint: "#e11d48" },
 };
