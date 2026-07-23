@@ -150,13 +150,13 @@ function TaskItem({ tarea, last }: { tarea: TareaPendiente; last: boolean }) {
         <Icon size={17} strokeWidth={1.9} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <p className="truncate text-[13px] font-semibold text-[var(--home-ink)]">{tarea.titulo}</p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-[var(--home-ink)]">{tarea.titulo}</p>
           <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide ${PRIORIDAD_STYLE[tarea.prioridad]}`}>
             {tarea.prioridad}
           </span>
         </div>
-        <p className="mt-1 text-[11px] text-[var(--home-ink-muted)]">{tarea.moduloNombre}</p>
+        <p className="mt-1.5 text-[11px] text-[var(--home-ink-muted)]">{tarea.moduloNombre}</p>
         {tarea.fecha && (
           <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-[var(--home-ink-muted)]">
             <Clock3 size={11} />
