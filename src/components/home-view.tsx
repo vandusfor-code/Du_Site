@@ -79,10 +79,10 @@ export function HomeView({
     : "";
 
   return (
-    <div className="min-h-screen bg-[#eef0f6] p-3 sm:p-5">
-      <div className="mx-auto max-w-[1180px] overflow-hidden rounded-[28px] bg-white shadow-[0_30px_80px_rgba(43,35,79,0.1)]">
+    <div className="min-h-screen bg-white">
+      <div className="mx-auto max-w-[1600px]">
         {/* Top bar */}
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#eef0f5] px-6 py-4">
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#eef0f5] px-6 py-4 lg:px-12">
           <div className="relative w-full max-w-xs">
             <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9aa0ac]" />
             <input
@@ -144,7 +144,7 @@ export function HomeView({
           </div>
         </header>
 
-        <main className="px-6 py-9 sm:px-9 sm:py-11">
+        <main className="px-6 py-9 sm:px-9 sm:py-11 lg:px-12">
           {/* Greeting */}
           <div className="relative animate-enter overflow-hidden">
             <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[#6d5fd4]">
