@@ -259,7 +259,7 @@ export function HomeView({
     <div className="min-h-screen bg-[var(--home-bg)] text-[var(--home-ink)]">
       {/* Header */}
       <header className="h-[78px] border-b border-[var(--home-border)] bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-full max-w-[1500px] items-center justify-between px-6 sm:px-8 xl:px-12">
+        <div className="mx-auto flex h-full max-w-[1920px] items-center justify-between px-6 sm:px-8 xl:px-14">
           <div className="flex items-center gap-3">
             <div
               className="flex size-11 items-center justify-center rounded-[14px] text-lg font-bold text-white shadow-sm"
@@ -299,7 +299,7 @@ export function HomeView({
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1500px] px-6 pb-16 pt-10 sm:px-8 xl:px-12" style={{ paddingLeft: "clamp(24px, 5vw, 80px)", paddingRight: "clamp(24px, 5vw, 80px)" }}>
+      <main className="mx-auto max-w-[1920px] pb-16 pt-10" style={{ paddingLeft: "clamp(24px, 4vw, 96px)", paddingRight: "clamp(24px, 4vw, 96px)" }}>
         {/* Welcome */}
         <section className="grid min-h-[190px] grid-cols-1 items-center gap-8 pb-6 pt-4 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="animate-enter">
