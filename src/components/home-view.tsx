@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   Bell,
-  Calendar,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -14,10 +13,7 @@ import {
   ClipboardCheck,
   Clock3,
   LogOut,
-  Rocket,
   SlidersHorizontal,
-  Target,
-  TrendingUp,
 } from "lucide-react";
 import type { Modulo, ModuloId } from "@/lib/modulos";
 import { MODULO_VISUALS } from "@/components/module-icons";
@@ -182,21 +178,6 @@ export function HomeView({
   const progresoMensaje =
     progresoPct >= 80 ? "¡Estás haciendo un gran trabajo! 💚" : progresoPct >= 50 ? "Vas por buen camino, sigue así." : "Aún tienes pendientes por resolver.";
 
-  const periodoSemana = now
-    ? (() => {
-        const inicio = new Date(now);
-        const diaSemana = (now.getDay() + 6) % 7; // lunes = 0
-        inicio.setDate(now.getDate() - diaSemana);
-        const fin = new Date(inicio);
-        fin.setDate(inicio.getDate() + 6);
-        const mismomes = inicio.getMonth() === fin.getMonth();
-        const mesFin = fin.toLocaleDateString("es-CO", { month: "long" });
-        return mismomes
-          ? `${inicio.getDate()} – ${fin.getDate()} de ${mesFin}`
-          : `${inicio.getDate()} ${inicio.toLocaleDateString("es-CO", { month: "long" })} – ${fin.getDate()} ${mesFin}`;
-      })()
-    : "";
-
   return (
     <div className="dusite-home">
       <header className="topbar">
@@ -290,49 +271,14 @@ export function HomeView({
 
           <div className="middleRow">
             <article className="progressCard">
-              <div className="progressDots" aria-hidden="true" />
-              <div className="progressTop">
-                <div className="ring" style={{ background: `conic-gradient(var(--lime-dark) 0 ${progresoPct}%, #e9eaf1 ${progresoPct}%)` }}>
-                  <strong>{progresoPct}%</strong>
-                  <small>Completado</small>
-                </div>
-                <div>
-                  <div className="progressLabel">
-                    <i aria-hidden="true">
-                      <TrendingUp size={16} />
-                    </i>
-                    <span>Tu progreso semanal</span>
-                  </div>
-                  <b>
-                    {data?.progresoLabel ?? "—"} <i />
-                  </b>
-                  <div className="progress">
-                    <i style={{ width: `${progresoPct}%` }} />
-                  </div>
-                </div>
+              <span>Tu progreso semanal</span>
+              <b>
+                {progresoPct}% · {data?.progresoLabel ?? "—"} <i />
+              </b>
+              <div className="progress">
+                <i style={{ width: `${progresoPct}%` }} />
               </div>
-              <div className="progressBadge">
-                <b aria-hidden="true">
-                  <Rocket size={15} />
-                </b>
-                <span>{progresoMensaje}</span>
-              </div>
-              <div className="progressFooter">
-                <div>
-                  <Calendar size={18} aria-hidden="true" />
-                  <div>
-                    <span>Período</span>
-                    <b>{periodoSemana}</b>
-                  </div>
-                </div>
-                <div>
-                  <Target size={18} aria-hidden="true" />
-                  <div>
-                    <span>Objetivo semanal</span>
-                    <b>100%</b>
-                  </div>
-                </div>
-              </div>
+              <small>{progresoMensaje}</small>
             </article>
 
             {data?.resumen && (
