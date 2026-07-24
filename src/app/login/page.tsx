@@ -29,7 +29,7 @@ export default async function LoginPage({
   const year = new Date().getFullYear();
 
   return (
-    <main className="relative flex min-h-screen w-full overflow-hidden bg-brand-deep">
+    <main className="relative flex min-h-screen w-full items-center justify-center gap-14 overflow-hidden bg-brand-deep px-6 py-16 lg:gap-16 lg:px-10">
       {/* shared background texture — one color across the whole page */}
       <div className="dot-grid absolute inset-0 opacity-70" aria-hidden="true" />
       <div
@@ -46,26 +46,23 @@ export default async function LoginPage({
         aria-hidden="true"
       />
 
-      {/* ── Brand panel ── */}
-      <section className="relative z-10 hidden w-[45%] flex-col lg:flex">
-        <div className="shrink-0 p-12 pb-0">
-          <BrandLogo size={46} showWordmark onDark />
-        </div>
+      {/* ── Brand column ── */}
+      <section className="relative z-10 hidden w-full max-w-md flex-col lg:flex">
+        <BrandLogo size={46} showWordmark onDark />
 
-        <div className="flex min-h-0 flex-1 flex-col justify-center px-12 py-8">
-          <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-accent">
-            Portal operativo
-          </span>
-          <h1 className="mt-4 max-w-md text-balance text-4xl font-extrabold leading-[1.1] tracking-tight text-white">
-            Excelencia operativa, todo en un solo lugar.
-          </h1>
-          <p className="mt-4 max-w-sm text-pretty text-[15px] leading-relaxed text-white/60">
-            Unifica métricas, gestión de casos y formación de tu equipo BPO en
-            una plataforma pensada para jornadas largas.
-          </p>
+        <span className="mt-10 inline-flex w-fit items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-accent">
+          Portal operativo
+        </span>
+        <h1 className="mt-4 text-balance text-4xl font-extrabold leading-[1.1] tracking-tight text-white">
+          Excelencia operativa, todo en un solo lugar.
+        </h1>
+        <p className="mt-4 max-w-sm text-pretty text-[15px] leading-relaxed text-white/60">
+          Unifica métricas, gestión de casos y formación de tu equipo BPO en
+          una plataforma pensada para jornadas largas.
+        </p>
 
-          {/* Floating dashboard illustration — one tight row, no drift */}
-          <div className="mt-7 flex flex-wrap items-end gap-3" aria-hidden="true">
+        {/* Floating dashboard illustration — one tight row, no drift */}
+        <div className="mt-7 flex flex-wrap items-end gap-3" aria-hidden="true">
             <div
               className="animate-float w-28 shrink-0 rounded-xl border border-white/10 bg-white/[0.06] p-3 shadow-2xl backdrop-blur-md"
               style={{ animationDelay: "0.4s" }}
@@ -132,9 +129,8 @@ export default async function LoginPage({
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="shrink-0 space-y-4 p-12 pt-0">
+        <div className="mt-10 space-y-4">
           {HIGHLIGHTS.map(({ icon: Icon, title, desc }, i) => (
             <div
               key={title}
@@ -156,7 +152,7 @@ export default async function LoginPage({
       </section>
 
       {/* ── Form panel — a card floating on the same background ── */}
-      <section className="relative z-10 flex w-full flex-col items-center justify-center px-6 py-10 lg:w-[55%] lg:justify-start lg:pt-20">
+      <section className="relative z-10 flex w-full max-w-sm flex-col items-center lg:w-auto">
         <div className="animate-scale-in w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.05] p-8 shadow-2xl backdrop-blur-md">
           <div className="flex flex-col items-center text-center">
             <div className="relative mb-6">
