@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Clock3, LogOut } from "lucide-react";
 import type { Modulo, ModuloId } from "@/lib/modulos";
 import { useModuleSound } from "@/lib/use-module-sound";
+import { MODULO_VISUALS } from "@/components/module-icons";
 
 export interface TareaPendiente {
   id: string;
@@ -199,6 +200,64 @@ const PRIORIDAD_DOT: Record<TareaPendiente["prioridad"], string> = {
   Baja: "#5D8A00",
 };
 
+function ModuloIlustrativo({ modulo, onNavigate }: { modulo: Modulo; onNavigate: () => void }) {
+  const visual = MODULO_VISUALS[modulo.id];
+  const Icon = visual.icon;
+  return (
+    <Link
+      href={modulo.href}
+      onClick={onNavigate}
+      className="home-card"
+      style={{
+        background: "#fff",
+        borderRadius: 18,
+        padding: 18,
+        minWidth: 0,
+        boxShadow: "0 4px 16px rgba(43,35,79,0.05)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        textAlign: "center",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 14 }}>
+        <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>
+          {modulo.nombre}
+        </span>
+        <span style={{ color: "#C4C9D6", fontSize: 13 }}>→</span>
+      </div>
+
+      <div style={{ position: "relative", width: 84, height: 84, marginBottom: 14 }}>
+        <span
+          style={{ position: "absolute", top: 0, right: 4, width: 22, height: 22, borderRadius: "50%", background: visual.accentBg, opacity: 0.7 }}
+        />
+        <span
+          style={{ position: "absolute", bottom: 2, left: 0, width: 14, height: 14, borderRadius: "50%", background: visual.accentBg }}
+        />
+        <span
+          style={{
+            position: "absolute",
+            inset: 0,
+            margin: "auto",
+            width: 64,
+            height: 64,
+            borderRadius: "50%",
+            background: visual.accentBg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: visual.accentFg,
+          }}
+        >
+          <Icon size={28} strokeWidth={1.8} />
+        </span>
+      </div>
+
+      <p style={{ fontSize: 11.5, color: "#9AA0AC", fontWeight: 600, lineHeight: 1.4, margin: 0 }}>{modulo.descripcion}</p>
+    </Link>
+  );
+}
+
 export function HomeView({
   nombre,
   modulos,
@@ -219,9 +278,6 @@ export function HomeView({
 
   const { countdown: turnoCountdown, label: turnoLabel } = useTurnoCountdown(data?.turno.horario ?? null);
   const { mesLabel, dias: calDias, diaActual } = useCalendario();
-
-  const tieneModulo = (id: ModuloId) => modulos.some((m) => m.id === id);
-  const hrefModulo = (id: ModuloId) => modulos.find((m) => m.id === id)?.href ?? "/";
 
   const progresoPct = data?.progresoPct ?? 0;
   const progresoAngulo = Math.round((progresoPct / 100) * 360);
@@ -325,147 +381,11 @@ export function HomeView({
 
         {/* Middle column */}
         <div className="home-fade" style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0, animationDelay: "0.08s" }}>
-          {(tieneModulo("metricas") || tieneModulo("pqrsf-data")) && (
-            <div style={{ display: "grid", gridTemplateColumns: tieneModulo("metricas") && tieneModulo("pqrsf-data") ? "2fr 1fr" : "1fr", gap: 14, minWidth: 0 }}>
-              {tieneModulo("metricas") && (
-                <Link
-                  href={hrefModulo("metricas")}
-                  onClick={playClick}
-                  className="home-card"
-                  style={{ background: "#fff", borderRadius: 18, padding: 18, minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)", display: "block" }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>
-                      {data?.calidad?.label ?? "Métricas"}
-                    </span>
-                    <span style={{ color: "#C4C9D6", fontSize: 13 }}>→</span>
-                  </div>
-                  {data?.calidad ? (
-                    <>
-                      <div style={{ fontSize: 26, fontWeight: 900, color: "#1A1535", letterSpacing: -0.6, marginBottom: 2 }}>{data.calidad.valor}</div>
-                      <div style={{ fontSize: 11, color: "#9AA0AC", fontWeight: 600, marginBottom: 12 }}>Indicador actual de tu área</div>
-                      <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: data.calidad.valor, background: "#7C6FCB", borderRadius: 99 }} />
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ fontSize: 13, color: "#9AA0AC", fontWeight: 600 }}>Ver mis indicadores →</div>
-                  )}
-                </Link>
-              )}
-              {tieneModulo("pqrsf-data") && (
-                <Link
-                  href={hrefModulo("pqrsf-data")}
-                  onClick={playClick}
-                  className="home-card"
-                  style={{ background: "#fff", borderRadius: 18, padding: 18, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)", display: "flex", flexDirection: "column" }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>PQRSF DATA</span>
-                    <span style={{ color: "#C4C9D6", fontSize: 13 }}>→</span>
-                  </div>
-                  {data?.pqrsf ? (
-                    <>
-                      <div style={{ fontSize: 26, fontWeight: 900, color: "#1A1535", letterSpacing: -0.6, marginBottom: 2 }}>
-                        {data.pqrsf.casosEnBase.toLocaleString("es-CO")}
-                      </div>
-                      <div style={{ fontSize: 11, color: "#9AA0AC", fontWeight: 600, marginBottom: "auto" }}>Casos en base</div>
-                      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, marginTop: 10, height: 32 }}>
-                        {data.pqrsf.consultasPorDia.map((v, i) => {
-                          const max = Math.max(1, ...data.pqrsf!.consultasPorDia);
-                          return <div key={i} style={{ flex: 1, background: "#0D9488", borderRadius: "3px 3px 1px 1px", height: `${Math.max(8, (v / max) * 100)}%` }} />;
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ fontSize: 13, color: "#9AA0AC", fontWeight: 600, marginTop: "auto" }}>Buscar y clasificar casos →</div>
-                  )}
-                </Link>
-              )}
-            </div>
-          )}
-
-          {(tieneModulo("radicaciones") || tieneModulo("quiz") || tieneModulo("linea-amiga")) && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${[tieneModulo("radicaciones"), tieneModulo("quiz"), tieneModulo("linea-amiga")].filter(Boolean).length}, 1fr)`,
-                gap: 14,
-                minWidth: 0,
-              }}
-            >
-              {tieneModulo("radicaciones") && (
-                <Link
-                  href={hrefModulo("radicaciones")}
-                  onClick={playClick}
-                  className="home-card"
-                  style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Radicaciones</span>
-                  </div>
-                  {data?.cardRadicaciones ? (
-                    <>
-                      <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardRadicaciones.hoy}</div>
-                      <div style={{ fontSize: 10.5, color: "#9AA0AC", fontWeight: 600, marginBottom: 9 }}>Radicaciones registradas hoy</div>
-                      <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
-                        <div style={{ height: "100%", width: `${Math.min(100, data.cardRadicaciones.hoy * 10)}%`, background: "#EA580C", borderRadius: 99 }} />
-                      </div>
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>{data.cardRadicaciones.mes} este mes</div>
-                    </>
-                  ) : (
-                    <div style={{ fontSize: 13, color: "#9AA0AC", fontWeight: 600 }}>Ir al módulo →</div>
-                  )}
-                </Link>
-              )}
-              {tieneModulo("quiz") && (
-                <Link
-                  href={hrefModulo("quiz")}
-                  onClick={playClick}
-                  className="home-card"
-                  style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Du Academy</span>
-                  </div>
-                  {data?.cardDuAcademy ? (
-                    <>
-                      <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardDuAcademy.pct}%</div>
-                      <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
-                        <div style={{ height: "100%", width: `${data.cardDuAcademy.pct}%`, background: "#DB2777", borderRadius: 99 }} />
-                      </div>
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>Progreso general</div>
-                    </>
-                  ) : (
-                    <div style={{ fontSize: 13, color: "#9AA0AC", fontWeight: 600 }}>Ir al módulo →</div>
-                  )}
-                </Link>
-              )}
-              {tieneModulo("linea-amiga") && (
-                <Link
-                  href={hrefModulo("linea-amiga")}
-                  onClick={playClick}
-                  className="home-card"
-                  style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                    <span className="home-pulse-green" style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
-                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Línea Amiga</span>
-                  </div>
-                  {data?.cardLineaAmiga ? (
-                    <>
-                      <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardLineaAmiga.hoy}</div>
-                      <div style={{ fontSize: 10.5, color: "#9AA0AC", fontWeight: 600, marginBottom: 9 }}>PQRSF registrados hoy</div>
-                      <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
-                        <div style={{ height: "100%", width: `${Math.min(100, data.cardLineaAmiga.hoy * 10)}%`, background: "#2563EB", borderRadius: 99 }} />
-                      </div>
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>{turnoLabel}</div>
-                    </>
-                  ) : (
-                    <div style={{ fontSize: 13, color: "#9AA0AC", fontWeight: 600 }}>Ir al módulo →</div>
-                  )}
-                </Link>
-              )}
+          {modulos.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, minWidth: 0 }}>
+              {modulos.map((modulo) => (
+                <ModuloIlustrativo key={modulo.id} modulo={modulo} onNavigate={playClick} />
+              ))}
             </div>
           )}
 
