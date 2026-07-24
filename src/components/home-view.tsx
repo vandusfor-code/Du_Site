@@ -219,6 +219,7 @@ export function HomeView({
   const { countdown: turnoCountdown, label: turnoLabel } = useTurnoCountdown(data?.turno.horario ?? null);
   const { mesLabel, dias: calDias, diaActual } = useCalendario();
 
+  const tieneModulo = (id: ModuloId) => modulos.some((m) => m.id === id);
   const hrefModulo = (id: ModuloId) => modulos.find((m) => m.id === id)?.href ?? "/";
 
   const progresoPct = data?.progresoPct ?? 0;
@@ -318,80 +319,120 @@ export function HomeView({
 
         {/* Middle column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
-          {(data?.calidad || data?.pqrsf) && (
-            <div style={{ display: "grid", gridTemplateColumns: data?.calidad && data?.pqrsf ? "2fr 1fr" : "1fr", gap: 14, minWidth: 0 }}>
-              {data?.calidad && (
-                <div style={{ background: "#fff", borderRadius: 18, padding: 18, minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}>
+          {(tieneModulo("metricas") || tieneModulo("pqrsf-data")) && (
+            <div style={{ display: "grid", gridTemplateColumns: tieneModulo("metricas") && tieneModulo("pqrsf-data") ? "2fr 1fr" : "1fr", gap: 14, minWidth: 0 }}>
+              {tieneModulo("metricas") && (
+                <Link href={hrefModulo("metricas")} style={{ background: "#fff", borderRadius: 18, padding: 18, minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)", display: "block" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>{data.calidad.label}</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>
+                      {data?.calidad?.label ?? "Métricas"}
+                    </span>
+                    <span style={{ color: "#C4C9D6", fontSize: 13 }}>→</span>
                   </div>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: "#1A1535", letterSpacing: -0.6, marginBottom: 2 }}>{data.calidad.valor}</div>
-                  <div style={{ fontSize: 11, color: "#9AA0AC", fontWeight: 600, marginBottom: 12 }}>Indicador actual de tu área</div>
-                  <svg width="100%" height="34" viewBox="0 0 300 34" preserveAspectRatio="none" style={{ display: "block" }}>
-                    <polyline points="0,17 300,17" fill="none" stroke="#E5E4F2" strokeWidth="2.5" strokeLinecap="round" />
-                  </svg>
-                </div>
+                  {data?.calidad ? (
+                    <>
+                      <div style={{ fontSize: 26, fontWeight: 900, color: "#1A1535", letterSpacing: -0.6, marginBottom: 2 }}>{data.calidad.valor}</div>
+                      <div style={{ fontSize: 11, color: "#9AA0AC", fontWeight: 600, marginBottom: 12 }}>Indicador actual de tu área</div>
+                      <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: data.calidad.valor, background: "#7C6FCB", borderRadius: 99 }} />
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#9AA0AC", fontWeight: 600 }}>Ver mis indicadores →</div>
+                  )}
+                </Link>
               )}
-              {data?.pqrsf && (
+              {tieneModulo("pqrsf-data") && (
                 <Link href={hrefModulo("pqrsf-data")} style={{ background: "#fff", borderRadius: 18, padding: 18, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)", display: "flex", flexDirection: "column" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                     <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>PQRSF DATA</span>
                     <span style={{ color: "#C4C9D6", fontSize: 13 }}>→</span>
                   </div>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: "#1A1535", letterSpacing: -0.6, marginBottom: 2 }}>
-                    {data.pqrsf.casosEnBase.toLocaleString("es-CO")}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#9AA0AC", fontWeight: 600, marginBottom: "auto" }}>Casos en base</div>
-                  <div style={{ display: "flex", alignItems: "flex-end", gap: 4, marginTop: 10, height: 32 }}>
-                    {data.pqrsf.consultasPorDia.map((v, i) => {
-                      const max = Math.max(1, ...data.pqrsf!.consultasPorDia);
-                      return <div key={i} style={{ flex: 1, background: "#0D9488", borderRadius: "3px 3px 1px 1px", height: `${Math.max(8, (v / max) * 100)}%` }} />;
-                    })}
-                  </div>
+                  {data?.pqrsf ? (
+                    <>
+                      <div style={{ fontSize: 26, fontWeight: 900, color: "#1A1535", letterSpacing: -0.6, marginBottom: 2 }}>
+                        {data.pqrsf.casosEnBase.toLocaleString("es-CO")}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#9AA0AC", fontWeight: 600, marginBottom: "auto" }}>Casos en base</div>
+                      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, marginTop: 10, height: 32 }}>
+                        {data.pqrsf.consultasPorDia.map((v, i) => {
+                          const max = Math.max(1, ...data.pqrsf!.consultasPorDia);
+                          return <div key={i} style={{ flex: 1, background: "#0D9488", borderRadius: "3px 3px 1px 1px", height: `${Math.max(8, (v / max) * 100)}%` }} />;
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#9AA0AC", fontWeight: 600, marginTop: "auto" }}>Buscar y clasificar casos →</div>
+                  )}
                 </Link>
               )}
             </div>
           )}
 
-          {(data?.cardRadicaciones || data?.cardDuAcademy || data?.cardLineaAmiga) && (
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${[data?.cardRadicaciones, data?.cardDuAcademy, data?.cardLineaAmiga].filter(Boolean).length}, 1fr)`, gap: 14, minWidth: 0 }}>
-              {data?.cardRadicaciones && (
+          {(tieneModulo("radicaciones") || tieneModulo("quiz") || tieneModulo("linea-amiga")) && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${[tieneModulo("radicaciones"), tieneModulo("quiz"), tieneModulo("linea-amiga")].filter(Boolean).length}, 1fr)`,
+                gap: 14,
+                minWidth: 0,
+              }}
+            >
+              {tieneModulo("radicaciones") && (
                 <Link href={hrefModulo("radicaciones")} style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                     <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Radicaciones</span>
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardRadicaciones.hoy}</div>
-                  <div style={{ fontSize: 10.5, color: "#9AA0AC", fontWeight: 600, marginBottom: 9 }}>Radicaciones registradas hoy</div>
-                  <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
-                    <div style={{ height: "100%", width: `${Math.min(100, data.cardRadicaciones.hoy * 10)}%`, background: "#EA580C", borderRadius: 99 }} />
-                  </div>
-                  <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>{data.cardRadicaciones.mes} este mes</div>
+                  {data?.cardRadicaciones ? (
+                    <>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardRadicaciones.hoy}</div>
+                      <div style={{ fontSize: 10.5, color: "#9AA0AC", fontWeight: 600, marginBottom: 9 }}>Radicaciones registradas hoy</div>
+                      <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
+                        <div style={{ height: "100%", width: `${Math.min(100, data.cardRadicaciones.hoy * 10)}%`, background: "#EA580C", borderRadius: 99 }} />
+                      </div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>{data.cardRadicaciones.mes} este mes</div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#9AA0AC", fontWeight: 600 }}>Ir al módulo →</div>
+                  )}
                 </Link>
               )}
-              {data?.cardDuAcademy && (
+              {tieneModulo("quiz") && (
                 <Link href={hrefModulo("quiz")} style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                     <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Du Academy</span>
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardDuAcademy.pct}%</div>
-                  <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
-                    <div style={{ height: "100%", width: `${data.cardDuAcademy.pct}%`, background: "#DB2777", borderRadius: 99 }} />
-                  </div>
-                  <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>Progreso general</div>
+                  {data?.cardDuAcademy ? (
+                    <>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardDuAcademy.pct}%</div>
+                      <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
+                        <div style={{ height: "100%", width: `${data.cardDuAcademy.pct}%`, background: "#DB2777", borderRadius: 99 }} />
+                      </div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>Progreso general</div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#9AA0AC", fontWeight: 600 }}>Ir al módulo →</div>
+                  )}
                 </Link>
               )}
-              {data?.cardLineaAmiga && (
+              {tieneModulo("linea-amiga") && (
                 <Link href={hrefModulo("linea-amiga")} style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
                     <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Línea Amiga</span>
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardLineaAmiga.hoy}</div>
-                  <div style={{ fontSize: 10.5, color: "#9AA0AC", fontWeight: 600, marginBottom: 9 }}>PQRSF registrados hoy</div>
-                  <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
-                    <div style={{ height: "100%", width: `${Math.min(100, data.cardLineaAmiga.hoy * 10)}%`, background: "#2563EB", borderRadius: 99 }} />
-                  </div>
-                  <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>{turnoLabel}</div>
+                  {data?.cardLineaAmiga ? (
+                    <>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardLineaAmiga.hoy}</div>
+                      <div style={{ fontSize: 10.5, color: "#9AA0AC", fontWeight: 600, marginBottom: 9 }}>PQRSF registrados hoy</div>
+                      <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
+                        <div style={{ height: "100%", width: `${Math.min(100, data.cardLineaAmiga.hoy * 10)}%`, background: "#2563EB", borderRadius: 99 }} />
+                      </div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>{turnoLabel}</div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#9AA0AC", fontWeight: 600 }}>Ir al módulo →</div>
+                  )}
                 </Link>
               )}
             </div>
@@ -416,6 +457,25 @@ export function HomeView({
                   </div>
                 ))}
               </div>
+              {data.resumenSemanal.serie.length > 1 && (
+                <svg width="100%" height="44" viewBox="0 0 300 44" preserveAspectRatio="none" style={{ display: "block", marginBottom: 12 }}>
+                  <polyline
+                    points={data.resumenSemanal.serie
+                      .map((v, i) => {
+                        const max = Math.max(1, ...data.resumenSemanal!.serie);
+                        const x = (i / (data.resumenSemanal!.serie.length - 1)) * 300;
+                        const y = 40 - (v / max) * 36;
+                        return `${x},${y}`;
+                      })
+                      .join(" ")}
+                    fill="none"
+                    stroke="#7C6FCB"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
               {data.resumenSemanal.areas.length > 0 && (
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   {data.resumenSemanal.areas.map((ta) => (
@@ -429,6 +489,7 @@ export function HomeView({
                 </div>
               )}
               <p style={{ marginTop: 10, fontSize: 9.5, color: "#B8C4D9", fontWeight: 600 }}>
+                {data.resumenSemanal.serie.length > 1 ? "Consultas en PQRSF DATA, últimos 6 días. " : ""}
                 Distribución de actividad real entre tus módulos este mes.
               </p>
             </div>
