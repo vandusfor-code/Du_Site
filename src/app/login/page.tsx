@@ -48,12 +48,12 @@ export default async function LoginPage({
           aria-hidden="true"
         />
 
-        <div className="relative z-10 p-12">
+        <div className="relative z-10 shrink-0 p-12 pb-0">
           <BrandLogo size={46} showWordmark onDark />
         </div>
 
-        <div className="relative z-10 px-12 pb-2">
-          <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-accent">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-center px-12 py-8">
+          <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-accent">
             Portal operativo
           </span>
           <h1 className="mt-4 max-w-md text-balance text-4xl font-extrabold leading-[1.1] tracking-tight text-white">
@@ -63,78 +63,78 @@ export default async function LoginPage({
             Unifica métricas, gestión de casos y formación de tu equipo BPO en
             una plataforma pensada para jornadas largas.
           </p>
-        </div>
 
-        {/* Floating dashboard illustration */}
-        <div className="relative z-10 mt-2 h-52 px-12" aria-hidden="true">
-          <div
-            className="animate-float absolute right-8 top-0 w-48 rounded-xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl backdrop-blur-md"
-            style={{ animationDelay: "0.4s" }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-white/60">Desempeño</span>
-              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">
-                +24.6%
-              </span>
-            </div>
-            <svg viewBox="0 0 120 40" className="mt-3 h-10 w-full" preserveAspectRatio="none">
-              <polyline
-                points="0,32 20,26 40,30 60,14 80,20 100,6 120,10"
-                fill="none"
-                stroke="var(--accent)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-
-          <div
-            className="animate-float absolute left-0 top-24 w-36 rounded-xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl backdrop-blur-md"
-            style={{ animationDelay: "1.3s" }}
-          >
-            <div className="relative mx-auto grid size-16 place-items-center">
-              <svg viewBox="0 0 36 36" className="size-16 -rotate-90">
-                <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="3" />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.5"
+          {/* Floating dashboard illustration — self-contained column, no absolute drift */}
+          <div className="mt-8 flex w-64 flex-col" aria-hidden="true">
+            <div
+              className="animate-float ml-auto w-44 rounded-xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl backdrop-blur-md"
+              style={{ animationDelay: "0.4s" }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-white/60">Desempeño</span>
+                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">
+                  +24.6%
+                </span>
+              </div>
+              <svg viewBox="0 0 120 40" className="mt-3 h-10 w-full" preserveAspectRatio="none">
+                <polyline
+                  points="0,32 20,26 40,30 60,14 80,20 100,6 120,10"
                   fill="none"
                   stroke="var(--accent)"
-                  strokeWidth="3"
+                  strokeWidth="2.5"
                   strokeLinecap="round"
-                  strokeDasharray="81.8 97.4"
+                  strokeLinejoin="round"
                 />
               </svg>
-              <span className="absolute text-sm font-bold text-white">84%</span>
             </div>
-            <p className="mt-2 text-center text-[11px] font-medium text-white/60">Casos resueltos</p>
-          </div>
 
-          <div
-            className="animate-float absolute right-2 top-40 w-44 rounded-xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl backdrop-blur-md"
-            style={{ animationDelay: "2.1s" }}
-          >
-            <p className="text-[11px] font-semibold text-white/70">Auditorías</p>
-            <div className="mt-2 space-y-1.5 text-[11px]">
-              <div className="flex justify-between">
-                <span className="text-white/50">Hoy</span>
-                <span className="font-bold text-white">12</span>
+            <div
+              className="animate-float -mt-6 w-36 rounded-xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl backdrop-blur-md"
+              style={{ animationDelay: "1.3s" }}
+            >
+              <div className="relative mx-auto grid size-16 place-items-center">
+                <svg viewBox="0 0 36 36" className="size-16 -rotate-90">
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="3" />
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15.5"
+                    fill="none"
+                    stroke="var(--accent)"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeDasharray="81.8 97.4"
+                  />
+                </svg>
+                <span className="absolute text-sm font-bold text-white">84%</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-white/50">Esta semana</span>
-                <span className="font-bold text-white">48</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-white/50">Pendientes</span>
-                <span className="font-bold text-accent">7</span>
+              <p className="mt-2 text-center text-[11px] font-medium text-white/60">Casos resueltos</p>
+            </div>
+
+            <div
+              className="animate-float -mt-6 ml-auto w-44 rounded-xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl backdrop-blur-md"
+              style={{ animationDelay: "2.1s" }}
+            >
+              <p className="text-[11px] font-semibold text-white/70">Auditorías</p>
+              <div className="mt-2 space-y-1.5 text-[11px]">
+                <div className="flex justify-between">
+                  <span className="text-white/50">Hoy</span>
+                  <span className="font-bold text-white">12</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/50">Esta semana</span>
+                  <span className="font-bold text-white">48</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/50">Pendientes</span>
+                  <span className="font-bold text-accent">7</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="relative z-10 mt-auto space-y-4 p-12 pt-6">
+        <div className="relative z-10 shrink-0 space-y-4 p-12 pt-0">
           {HIGHLIGHTS.map(({ icon: Icon, title, desc }, i) => (
             <div
               key={title}
