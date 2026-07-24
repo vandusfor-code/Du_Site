@@ -121,6 +121,7 @@ function UserMenu({ nombre, logoutAction }: { nombre: string; logoutAction: () =
 
       {open && (
         <div
+          onClick={(e) => e.stopPropagation()}
           style={{
             position: "absolute",
             right: 0,
