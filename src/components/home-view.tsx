@@ -88,7 +88,8 @@ function parseHora(h?: string): Date | null {
 function useTurnoCountdown(horario: HorarioNormalizado | null) {
   const now = useNow();
 
-  if (!horario || !now) return { countdown: "--:--", label: "Sincronizando turno..." };
+  if (!horario) return { countdown: "--:--", label: "Sin turno asignado hoy" };
+  if (!now) return { countdown: "--:--", label: "Sincronizando turno..." };
 
   const [inicioTxt, finTxt] = (horario.jornada ?? "").split(" a ");
   const inicio = parseHora(inicioTxt);
@@ -255,7 +256,15 @@ export function HomeView({
 
       <div
         className="home-grid"
-        style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 40px 60px", display: "grid", gridTemplateColumns: "260px minmax(0,1.3fr) 280px", gap: 20, alignItems: "start" }}
+        style={{
+          maxWidth: 1760,
+          margin: "0 auto",
+          padding: "28px clamp(24px,4vw,64px) 60px",
+          display: "grid",
+          gridTemplateColumns: "300px minmax(0,1.3fr) 320px",
+          gap: 24,
+          alignItems: "start",
+        }}
       >
         {/* Left column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
