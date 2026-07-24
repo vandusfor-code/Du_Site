@@ -195,3 +195,50 @@ export async function guardarRegistro(usuario: string, consulta: string): Promis
   const fecha = new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" });
   await appendRow(id, "Registros!A:C", [fecha, usuario, consulta]);
 }
+
+export interface ResumenPqrsf {
+  /** Total de registros reales en las bases DATA + CASOS + GENERAL */
+  casosEnBase: number;
+  /** Consultas registradas por día, últimos 6 días (más antiguo primero) */
+  consultasPorDia: number[];
+}
+
+function fechaBogotaISO(fecha: Date): string {
+  return fecha.toLocaleDateString("sv-SE", { timeZone: "America/Bogota" });
+}
+
+export async function obtenerResumenPqrsf(): Promise<ResumenPqrsf> {
+  try {
+    const id = sheetId();
+    const [dataRaw, casosRaw, generalRaw, registrosRaw] = await Promise.all([
+      readRange(id, "DATA"),
+      readRange(id, "CASOS"),
+      readRange(id, "GENERAL"),
+      readRange(id, "Registros", { unformatted: true }),
+    ]);
+
+    const casosEnBase =
+      Math.max(0, dataRaw.length - 1) + Math.max(0, casosRaw.length - 1) + Math.max(0, generalRaw.length - 1);
+
+    const dias: string[] = [];
+    const hoy = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(hoy);
+      d.setDate(d.getDate() - i);
+      dias.push(fechaBogotaISO(d));
+    }
+    const conteos = new Map(dias.map((d) => [d, 0]));
+    for (let i = 1; i < registrosRaw.length; i++) {
+      const raw = registrosRaw[i][0];
+      const fecha = typeof raw === "string" ? new Date(raw.replace(" ", "T")) : null;
+      if (!fecha || isNaN(fecha.getTime())) continue;
+      const iso = fechaBogotaISO(fecha);
+      if (conteos.has(iso)) conteos.set(iso, (conteos.get(iso) ?? 0) + 1);
+    }
+    const consultasPorDia = dias.map((d) => conteos.get(d) ?? 0);
+
+    return { casosEnBase, consultasPorDia };
+  } catch {
+    return { casosEnBase: 0, consultasPorDia: [0, 0, 0, 0, 0, 0] };
+  }
+}

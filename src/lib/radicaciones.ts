@@ -164,6 +164,27 @@ export async function obtenerResumenHoy(usuario: string): Promise<ResumenHoy> {
   }
 }
 
+export async function obtenerResumenMes(usuario: string): Promise<number> {
+  try {
+    const id = sheetId();
+    const data = await readRange(id, "GESTIONES", { unformatted: true });
+    const uNorm = normalize(usuario);
+    const { mes, anio } = hoyEnBogota();
+
+    let total = 0;
+    for (let i = 1; i < data.length; i++) {
+      const fecha = parseSheetDate(data[i][0]);
+      if (!fecha) continue;
+      if (fecha.getUTCMonth() !== mes || fecha.getUTCFullYear() !== anio) continue;
+      if (normalize(data[i][2]) !== uNorm) continue;
+      total++;
+    }
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
 export interface HistorialItem {
   fecha: string;
   radicado: string;

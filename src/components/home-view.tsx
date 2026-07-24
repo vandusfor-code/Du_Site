@@ -1,10 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Bell, ChevronDown, Clock3, LogOut } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Clock3, LogOut } from "lucide-react";
 import type { Modulo, ModuloId } from "@/lib/modulos";
-import { MODULO_VISUALS } from "@/components/module-icons";
 
 export interface TareaPendiente {
   id: string;
@@ -12,9 +12,34 @@ export interface TareaPendiente {
   moduloId: ModuloId;
   moduloNombre: string;
   moduloHref: string;
-  /** Vacío cuando el origen no tiene una fecha asociada (ej. formación pendiente) */
   fecha: string;
   prioridad: "Alta" | "Media" | "Baja";
+}
+
+export interface HorarioNormalizado {
+  jornada?: string;
+  almuerzo?: string;
+  break1?: string;
+  break2?: string;
+}
+
+export interface HomeData {
+  progresoPct: number;
+  progresoLabel: string;
+  calidad: { label: string; valor: string } | null;
+  turno: { horario: HorarioNormalizado | null; moduloOrigen: "linea-amiga" | "radicaciones" | null };
+  pqrsf: { casosEnBase: number; consultasPorDia: number[] } | null;
+  cardRadicaciones: { hoy: number; mes: number } | null;
+  cardDuAcademy: { pct: number } | null;
+  cardLineaAmiga: { hoy: number } | null;
+  resumenSemanal: {
+    compromisos: number;
+    firmados: number;
+    pendientes: number;
+    vencidos: number;
+    serie: number[];
+    areas: { label: string; color: string; pct: number }[];
+  } | null;
 }
 
 function saludoPorHora(h: number): string {
@@ -45,39 +70,68 @@ function useSaludo() {
   return saludo;
 }
 
-function FlowGraphic() {
-  return (
-    <div className="relative hidden h-[150px] lg:block">
-      <div
-        className="absolute inset-0"
-        style={{ background: "radial-gradient(circle, rgba(114,87,255,0.08), transparent 65%)" }}
-        aria-hidden="true"
-      />
-      <svg viewBox="0 0 600 180" className="absolute inset-0 h-full w-full" fill="none" aria-hidden="true">
-        <path
-          d="M20 110 C120 30, 160 155, 260 80 S420 45, 580 105"
-          stroke="var(--home-purple)"
-          strokeWidth="1.5"
-          opacity="0.55"
-        />
-        <path
-          d="M40 130 C150 150, 170 40, 290 105 S440 150, 570 45"
-          stroke="var(--home-lime)"
-          strokeWidth="1.4"
-          opacity="0.5"
-        />
-        <path
-          d="M70 90 C180 45, 220 130, 330 70 S470 65, 560 110"
-          stroke="#2bb9a7"
-          strokeWidth="1"
-          opacity="0.25"
-        />
-        <circle cx="160" cy="85" r="4" fill="var(--home-purple)" />
-        <circle cx="290" cy="105" r="4" fill="var(--home-lime)" />
-        <circle cx="445" cy="74" r="3" fill="var(--home-purple)" />
-      </svg>
-    </div>
-  );
+function parseHora(h?: string): Date | null {
+  if (!h) return null;
+  const clean = h.trim();
+  if (!clean || clean === "-" || /descanso/i.test(clean)) return null;
+  const m = clean.toLowerCase().match(/(\d+):(\d+)\s*(am|pm)/);
+  if (!m) return null;
+  let hrs = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  if (m[3] === "pm" && hrs < 12) hrs += 12;
+  if (m[3] === "am" && hrs === 12) hrs = 0;
+  const d = new Date();
+  d.setHours(hrs, min, 0, 0);
+  return d;
+}
+
+function useTurnoCountdown(horario: HorarioNormalizado | null) {
+  const now = useNow();
+
+  if (!horario || !now) return { countdown: "--:--", label: "Sincronizando turno..." };
+
+  const [inicioTxt, finTxt] = (horario.jornada ?? "").split(" a ");
+  const inicio = parseHora(inicioTxt);
+  const fin = parseHora(finTxt);
+  const [b1Txt] = (horario.break1 ?? "").split(" a ");
+  const [b2Txt] = (horario.break2 ?? "").split(" a ");
+  const [almTxt] = (horario.almuerzo ?? "").split(" a ");
+
+  const eventos = [
+    { t: parseHora(b1Txt), l: "tu break" },
+    { t: parseHora(almTxt), l: "tu almuerzo" },
+    { t: parseHora(b2Txt), l: "tu break" },
+    { t: fin, l: "el fin de tu jornada" },
+  ].filter((e): e is { t: Date; l: string } => !!e.t);
+
+  eventos.sort((a, b) => a.t.getTime() - b.t.getTime());
+  const proximo = eventos.find((e) => e.t > now);
+
+  if (!inicio || !fin || now < inicio || now > fin) {
+    return { countdown: "--:--", label: "Fuera de turno" };
+  }
+  if (!proximo) return { countdown: "--:--", label: "Sin más eventos hoy" };
+
+  const diff = Math.max(0, proximo.t.getTime() - now.getTime());
+  const mm = Math.floor(diff / 60000);
+  const ss = Math.floor((diff % 60000) / 1000);
+  return { countdown: `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`, label: `hasta ${proximo.l}` };
+}
+
+function useCalendario() {
+  const [hoy, setHoy] = useState<Date | null>(null);
+  useEffect(() => {
+    const id = setTimeout(() => setHoy(new Date()), 0);
+    return () => clearTimeout(id);
+  }, []);
+
+  if (!hoy) return { mesLabel: "", dias: [] as number[], diaActual: -1 };
+
+  const mesLabelRaw = hoy.toLocaleDateString("es-CO", { month: "long", year: "numeric" });
+  const mesLabel = mesLabelRaw.charAt(0).toUpperCase() + mesLabelRaw.slice(1);
+  const diasEnMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+  const dias = Array.from({ length: diasEnMes }, (_, i) => i + 1);
+  return { mesLabel, dias, diaActual: hoy.getDate() };
 }
 
 function UserMenu({ nombre, logoutAction }: { nombre: string; logoutAction: () => void }) {
@@ -95,30 +149,20 @@ function UserMenu({ nombre, logoutAction }: { nombre: string; logoutAction: () =
 
   return (
     <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-3">
-        <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-[var(--home-indigo)] text-[13px] font-bold text-white">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-2.5">
+        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#2B234F] text-[11px] font-bold text-[#CCFF00]">
           {inicial}
-          <span
-            className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-white bg-[var(--home-green)]"
-            aria-hidden="true"
-          />
         </span>
-        <span className="hidden text-left sm:block">
-          <span className="block text-[13px] font-semibold text-[var(--home-ink)]">{nombre}</span>
-        </span>
-        <ChevronDown size={15} className={`hidden text-[var(--home-ink-muted)] transition-transform sm:block ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={14} className={`hidden text-[#9AA0AC] transition-transform sm:block ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-52 overflow-hidden rounded-[14px] border border-[var(--home-border)] bg-white shadow-[var(--home-shadow-md)]">
-          <div className="border-b border-[var(--home-border)] px-4 py-3">
-            <p className="truncate text-[13px] font-bold text-[var(--home-ink)]">{nombre}</p>
+        <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-52 overflow-hidden rounded-[14px] border border-[rgba(23,19,33,0.06)] bg-white shadow-[0_12px_35px_rgba(30,35,60,0.12)]">
+          <div className="border-b border-[rgba(23,19,33,0.06)] px-4 py-3">
+            <p className="truncate text-[13px] font-bold text-[#1A1535]">{nombre}</p>
           </div>
           <form action={logoutAction}>
-            <button
-              type="submit"
-              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-semibold text-[#e11d48] transition-colors hover:bg-[#fff1f2]"
-            >
+            <button type="submit" className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-semibold text-[#e11d48] transition-colors hover:bg-[#fff1f2]">
               <LogOut size={15} />
               Cerrar sesión
             </button>
@@ -129,257 +173,350 @@ function UserMenu({ nombre, logoutAction }: { nombre: string; logoutAction: () =
   );
 }
 
-const PRIORIDAD_STYLE: Record<TareaPendiente["prioridad"], string> = {
-  Alta: "bg-red-50 text-red-500",
-  Media: "bg-amber-50 text-amber-600",
-  Baja: "bg-emerald-50 text-emerald-600",
+function SoundIcon({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <div onClick={onClick} style={{ cursor: "pointer" }} title={on ? "Silenciar sonido" : "Activar sonido"}>
+      {on ? (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M11 5L6 9H2v6h4l5 4V5z" />
+          <path d="M15.5 8.5a5 5 0 010 7" />
+        </svg>
+      ) : (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M11 5L6 9H2v6h4l5 4V5z" />
+          <path d="M23 9l-6 6M17 9l6 6" />
+        </svg>
+      )}
+    </div>
+  );
+}
+
+const PRIORIDAD_DOT: Record<TareaPendiente["prioridad"], string> = {
+  Alta: "#DC2626",
+  Media: "#B45309",
+  Baja: "#5D8A00",
 };
-
-function TaskItem({ tarea, last }: { tarea: TareaPendiente; last: boolean }) {
-  const visual = MODULO_VISUALS[tarea.moduloId];
-  const Icon = visual.icon;
-  return (
-    <Link
-      href={tarea.moduloHref}
-      className={`flex gap-3 px-6 py-4 text-left transition-colors hover:bg-[var(--home-surface-soft)] ${!last ? "border-b border-[var(--home-border)]" : ""}`}
-    >
-      <span
-        className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-[12px]"
-        style={{ backgroundColor: visual.accentBg, color: visual.accentFg }}
-      >
-        <Icon size={17} strokeWidth={1.9} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-[var(--home-ink)]">{tarea.titulo}</p>
-          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide ${PRIORIDAD_STYLE[tarea.prioridad]}`}>
-            {tarea.prioridad}
-          </span>
-        </div>
-        <p className="mt-1.5 text-[11px] text-[var(--home-ink-muted)]">{tarea.moduloNombre}</p>
-        {tarea.fecha && (
-          <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-[var(--home-ink-muted)]">
-            <Clock3 size={11} />
-            {tarea.fecha}
-          </div>
-        )}
-      </div>
-    </Link>
-  );
-}
-
-function ModuleCard({ modulo }: { modulo: Modulo }) {
-  const visual = MODULO_VISUALS[modulo.id];
-  const Icon = visual.icon;
-  return (
-    <Link
-      href={modulo.href}
-      className="group relative flex min-h-[190px] flex-col overflow-hidden rounded-[22px] border border-[var(--home-border)] bg-white/80 p-6 shadow-[var(--home-shadow-sm)] transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(90,70,200,0.15)] hover:shadow-[0_16px_40px_rgba(30,35,60,0.08)]"
-    >
-      <span
-        className="grid size-12 place-items-center rounded-[14px]"
-        style={{ backgroundColor: visual.accentBg, color: visual.accentFg }}
-      >
-        <Icon size={22} strokeWidth={1.9} />
-      </span>
-
-      <h4 className="mt-5 text-[17px] font-bold tracking-tight text-[var(--home-ink)]">{modulo.nombre}</h4>
-      <p className="mt-2 max-w-[290px] text-[13px] leading-5 text-[var(--home-ink-secondary)]">{modulo.descripcion}</p>
-
-      <span className="absolute bottom-5 right-5 grid size-9 place-items-center rounded-full border border-[var(--home-border)] bg-white text-[var(--home-purple)] transition-transform duration-200 group-hover:translate-x-0.5">
-        <ArrowUpRight size={16} />
-      </span>
-    </Link>
-  );
-}
-
-function MetricasFeaturedCard({ modulo }: { modulo: Modulo }) {
-  const visual = MODULO_VISUALS.metricas;
-  const Icon = visual.icon;
-  return (
-    <Link
-      href={modulo.href}
-      className="group relative flex min-h-[190px] flex-col overflow-hidden rounded-[22px] p-6 text-white shadow-[0_18px_45px_rgba(35,25,75,0.16)] transition duration-200 hover:-translate-y-0.5"
-      style={{ background: "linear-gradient(145deg, var(--home-indigo), var(--home-indigo-deep))" }}
-    >
-      <span className="grid size-12 place-items-center rounded-[14px] bg-white/10" style={{ color: visual.accentFg }}>
-        <Icon size={22} strokeWidth={1.9} />
-      </span>
-
-      <h4 className="mt-5 text-[18px] font-bold tracking-tight">{modulo.nombre}</h4>
-      <p className="mt-2 max-w-[260px] text-[13px] leading-5 text-white/65">{modulo.descripcion}</p>
-
-      <svg viewBox="0 0 200 60" className="pointer-events-none absolute bottom-7 right-6 h-[64px] w-[160px]" aria-hidden="true">
-        <path
-          d="M5 50 C35 45,45 35,70 38 S105 25,125 30 S160 15,195 8"
-          fill="none"
-          stroke="var(--home-lime)"
-          strokeWidth="2"
-          opacity="0.9"
-        />
-      </svg>
-
-      <span
-        className="absolute bottom-5 left-6 grid size-9 place-items-center rounded-full text-[var(--home-indigo-deep)] transition-transform duration-200 group-hover:translate-x-0.5"
-        style={{ backgroundColor: "var(--home-lime)" }}
-      >
-        <ArrowUpRight size={16} />
-      </span>
-    </Link>
-  );
-}
 
 export function HomeView({
   nombre,
   modulos,
   logoutAction,
   tareas,
+  data,
 }: {
   nombre: string;
   modulos: Modulo[];
   logoutAction: () => void;
   tareas: TareaPendiente[];
+  data: HomeData | null;
 }) {
   const saludo = useSaludo();
-  const now = useNow();
   const primerNombre = nombre.split(" ")[0] || nombre;
-
-  const hora = now
-    ? new Intl.DateTimeFormat("es-CO", { hour: "2-digit", minute: "2-digit", hour12: true }).format(now)
-    : "--:--";
-  const fecha = now
-    ? new Intl.DateTimeFormat("es-CO", { weekday: "long", day: "numeric", month: "long" }).format(now)
-    : "";
-
-  const metricas = modulos.find((m) => m.id === "metricas");
-  const otrosModulos = modulos.filter((m) => m.id !== "metricas");
+  const [soundOn, setSoundOn] = useState(true);
   const alertas = tareas.filter((t) => t.prioridad === "Alta").length;
 
+  const { countdown: turnoCountdown, label: turnoLabel } = useTurnoCountdown(data?.turno.horario ?? null);
+  const { mesLabel, dias: calDias, diaActual } = useCalendario();
+
+  const hrefModulo = (id: ModuloId) => modulos.find((m) => m.id === id)?.href ?? "/";
+
+  const progresoPct = data?.progresoPct ?? 0;
+  const progresoAngulo = Math.round((progresoPct / 100) * 360);
+
   return (
-    <div className="min-h-screen bg-[var(--home-bg)] text-[var(--home-ink)]">
+    <div style={{ minHeight: "100vh", background: "#F5F4FA", fontFamily: "'Inter', sans-serif", color: "#171321" }}>
       {/* Header */}
-      <header className="h-[78px] border-b border-[var(--home-border)] bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-full max-w-[1920px] items-center justify-between px-6 sm:px-8 xl:px-14">
-          <div className="flex items-center gap-3">
-            <div
-              className="flex size-11 items-center justify-center rounded-[14px] text-lg font-bold text-white shadow-sm"
-              style={{ background: "var(--home-indigo-deep)" }}
-            >
-              Du
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 40px", background: "#fff", borderBottom: "1px solid rgba(23,19,33,0.06)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: "#2B234F", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <span style={{ color: "#CCFF00", fontWeight: 800, fontSize: 12 }}>Du</span>
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 800, color: "#2B234F" }}>Du Site</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#F5F4FA", borderRadius: 12, padding: 5 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", background: "#2B234F", padding: "8px 16px", borderRadius: 9 }}>Inicio</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#8B90A0", padding: "8px 16px" }}>Calendario</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#8B90A0", padding: "8px 16px" }}>Analítica</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <SoundIcon on={soundOn} onClick={() => setSoundOn((v) => !v)} />
+          <Link href="#pendientes" style={{ position: "relative", color: "#6B7280", cursor: "pointer", display: "flex" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+              <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.7 21a2 2 0 01-3.4 0" />
+            </svg>
+            {alertas > 0 && (
+              <span style={{ position: "absolute", top: -2, right: -2, width: 6, height: 6, borderRadius: "50%", background: "#CCFF00", border: "1.5px solid #fff" }} />
+            )}
+          </Link>
+          <UserMenu nombre={nombre} logoutAction={logoutAction} />
+        </div>
+      </div>
+
+      <div
+        className="home-grid"
+        style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 40px 60px", display: "grid", gridTemplateColumns: "260px minmax(0,1.3fr) 280px", gap: 20, alignItems: "start" }}
+      >
+        {/* Left column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 22, padding: 24, boxShadow: "0 4px 20px rgba(43,35,79,0.05)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#1A1535", marginBottom: 4 }}>Hola, {primerNombre}.</div>
+            <div style={{ fontSize: 12, color: "#9AA0AC", fontWeight: 500, lineHeight: 1.5, marginBottom: 18 }}>
+              {saludo}. {tareas.length > 0 ? `Tienes ${tareas.length} pendiente${tareas.length === 1 ? "" : "s"} por resolver esta semana.` : "Estás al día con tus módulos."}
             </div>
-            <div>
-              <div className="text-[18px] font-bold tracking-tight text-[var(--home-ink)]">Du Site</div>
-              <div className="text-[11px] font-medium text-[var(--home-ink-muted)]">Portal de Gestión</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: "50%",
+                  background: `conic-gradient(#CCFF00 0deg ${progresoAngulo}deg, #F0F1F6 ${progresoAngulo}deg 360deg)`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, color: "#1A1535" }}>
+                  {progresoPct}%
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9AA0AC" }}>Tu progreso</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#1A1535" }}>{data?.progresoLabel ?? "—"}</div>
+              </div>
+            </div>
+            <Link href="#pendientes" style={{ display: "block", background: "#2B234F", color: "#CCFF00", textAlign: "center", padding: 12, borderRadius: 13, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+              Ver agenda
+            </Link>
+          </div>
+
+          <div style={{ position: "relative", width: "100%", height: 170, flexShrink: 0, borderRadius: 22, overflow: "hidden" }}>
+            <Image src="/trabajo-en-equipo.webp" alt="Trabajo en equipo: juntos logramos más" fill style={{ objectFit: "cover" }} />
+          </div>
+
+          {data?.turno.horario && (
+            <div style={{ background: "linear-gradient(155deg,#2B234F,#1A1535)", borderRadius: 22, padding: "20px 22px", position: "relative", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#CCFF00" }} />
+                <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 9.5, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase" }}>Tu turno</span>
+              </div>
+              <div style={{ color: "#fff", fontSize: 26, fontWeight: 900, letterSpacing: -0.8, fontVariantNumeric: "tabular-nums" }}>{turnoCountdown}</div>
+              <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10.5, fontWeight: 600 }}>{turnoLabel}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Middle column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+          {(data?.calidad || data?.pqrsf) && (
+            <div style={{ display: "grid", gridTemplateColumns: data?.calidad && data?.pqrsf ? "2fr 1fr" : "1fr", gap: 14, minWidth: 0 }}>
+              {data?.calidad && (
+                <div style={{ background: "#fff", borderRadius: 18, padding: 18, minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>{data.calidad.label}</span>
+                  </div>
+                  <div style={{ fontSize: 26, fontWeight: 900, color: "#1A1535", letterSpacing: -0.6, marginBottom: 2 }}>{data.calidad.valor}</div>
+                  <div style={{ fontSize: 11, color: "#9AA0AC", fontWeight: 600, marginBottom: 12 }}>Indicador actual de tu área</div>
+                  <svg width="100%" height="34" viewBox="0 0 300 34" preserveAspectRatio="none" style={{ display: "block" }}>
+                    <polyline points="0,17 300,17" fill="none" stroke="#E5E4F2" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              )}
+              {data?.pqrsf && (
+                <Link href={hrefModulo("pqrsf-data")} style={{ background: "#fff", borderRadius: 18, padding: 18, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)", display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>PQRSF DATA</span>
+                    <span style={{ color: "#C4C9D6", fontSize: 13 }}>→</span>
+                  </div>
+                  <div style={{ fontSize: 26, fontWeight: 900, color: "#1A1535", letterSpacing: -0.6, marginBottom: 2 }}>
+                    {data.pqrsf.casosEnBase.toLocaleString("es-CO")}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#9AA0AC", fontWeight: 600, marginBottom: "auto" }}>Casos en base</div>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 4, marginTop: 10, height: 32 }}>
+                    {data.pqrsf.consultasPorDia.map((v, i) => {
+                      const max = Math.max(1, ...data.pqrsf!.consultasPorDia);
+                      return <div key={i} style={{ flex: 1, background: "#0D9488", borderRadius: "3px 3px 1px 1px", height: `${Math.max(8, (v / max) * 100)}%` }} />;
+                    })}
+                  </div>
+                </Link>
+              )}
+            </div>
+          )}
+
+          {(data?.cardRadicaciones || data?.cardDuAcademy || data?.cardLineaAmiga) && (
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${[data?.cardRadicaciones, data?.cardDuAcademy, data?.cardLineaAmiga].filter(Boolean).length}, 1fr)`, gap: 14, minWidth: 0 }}>
+              {data?.cardRadicaciones && (
+                <Link href={hrefModulo("radicaciones")} style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Radicaciones</span>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardRadicaciones.hoy}</div>
+                  <div style={{ fontSize: 10.5, color: "#9AA0AC", fontWeight: 600, marginBottom: 9 }}>Radicaciones registradas hoy</div>
+                  <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
+                    <div style={{ height: "100%", width: `${Math.min(100, data.cardRadicaciones.hoy * 10)}%`, background: "#EA580C", borderRadius: 99 }} />
+                  </div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>{data.cardRadicaciones.mes} este mes</div>
+                </Link>
+              )}
+              {data?.cardDuAcademy && (
+                <Link href={hrefModulo("quiz")} style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Du Academy</span>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardDuAcademy.pct}%</div>
+                  <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
+                    <div style={{ height: "100%", width: `${data.cardDuAcademy.pct}%`, background: "#DB2777", borderRadius: 99 }} />
+                  </div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>Progreso general</div>
+                </Link>
+              )}
+              {data?.cardLineaAmiga && (
+                <Link href={hrefModulo("linea-amiga")} style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
+                    <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Línea Amiga</span>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "#1A1535", letterSpacing: -0.4, marginBottom: 3 }}>{data.cardLineaAmiga.hoy}</div>
+                  <div style={{ fontSize: 10.5, color: "#9AA0AC", fontWeight: 600, marginBottom: 9 }}>PQRSF registrados hoy</div>
+                  <div style={{ width: "100%", height: 6, background: "#F0F1F6", borderRadius: 99, overflow: "hidden", marginBottom: 8 }}>
+                    <div style={{ height: "100%", width: `${Math.min(100, data.cardLineaAmiga.hoy * 10)}%`, background: "#2563EB", borderRadius: 99 }} />
+                  </div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6B7280" }}>{turnoLabel}</div>
+                </Link>
+              )}
+            </div>
+          )}
+
+          {data?.resumenSemanal && (
+            <div style={{ background: "#fff", borderRadius: 22, padding: "18px 20px", boxShadow: "0 4px 20px rgba(43,35,79,0.05)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#1A1535" }}>Resumen de compromisos</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#6B7280", background: "#F4F5F9", padding: "4px 10px", borderRadius: 8 }}>Este mes</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                {[
+                  { label: "Compromisos", value: data.resumenSemanal.compromisos, color: "#2563EB" },
+                  { label: "Firmados", value: data.resumenSemanal.firmados, color: "#0D9488" },
+                  { label: "Pendientes", value: data.resumenSemanal.pendientes, color: "#B45309" },
+                  { label: "Vencidos (+5 días)", value: data.resumenSemanal.vencidos, color: "#DB2777" },
+                ].map((w) => (
+                  <div key={w.label} style={{ flex: 1, minWidth: 90 }}>
+                    <div style={{ fontSize: 13, fontWeight: 900, color: "#1A1535", whiteSpace: "nowrap" }}>{w.value}</div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AC", whiteSpace: "nowrap" }}>{w.label}</div>
+                  </div>
+                ))}
+              </div>
+              {data.resumenSemanal.areas.length > 0 && (
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {data.resumenSemanal.areas.map((ta) => (
+                    <div key={ta.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: ta.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 10, fontWeight: 600, color: "#4B5065", whiteSpace: "nowrap" }}>
+                        {ta.label} {ta.pct}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p style={{ marginTop: 10, fontSize: 9.5, color: "#B8C4D9", fontWeight: 600 }}>
+                Distribución de actividad real entre tus módulos este mes.
+              </p>
+            </div>
+          )}
+
+          {modulos.length === 0 && (
+            <div style={{ background: "#fff", borderRadius: 22, padding: 40, textAlign: "center", boxShadow: "0 4px 20px rgba(43,35,79,0.05)" }}>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#1A1535" }}>No tienes módulos asignados</p>
+              <p style={{ marginTop: 6, fontSize: 13, color: "#9AA0AC" }}>Contacta a un administrador para habilitar tus accesos.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Right column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 22, padding: 20, boxShadow: "0 4px 20px rgba(43,35,79,0.05)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 800, color: "#1A1535" }}>{mesLabel}</span>
+              <div style={{ display: "flex", gap: 6, color: "#B8C4D9" }}>
+                <ChevronLeft size={13} />
+                <ChevronRight size={13} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, textAlign: "center" }}>
+              {["D", "L", "M", "M", "J", "V", "S"].map((d, i) => (
+                <span key={i} style={{ fontSize: 9.5, fontWeight: 700, color: "#B8C4D9", paddingBottom: 6 }}>
+                  {d}
+                </span>
+              ))}
+              {calDias.map((n) => {
+                const esHoy = n === diaActual;
+                return (
+                  <span
+                    key={n}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: esHoy ? 800 : 600,
+                      color: esHoy ? "#fff" : "#4B5065",
+                      background: esHoy ? "#2B234F" : "transparent",
+                      borderRadius: 8,
+                      padding: "5px 0",
+                    }}
+                  >
+                    {n}
+                  </span>
+                );
+              })}
             </div>
           </div>
 
-          <div className="flex items-center gap-5 sm:gap-6">
-            <div className="hidden text-right md:block">
-              <div className="text-[13px] font-semibold text-[var(--home-ink)]">{hora}</div>
-              <div className="text-[11px] capitalize text-[var(--home-ink-muted)]">{fecha}</div>
+          <div id="pendientes" style={{ background: "#fff", borderRadius: 22, boxShadow: "0 4px 20px rgba(43,35,79,0.05)", overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 13.5, fontWeight: 800, color: "#1A1535" }}>Pendientes</span>
             </div>
-
-            <Link
-              href="#pendientes"
-              title="Tareas de prioridad alta"
-              className="relative grid size-10 place-items-center rounded-full text-[var(--home-ink-secondary)] transition-colors hover:bg-[var(--home-surface-soft)]"
-            >
-              <Bell size={18} strokeWidth={1.8} />
-              {alertas > 0 && (
-                <span
-                  className="absolute right-1.5 top-1.5 size-2 rounded-full"
-                  style={{ background: "var(--home-lime)" }}
-                  aria-hidden="true"
-                />
+            <div style={{ maxHeight: 420, overflowY: "auto" }}>
+              {tareas.length === 0 ? (
+                <div style={{ padding: "24px 20px", textAlign: "center" }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: "#1A1535" }}>Sin pendientes por ahora</p>
+                  <p style={{ marginTop: 4, fontSize: 11, color: "#9AA0AC" }}>Estás al día.</p>
+                </div>
+              ) : (
+                tareas.map((a, i) => (
+                  <Link
+                    key={a.id}
+                    href={a.moduloHref}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 11,
+                      padding: "12px 20px",
+                      borderTop: i === 0 ? "none" : "1px solid rgba(23,19,33,0.06)",
+                    }}
+                  >
+                    <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(204,255,0,0.18)", color: "#5D8A00", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Clock3 size={15} />
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: "#1A1535", lineHeight: 1.3 }}>{a.titulo}</div>
+                      <div style={{ fontSize: 10, color: "#9AA0AC", fontWeight: 600, marginTop: 1, display: "flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: PRIORIDAD_DOT[a.prioridad], flexShrink: 0 }} />
+                        {a.moduloNombre} {a.fecha ? `· ${a.fecha}` : ""}
+                      </div>
+                    </div>
+                    <span style={{ color: "#C4C9D6", fontSize: 13 }}>›</span>
+                  </Link>
+                ))
               )}
-            </Link>
-
-            <UserMenu nombre={nombre} logoutAction={logoutAction} />
+            </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="mx-auto max-w-[1920px] pb-16 pt-10" style={{ paddingLeft: "clamp(24px, 4vw, 96px)", paddingRight: "clamp(24px, 4vw, 96px)" }}>
-        {/* Welcome */}
-        <section className="grid min-h-[190px] grid-cols-1 items-center gap-8 pb-6 pt-4 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="animate-enter">
-            <span className="mb-3 block text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--home-purple)]">
-              Portal de Gestión
-            </span>
-            <h1 className="text-[38px] font-bold leading-[0.98] tracking-[-0.04em] text-[var(--home-ink)] sm:text-[48px]">
-              {saludo}, {primerNombre}
-              <span style={{ color: "var(--home-lime)", WebkitTextStroke: "0.5px rgba(0,0,0,0.15)" }}>.</span>
-            </h1>
-            <h2 className="mt-3 text-[17px] font-semibold text-[var(--home-ink-secondary)]">¿Qué deseas hacer hoy?</h2>
-            <p className="mt-2 max-w-[440px] text-[14px] leading-6 text-[var(--home-ink-muted)]">
-              Accede a tus herramientas y continúa impulsando tus resultados.
-            </p>
-          </div>
-
-          <FlowGraphic />
-        </section>
-
-        {/* Workspace */}
-        <section className="mt-4 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-          {/* Modules */}
-          <div>
-            <div className="mb-5 flex items-center gap-3">
-              <span className="h-5 w-[3px] rounded-full" style={{ background: "var(--home-purple)" }} />
-              <h3 className="text-[15px] font-bold text-[var(--home-ink)]">Tus módulos</h3>
-            </div>
-
-            {modulos.length === 0 ? (
-              <div className="rounded-[22px] border border-dashed border-[var(--home-border-strong)] bg-[var(--home-surface-soft)] p-10 text-center">
-                <p className="text-[15px] font-semibold text-[var(--home-ink)]">No tienes módulos asignados</p>
-                <p className="mt-1 text-[13px] text-[var(--home-ink-secondary)]">
-                  Contacta a un administrador para habilitar tus accesos.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {metricas && <MetricasFeaturedCard modulo={metricas} />}
-                {otrosModulos.map((modulo) => (
-                  <ModuleCard key={modulo.id} modulo={modulo} />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Pending tasks */}
-          <aside
-            id="pendientes"
-            className="self-start overflow-hidden rounded-[22px] border border-[var(--home-border)] bg-white shadow-[var(--home-shadow-md)]"
-          >
-            <div className="px-6 py-6">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--home-ink-muted)]">
-                Tu agenda
-              </span>
-              <div className="mt-1 flex items-center gap-2">
-                <h3 className="text-[19px] font-bold tracking-tight text-[var(--home-ink)]">Pendientes</h3>
-                <span
-                  className="flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-bold"
-                  style={{ backgroundColor: "#ede9fe", color: "var(--home-purple)" }}
-                >
-                  {tareas.length}
-                </span>
-              </div>
-            </div>
-
-            {tareas.length === 0 ? (
-              <div className="border-t border-[var(--home-border)] px-6 py-8 text-center">
-                <p className="text-[13px] font-semibold text-[var(--home-ink)]">Sin pendientes por ahora</p>
-                <p className="mt-1 text-[12px] text-[var(--home-ink-muted)]">Estás al día con tus módulos.</p>
-              </div>
-            ) : (
-              <div className="max-h-[520px] overflow-y-auto border-t border-[var(--home-border)]">
-                {tareas.map((tarea, i) => (
-                  <TaskItem key={tarea.id} tarea={tarea} last={i === tareas.length - 1} />
-                ))}
-              </div>
-            )}
-          </aside>
-        </section>
-      </main>
+      <style>{`
+        @media (max-width: 1080px) {
+          .home-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   );
 }
