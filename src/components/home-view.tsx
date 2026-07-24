@@ -416,13 +416,6 @@ export function HomeView({
                 );
               })
             )}
-            <div className="encourage">
-              <b>⚡</b>
-              <div>
-                <strong>{progresoPct >= 80 ? "¡Vas muy bien!" : "¡Sigue así!"}</strong>
-                <span>Mantén tu ritmo esta semana.</span>
-              </div>
-            </div>
           </article>
         </aside>
       </div>
