@@ -257,6 +257,17 @@ body {
   }
 }
 
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
 @keyframes pulse-ring {
   0% {
     box-shadow: 0 0 0 0 rgba(204, 255, 0, 0.4);
@@ -292,6 +303,9 @@ body {
 }
 .animate-float {
   animation: float 6s ease-in-out infinite;
+}
+.animate-pulse-glow {
+  animation: pulse-glow 3.5s ease-in-out infinite;
 }
 
 .shimmer-surface {

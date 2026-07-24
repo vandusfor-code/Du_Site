@@ -31,7 +31,7 @@ export default async function LoginPage({
   return (
     <main className="flex min-h-screen w-full">
       {/* ── Brand panel ── */}
-      <section className="relative hidden w-[45%] overflow-hidden bg-brand-deep lg:flex lg:flex-col lg:justify-between">
+      <section className="relative hidden w-[45%] flex-col overflow-hidden bg-brand-deep lg:flex">
         {/* textured background */}
         <div className="dot-grid absolute inset-0 opacity-70" aria-hidden="true" />
         <div
@@ -52,10 +52,10 @@ export default async function LoginPage({
           <BrandLogo size={46} showWordmark onDark />
         </div>
 
-        <div className="relative z-10 px-12 pb-4">
-          <p className="text-[13px] font-semibold uppercase tracking-[0.22em] text-accent">
+        <div className="relative z-10 px-12 pb-2">
+          <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-accent">
             Portal operativo
-          </p>
+          </span>
           <h1 className="mt-4 max-w-md text-balance text-4xl font-extrabold leading-[1.1] tracking-tight text-white">
             Excelencia operativa, todo en un solo lugar.
           </h1>
@@ -65,19 +65,88 @@ export default async function LoginPage({
           </p>
         </div>
 
-        <div className="relative z-10 space-y-3 p-12 pt-8">
+        {/* Floating dashboard illustration */}
+        <div className="relative z-10 mt-2 h-52 px-12" aria-hidden="true">
+          <div
+            className="animate-float absolute right-8 top-0 w-48 rounded-xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl backdrop-blur-md"
+            style={{ animationDelay: "0.4s" }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-white/60">Desempeño</span>
+              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">
+                +24.6%
+              </span>
+            </div>
+            <svg viewBox="0 0 120 40" className="mt-3 h-10 w-full" preserveAspectRatio="none">
+              <polyline
+                points="0,32 20,26 40,30 60,14 80,20 100,6 120,10"
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+
+          <div
+            className="animate-float absolute left-0 top-24 w-36 rounded-xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl backdrop-blur-md"
+            style={{ animationDelay: "1.3s" }}
+          >
+            <div className="relative mx-auto grid size-16 place-items-center">
+              <svg viewBox="0 0 36 36" className="size-16 -rotate-90">
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="3" />
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="15.5"
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeDasharray="81.8 97.4"
+                />
+              </svg>
+              <span className="absolute text-sm font-bold text-white">84%</span>
+            </div>
+            <p className="mt-2 text-center text-[11px] font-medium text-white/60">Casos resueltos</p>
+          </div>
+
+          <div
+            className="animate-float absolute right-2 top-40 w-44 rounded-xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl backdrop-blur-md"
+            style={{ animationDelay: "2.1s" }}
+          >
+            <p className="text-[11px] font-semibold text-white/70">Auditorías</p>
+            <div className="mt-2 space-y-1.5 text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-white/50">Hoy</span>
+                <span className="font-bold text-white">12</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/50">Esta semana</span>
+                <span className="font-bold text-white">48</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/50">Pendientes</span>
+                <span className="font-bold text-accent">7</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10 mt-auto space-y-4 p-12 pt-6">
           {HIGHLIGHTS.map(({ icon: Icon, title, desc }, i) => (
             <div
               key={title}
-              className="animate-enter flex items-start gap-4 rounded-lg border border-white/10 bg-white/[0.04] p-4 backdrop-blur-sm"
+              className="animate-enter flex items-start gap-3.5"
               style={{ animationDelay: `${0.3 + i * 0.12}s` }}
             >
-              <span className="grid size-10 shrink-0 place-items-center rounded-md bg-white/10 text-accent">
-                <Icon size={20} strokeWidth={2} />
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent/15 text-accent">
+                <Icon size={18} strokeWidth={2.2} />
               </span>
               <div>
                 <p className="text-sm font-semibold text-white">{title}</p>
-                <p className="mt-0.5 text-[13px] leading-relaxed text-white/55">
+                <p className="mt-0.5 text-[12.5px] leading-relaxed text-white/50">
                   {desc}
                 </p>
               </div>
@@ -88,27 +157,33 @@ export default async function LoginPage({
 
       {/* ── Form panel ── */}
       <section className="flex w-full flex-col items-center justify-center bg-background px-6 py-10 lg:w-[55%]">
-        <div className="animate-scale-in w-full max-w-sm">
-          <div className="mb-8 lg:hidden">
-            <BrandLogo size={44} showWordmark />
-          </div>
-
-          <div className="mb-8 hidden lg:block">
-            <BrandLogo size={40} />
+        <div className="animate-scale-in flex w-full max-w-sm flex-col items-center text-center">
+          <div className="relative mb-6">
+            <div
+              className="animate-pulse-glow absolute inset-0 -z-10 rounded-full blur-2xl"
+              style={{ background: "radial-gradient(circle, var(--accent-tint), transparent 70%)" }}
+              aria-hidden="true"
+            />
+            <BrandLogo size={64} />
           </div>
 
           <h2 className="text-2xl font-extrabold tracking-tight text-foreground">
-            Bienvenido de vuelta
+            ¡Bienvenido de vuelta! <span aria-hidden="true">👋</span>
           </h2>
-          <p className="mt-1.5 text-[14px] leading-relaxed text-muted">
+          <p className="mt-1.5 max-w-xs text-[14px] leading-relaxed text-muted">
             Ingresa con tu usuario y contraseña asignados para continuar.
           </p>
 
-          <div className="mt-8">
+          <div className="mt-8 w-full text-left">
             <LoginForm callbackUrl={callbackUrl ?? "/"} />
           </div>
 
-          <p className="mt-10 text-center text-[12px] text-faint">
+          <div className="mt-8 flex items-center gap-1.5 text-[12px] font-medium text-faint">
+            <ShieldCheck size={14} strokeWidth={2.2} />
+            <span>Conexión segura y encriptada</span>
+          </div>
+
+          <p className="mt-4 text-center text-[12px] text-faint">
             © {year} Portal de Gestión · People BPO · v4.0
           </p>
         </div>
