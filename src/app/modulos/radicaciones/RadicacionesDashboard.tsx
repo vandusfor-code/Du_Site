@@ -377,7 +377,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                   <div className="value">
                     {resumen.total > 0 ? Math.round((resumen.efectivos / resumen.total) * 100) : 0}%
                   </div>
-                  <div className="sub-text" style={{ color: "var(--primary)" }}>Rendimiento global</div>
+                  <div className="sub-text" style={{ color: "var(--primary-deep)" }}>Rendimiento global</div>
                 </div>
               </div>
 
@@ -553,7 +553,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                   ) : (
                     <div className="form-box">
                       <div style={{ marginBottom: 24, textAlign: "center" }}>
-                        <h3 style={{ color: "var(--primary)" }}>Resultado Encontrado</h3>
+                        <h3 style={{ color: "var(--primary-deep)" }}>Resultado Encontrado</h3>
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 24 }}>
                         <div>
@@ -601,7 +601,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                       <div>
                         <b style={{ fontSize: 16, display: "block", marginBottom: 4 }}>{n.radicado}</b>
                         <p style={{ fontSize: 14, color: "var(--text-muted)" }}>{n.mensaje}</p>
-                        <span style={{ fontSize: 10, marginTop: 8, display: "block", color: "var(--primary)", fontWeight: 600 }}>
+                        <span style={{ fontSize: 10, marginTop: 8, display: "block", color: "var(--primary-deep)", fontWeight: 600 }}>
                           {n.fecha}
                         </span>
                       </div>
@@ -669,7 +669,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
         <div className="fullscreen-overlay">
           <div className="alert-box">
             <div className="brand-logo" style={{ margin: "0 auto 20px" }}>P</div>
-            <h1 style={{ fontFamily: "'Poppins'", marginBottom: 10, color: "var(--primary)" }}>Alerta de Horario</h1>
+            <h1 style={{ fontFamily: "'Poppins'", marginBottom: 10, color: "var(--primary-deep)" }}>Alerta de Horario</h1>
             <h2 style={{ fontSize: 24, marginBottom: 40 }}>{wfmAlert.mensaje}</h2>
             <button className="btn-primary" onClick={cerrarAlertaWfm}>
               <span>Entendido / Detener Alerta</span>

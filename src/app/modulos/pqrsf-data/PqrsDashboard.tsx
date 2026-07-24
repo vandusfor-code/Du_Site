@@ -80,7 +80,7 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
         >
           <div className="header">
             <h1>
-              PEOPLE ACADEMY <span style={{ color: "var(--lima)" }}>PRO</span>
+              PEOPLE ACADEMY <span style={{ color: "var(--morado-claro)" }}>PRO</span>
             </h1>
             <div style={{ marginTop: 5 }}>
               <div className="user-chip">ID: {nombre}</div>
@@ -134,7 +134,7 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
           {loading && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 25 }}>
               <div className="loader-ring" />
-              <p style={{ fontSize: 12, color: "var(--lima)", marginTop: 10, letterSpacing: 2 }}>
+              <p style={{ fontSize: 12, color: "var(--morado-claro)", marginTop: 10, letterSpacing: 2 }}>
                 PROCESANDO CON INTELIGENCIA ARTIFICIAL...
               </p>
             </div>
@@ -148,10 +148,10 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
             {mode === "GENERAL" ? (
               <>
                 <div style={{ marginBottom: 25 }}>
-                  <span className="label-neon" style={{ color: "#00e5ff" }}>
+                  <span className="label-neon" style={{ color: "#0e7490" }}>
                     Respuesta / Qué decir
                   </span>
-                  <div style={{ fontSize: 22, fontWeight: 600, color: "white", lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text-main)", lineHeight: 1.4 }}>
                     {actual.accion}
                   </div>
                 </div>
@@ -172,7 +172,7 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
                 <div className="nav-controls">
                   <div
                     className="source-badge"
-                    style={{ background: "rgba(0, 229, 255, 0.1)", color: "#00e5ff", borderColor: "rgba(0, 229, 255, 0.3)" }}
+                    style={{ background: "rgba(14, 116, 144, 0.1)", color: "#0e7490", borderColor: "rgba(14, 116, 144, 0.3)" }}
                   >
                     {actual.fuente}
                   </div>
@@ -192,8 +192,8 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
                 </div>
 
                 <div style={{ marginBottom: 30 }}>
-                  <h2 style={{ margin: 0, color: "white", fontSize: 26, fontWeight: 700 }}>{actual.tipo}</h2>
-                  <p style={{ color: "rgba(255,255,255,0.5)", marginTop: 8, fontSize: 14, textTransform: "uppercase", letterSpacing: 1 }}>
+                  <h2 style={{ margin: 0, color: "var(--text-main)", fontSize: 26, fontWeight: 700 }}>{actual.tipo}</h2>
+                  <p style={{ color: "var(--text-muted)", marginTop: 8, fontSize: 14, textTransform: "uppercase", letterSpacing: 1 }}>
                     {actual.clasificacion}
                   </p>
                 </div>
@@ -213,7 +213,7 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
 
                 <div style={{ marginTop: 30 }}>
                   <span className="label-neon">Recordatorio</span>
-                  <div className="value-text" style={{ fontSize: 14, color: "rgba(255,255,255,0.9)" }}>
+                  <div className="value-text" style={{ fontSize: 14, color: "var(--text-main)" }}>
                     {actual.recordatorio}
                   </div>
                 </div>
@@ -233,7 +233,7 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
         )}
 
         <div className="banner-smart">
-          <span className="material-icons" style={{ color: "var(--lima)" }}>
+          <span className="material-icons" style={{ color: "var(--morado-claro)" }}>
             tips_and_updates
           </span>
           <span>
@@ -245,7 +245,7 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
         <div className="accordion-ng">
           <div className="accordion-ng-header" onClick={() => setAccordionOpen((v) => !v)}>
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span className="material-icons" style={{ fontSize: 18, color: "var(--lima)" }}>
+              <span className="material-icons" style={{ fontSize: 18, color: "var(--morado-claro)" }}>
                 gavel
               </span>
               REGLAS DE ORO DEL RADICADOR
@@ -272,8 +272,8 @@ export default function PqrsDashboard({ nombre }: { nombre: string }) {
             <button className="modal-close" onClick={() => setModalOpen(false)} aria-label="Cerrar">
               ×
             </button>
-            <h2 style={{ color: "var(--lima)", marginBottom: 5 }}>¡HOLA, {nombre.toUpperCase()}!</h2>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", marginBottom: 25 }}>
+            <h2 style={{ color: "var(--morado-claro)", marginBottom: 5 }}>¡HOLA, {nombre.toUpperCase()}!</h2>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 25 }}>
               Antes de continuar, recuerda nuestras directrices:
             </p>
             <ul className="rules-list">
@@ -305,7 +305,7 @@ function NavButtons({
   if (total <= 1) return null;
   return (
     <div style={{ display: "flex", gap: 15, alignItems: "center" }}>
-      <span style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>
+      <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 500 }}>
         {idx + 1} de {total}
       </span>
       <div style={{ display: "flex", gap: 8 }}>

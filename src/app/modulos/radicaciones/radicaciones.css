@@ -1,10 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700&display=swap');
 
 .radic-scope {
-  --bg: #0b0e14;
-  --sidebar: #11141d;
-  --card: #161b26;
-  --card-hover: #1c2331;
+  --bg: #f0f2f5;
+  --sidebar: linear-gradient(160deg, #2B234F, #1A1535);
+  --card: #ffffff;
+  --card-hover: #f8fafc;
   --primary: #CCFF00;
   --primary-hover: #b8e600;
   --primary-text: #1A1535;
@@ -13,9 +13,9 @@
   --secondary: #10b981;
   --accent: #f59e0b;
   --error: #ef4444;
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --border: rgba(255, 255, 255, 0.06);
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 20px;
@@ -38,6 +38,7 @@
 .radic-scope .sidebar {
   width: 280px;
   background: var(--sidebar);
+  color: #fff;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -81,7 +82,7 @@
   justify-content: space-between;
   padding: 14px 16px;
   border-radius: var(--radius-md);
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.6);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
@@ -90,10 +91,10 @@
   transition: var(--transition);
 }
 
-.radic-scope .nav-link:hover { background: rgba(255, 255, 255, 0.03); color: white; }
+.radic-scope .nav-link:hover { background: rgba(255, 255, 255, 0.08); color: white; }
 
 .radic-scope .nav-link.active {
-  background: rgba(204, 255, 0, 0.1);
+  background: rgba(204, 255, 0, 0.15);
   color: var(--primary);
   font-weight: 600;
 }
@@ -113,7 +114,7 @@
 .radic-scope .sidebar-user {
   margin-top: auto;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
@@ -134,8 +135,8 @@
 }
 
 .radic-scope .user-meta { flex: 1; overflow: hidden; }
-.radic-scope .user-meta h4 { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
-.radic-scope .user-meta p { font-size: 11px; color: var(--text-muted); margin: 0; }
+.radic-scope .user-meta h4 { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
+.radic-scope .user-meta p { font-size: 11px; color: rgba(255, 255, 255, 0.55); margin: 0; }
 
 .radic-scope .btn-primary {
   width: 100%;
@@ -196,7 +197,7 @@
   transition: var(--transition);
 }
 
-.radic-scope .stat-card:hover { border-color: rgba(255, 255, 255, 0.12); transform: translateY(-4px); }
+.radic-scope .stat-card:hover { border-color: rgba(43, 35, 79, 0.15); transform: translateY(-4px); }
 
 .radic-scope .stat-card .label {
   font-size: 12px;
@@ -235,7 +236,7 @@
 }
 
 .radic-scope .history-row:last-child { border-bottom: none; }
-.radic-scope .history-row:hover { background: rgba(255, 255, 255, 0.02); }
+.radic-scope .history-row:hover { background: #f8fafc; }
 
 .radic-scope .row-main { flex: 1; }
 .radic-scope .row-main b { font-size: 15px; display: block; margin-bottom: 2px; }
@@ -269,11 +270,11 @@
 
 .radic-scope .input-field {
   width: 100%;
-  background: #0f1218;
+  background: #f8fafc;
   border: 1px solid var(--border);
   padding: 14px 18px;
   border-radius: var(--radius-md);
-  color: white;
+  color: var(--text-main);
   font-family: inherit;
   font-size: 15px;
   transition: var(--transition);
@@ -291,7 +292,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #0f1218;
+  background: #f8fafc;
   padding: 16px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
@@ -321,11 +322,11 @@
 
 .radic-scope .chat-msg.own { align-self: flex-end; background: var(--primary); color: var(--primary-text); border-bottom-right-radius: 4px; }
 
-.radic-scope .chat-msg.other { align-self: flex-start; background: #0f1218; border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.radic-scope .chat-msg.other { align-self: flex-start; background: #f8fafc; color: var(--text-main); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
 
 .radic-scope .chat-info { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; opacity: 0.6; }
 
-.radic-scope .chat-input-area { padding: 24px 32px; background: #0f1218; border-top: 1px solid var(--border); display: flex; gap: 12px; align-items: center; }
+.radic-scope .chat-input-area { padding: 24px 32px; background: #f8fafc; border-top: 1px solid var(--border); display: flex; gap: 12px; align-items: center; }
 
 /* --- TOAST --- */
 .radic-scope .toast {
@@ -359,7 +360,7 @@
 
 /* --- WFM STYLES --- */
 .radic-scope .wfm-card {
-  background: linear-gradient(135deg, var(--card) 0%, #1a1f2e 100%) !important;
+  background: linear-gradient(135deg, var(--card) 0%, #f3f8e0 100%) !important;
   border: 1px solid var(--primary) !important;
 }
 
@@ -369,7 +370,7 @@
 .radic-scope .status-lunch { background: #f97316; box-shadow: 0 0 10px #f97316; }
 .radic-scope .status-offline { background: var(--error); box-shadow: 0 0 10px var(--error); }
 
-.radic-scope .countdown-timer { font-size: 24px; font-weight: 800; font-family: 'Poppins', sans-serif; color: var(--primary); margin-top: 10px; }
+.radic-scope .countdown-timer { font-size: 24px; font-weight: 800; font-family: 'Poppins', sans-serif; color: var(--primary-deep); margin-top: 10px; }
 
 .radic-scope .fullscreen-overlay {
   position: fixed;
@@ -404,8 +405,8 @@
 /* --- SCROLLBAR --- */
 .radic-scope ::-webkit-scrollbar { width: 8px; }
 .radic-scope ::-webkit-scrollbar-track { background: transparent; }
-.radic-scope ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
-.radic-scope ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+.radic-scope ::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.12); border-radius: 10px; }
+.radic-scope ::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.22); }
 
 @media (max-width: 1024px) {
   .radic-scope { flex-direction: column; height: auto; overflow: visible; min-height: 100vh; }

@@ -6,15 +6,25 @@
   --morado-profundo: #1A1535;
   --morado-claro: #2B234F;
   --accent: #CCFF00;
-  --glass: rgba(255, 255, 255, 0.04);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass: #ffffff;
+  --glass-border: #e2e8f0;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
 
   font-family: 'Poppins', sans-serif;
-  background: radial-gradient(circle at top right, #2B234F, #1A1535);
-  color: #FFFFFF;
+  background: #f0f2f5;
+  color: var(--text-main);
   min-height: 100vh;
   padding: 20px 0;
 }
+
+.pqrs-scope .du-sound-btn {
+  background: #f8fafc;
+  border: 1px solid var(--glass-border);
+  color: var(--morado-claro);
+}
+.pqrs-scope .du-sound-btn:hover { background: #eef2f5; }
+.pqrs-scope .du-sound-btn[data-off="true"] { color: var(--text-muted); }
 
 .pqrs-scope .container {
   width: 100%;
@@ -26,26 +36,24 @@
 
 .pqrs-scope .card {
   background: var(--glass);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
   border: 1px solid var(--glass-border);
   border-radius: 28px;
   padding: 45px;
-  box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.06);
   margin-bottom: 30px;
   transition: all 0.5s ease;
 }
 
 .pqrs-scope .card:hover {
-  border-color: rgba(204, 255, 0, 0.2);
-  box-shadow: 0 50px 120px rgba(0,0,0,0.6);
+  border-color: rgba(204, 255, 0, 0.4);
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.09);
 }
 
 .pqrs-scope .header h1 {
   font-size: 34px;
   font-weight: 800;
   letter-spacing: -1.5px;
-  background: linear-gradient(to right, #FFFFFF, var(--lima));
+  background: linear-gradient(to right, var(--morado-claro), var(--lima));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin: 0;
@@ -53,7 +61,7 @@
 
 .pqrs-scope .header p {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   margin-top: 5px;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -63,11 +71,11 @@
 .pqrs-scope input {
   width: 100%;
   height: 54px;
-  background: rgba(255, 255, 255, 0.05);
+  background: #f8fafc;
   border: 1.5px solid var(--glass-border);
   border-radius: 12px;
   padding: 0 20px;
-  color: white;
+  color: var(--text-main);
   font-family: inherit;
   font-size: 15px;
   outline: none;
@@ -78,9 +86,9 @@
 }
 
 .pqrs-scope input:focus {
-  background: rgba(255, 255, 255, 0.1);
+  background: #ffffff;
   border-color: var(--lima);
-  box-shadow: 0 0 20px rgba(204, 255, 0, 0.15);
+  box-shadow: 0 0 0 4px rgba(204, 255, 0, 0.15);
 }
 
 .pqrs-scope .btn-primary {
@@ -114,7 +122,7 @@
 .pqrs-scope .btn-outline {
   background: transparent;
   border: 1px solid var(--glass-border);
-  color: rgba(255,255,255,0.8);
+  color: var(--text-muted);
   padding: 10px 20px;
   border-radius: 10px;
   font-size: 13px;
@@ -127,9 +135,9 @@
 }
 
 .pqrs-scope .btn-outline:hover {
-  background: rgba(255,255,255,0.05);
-  border-color: white;
-  color: white;
+  background: #f8fafc;
+  border-color: var(--morado-claro);
+  color: var(--text-main);
 }
 
 .pqrs-scope .btn-outline:disabled {
@@ -163,14 +171,14 @@
 }
 
 .pqrs-scope .resumen-box {
-  background: rgba(0,0,0,0.3);
+  background: #f8fafc;
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 25px;
   border: 1px solid var(--glass-border);
   font-size: 14px;
   line-height: 1.6;
-  color: rgba(255,255,255,0.8);
+  color: var(--text-muted);
   position: relative;
 }
 
@@ -181,7 +189,7 @@
 }
 
 .pqrs-scope .label-neon {
-  color: var(--lima);
+  color: var(--morado-claro);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -194,7 +202,7 @@
 .pqrs-scope .value-text {
   font-size: 15px;
   line-height: 1.6;
-  color: white;
+  color: var(--text-main);
   font-weight: 400;
 }
 
@@ -211,20 +219,20 @@
 }
 
 .pqrs-scope .modal-content {
-  background: var(--morado-profundo);
+  background: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: 28px;
   padding: 40px;
   max-width: 550px;
   width: 90%;
   position: relative;
-  box-shadow: 0 50px 100px rgba(0,0,0,0.8);
+  box-shadow: 0 30px 70px rgba(16, 24, 40, 0.25);
 }
 
 .pqrs-scope .modal-close {
   position: absolute;
   top: 20px; right: 20px;
-  color: rgba(255,255,255,0.5);
+  color: var(--text-muted);
   cursor: pointer;
   transition: 0.3s;
   background: none;
@@ -233,7 +241,7 @@
   line-height: 1;
 }
 
-.pqrs-scope .modal-close:hover { color: white; }
+.pqrs-scope .modal-close:hover { color: var(--text-main); }
 
 .pqrs-scope .nav-controls {
   display: flex;
@@ -246,18 +254,18 @@
 
 .pqrs-scope .source-badge {
   background: rgba(204, 255, 0, 0.15);
-  color: var(--lima);
+  color: var(--morado-claro);
   padding: 6px 14px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
-  border: 1px solid rgba(204, 255, 0, 0.3);
+  border: 1px solid rgba(204, 255, 0, 0.4);
 }
 
 .pqrs-scope .banner-smart {
-  background: rgba(255, 255, 255, 0.03);
+  background: #f8fafc;
   border-left: 3px solid var(--lima);
   padding: 20px;
   border-radius: 0 16px 16px 0;
@@ -270,7 +278,7 @@
 }
 
 .pqrs-scope .accordion-ng {
-  background: rgba(255,255,255,0.03);
+  background: #ffffff;
   border-radius: 20px;
   border: 1px solid var(--glass-border);
   margin-top: 20px;
@@ -302,19 +310,19 @@
 .pqrs-scope .rules-list {
   margin: 0;
   padding-left: 20px;
-  color: rgba(255,255,255,0.7);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.9;
 }
 
 .pqrs-scope .user-chip {
   display: inline-block;
-  background: rgba(255,255,255,0.06);
+  background: #f8fafc;
   border: 1px solid var(--glass-border);
   padding: 4px 12px;
   border-radius: 8px;
   font-size: 12px;
-  color: rgba(255,255,255,0.6);
+  color: var(--text-muted);
 }
 
 @keyframes pqrs-fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -335,7 +343,7 @@
   height: 45px;
   border-width: 4px;
   border-style: solid;
-  border-color: rgba(255,255,255,0.1);
+  border-color: rgba(15, 23, 42, 0.1);
   border-top-color: var(--lima);
   border-radius: 50%;
   animation: pqrs-spin 0.8s linear infinite;
@@ -353,7 +361,7 @@
 .pqrs-scope .tab-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -365,13 +373,13 @@
 }
 
 .pqrs-scope .tab-btn.active {
-  color: var(--lima);
-  background: rgba(204, 255, 0, 0.1);
+  color: var(--morado-claro);
+  background: rgba(204, 255, 0, 0.2);
 }
 
 .pqrs-scope .tab-btn:hover:not(.active) {
-  color: white;
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  background: #f8fafc;
 }
 
 @media (max-width: 640px) {
