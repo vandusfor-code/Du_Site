@@ -276,6 +276,30 @@ export async function obtenerAuditoriasConEstado(asesor: string): Promise<Audito
   }
 }
 
+export async function obtenerConteoMesAnterior(asesor: string): Promise<number> {
+  try {
+    const id = sheetId();
+    const asesorBuscado = (asesor || "").trim().toUpperCase();
+    const dataConsolidado = await readRange(id, "Consolidado!A2:W", { unformatted: true });
+
+    const { mes: mesActual, anio: anioActual } = mesYAnioBogota();
+    const mesAnterior = mesActual === 0 ? 11 : mesActual - 1;
+    const anioAnterior = mesActual === 0 ? anioActual - 1 : anioActual;
+
+    let total = 0;
+    dataConsolidado.forEach((row) => {
+      if (texto(row, 2).trim().toUpperCase() !== asesorBuscado) return;
+      const fechaDate = parseSheetDate(row[0]);
+      if (!fechaDate) return;
+      if (fechaDate.getUTCMonth() !== mesAnterior || fechaDate.getUTCFullYear() !== anioAnterior) return;
+      total++;
+    });
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
 export async function guardarCompromiso(
   asesor: string,
   idGestion: string,
