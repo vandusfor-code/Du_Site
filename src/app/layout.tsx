@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { CursorSpotlight } from "@/components/cursor-spotlight";
 import "./globals.css";
 
 const inter = Inter({
@@ -32,6 +33,7 @@ export default function RootLayout({
       className={`${inter.variable} h-full antialiased bg-background`}
     >
       <body className="min-h-full flex flex-col font-sans text-foreground">
+        <CursorSpotlight />
         {children}
       </body>
     </html>
