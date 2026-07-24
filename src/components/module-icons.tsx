@@ -17,9 +17,9 @@ export interface ModuloVisual {
 }
 
 export const MODULO_VISUALS: Record<ModuloId, ModuloVisual> = {
-  metricas: { icon: BarChart3, accentBg: "rgba(186,255,0,0.14)", accentFg: "#baff00" },
-  "pqrsf-data": { icon: Search, accentBg: "#ede9fe", accentFg: "#7257ff" },
-  "linea-amiga": { icon: Headphones, accentBg: "#ccfbf1", accentFg: "#0d9488" },
-  radicaciones: { icon: FolderOpen, accentBg: "#ffedd5", accentFg: "#ea580c" },
-  quiz: { icon: GraduationCap, accentBg: "#ffe4e6", accentFg: "#e11d48" },
+  metricas: { icon: BarChart3, accentBg: "#ecfccb", accentFg: "#65a30d" },
+  "pqrsf-data": { icon: Search, accentBg: "#e0d7ff", accentFg: "#6d28d9" },
+  "linea-amiga": { icon: Headphones, accentBg: "#99f6e4", accentFg: "#0f766e" },
+  radicaciones: { icon: FolderOpen, accentBg: "#fed7aa", accentFg: "#c2410c" },
+  quiz: { icon: GraduationCap, accentBg: "#fecdd3", accentFg: "#be123c" },
 };
