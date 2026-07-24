@@ -51,6 +51,8 @@ const MODULO_TONE: Record<ModuloId, string> = {
   quiz: "pink",
 };
 
+const PENDIENTES_VISIBLES = 5;
+
 function useNow() {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
@@ -161,6 +163,7 @@ export function HomeView({
   const now = useNow();
   const primerNombre = nombre.split(" ")[0] || nombre;
   const { playClick } = useModuleSound();
+  const [mostrarTodasTareas, setMostrarTodasTareas] = useState(false);
   const alertas = tareas.filter((t) => t.prioridad === "Alta").length;
   const { mesLabel, semanas, diaActual } = useCalendario();
 
@@ -268,7 +271,7 @@ export function HomeView({
 
           <div className="middleRow">
             <article className="progressCard">
-              <div className="ring" style={{ background: `conic-gradient(var(--lime) 0 ${progresoPct}%, #e9eaf1 ${progresoPct}%)` }}>
+              <div className="ring" style={{ background: `conic-gradient(var(--lime-dark) 0 ${progresoPct}%, #e9eaf1 ${progresoPct}%)` }}>
                 <strong>{progresoPct}%</strong>
               </div>
               <div>
@@ -380,6 +383,11 @@ export function HomeView({
               <h3>
                 Pendientes <b>{tareas.length}</b>
               </h3>
+              {tareas.length > PENDIENTES_VISIBLES && (
+                <button type="button" onClick={() => setMostrarTodasTareas((v) => !v)}>
+                  {mostrarTodasTareas ? "Ver menos" : "Ver todos"}
+                </button>
+              )}
             </div>
             {tareas.length === 0 ? (
               <div style={{ padding: "20px 0", textAlign: "center" }}>
@@ -387,7 +395,7 @@ export function HomeView({
                 <p style={{ margin: "4px 0 0", fontSize: 12, color: "#66708a" }}>Estás al día.</p>
               </div>
             ) : (
-              tareas.map((t) => {
+              (mostrarTodasTareas ? tareas : tareas.slice(0, PENDIENTES_VISIBLES)).map((t) => {
                 const visual = MODULO_VISUALS[t.moduloId];
                 const Icon = visual.icon;
                 const tone = MODULO_TONE[t.moduloId];

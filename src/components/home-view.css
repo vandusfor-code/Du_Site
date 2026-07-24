@@ -7,6 +7,7 @@
   --indigo: #21174f;
   --purple: #6f55ed;
   --lime: #b8f000;
+  --lime-dark: #8fc900;
   --teal: #10a99b;
   --orange: #ff8515;
   --pink: #ef4e86;
@@ -37,7 +38,7 @@
 .dusite-home .bell { position: relative; margin-right: 10px; color: var(--ink); display: flex; }
 .dusite-home .bell i { position: absolute; right: -8px; top: -9px; background: var(--purple); color: #fff; font-size: 9px; font-style: normal; border-radius: 10px; padding: 2px 5px; }
 
-.dusite-home .shell { max-width: 1460px; margin: 0 auto; padding: 38px 36px 48px; display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 26px; }
+.dusite-home .shell { max-width: 1920px; margin: 0 auto; padding: 38px clamp(24px, 3vw, 64px) 48px; display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 26px; }
 .dusite-home .left { min-width: 0; }
 
 .dusite-home .intro { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 28px; align-items: stretch; }
@@ -61,14 +62,14 @@
 .dusite-home .progressCard, .dusite-home .summary, .dusite-home .calendar, .dusite-home .pending { background: #fff; border: 1px solid #ececf2; border-radius: var(--r-md); box-shadow: var(--shadow); }
 .dusite-home .progressCard { height: 145px; padding: 22px; display: flex; gap: 18px; align-items: center; }
 .dusite-home .ring { position: relative; width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
-.dusite-home .ring:before { content: ""; position: absolute; width: 58px; height: 58px; border-radius: 50%; background: #fff; }
+.dusite-home .ring:before { content: ""; position: absolute; inset: 0; margin: auto; width: 58px; height: 58px; border-radius: 50%; background: #fff; }
 .dusite-home .ring strong { position: relative; font-size: 19px; }
 .dusite-home .progressCard span, .dusite-home .progressCard b, .dusite-home .progressCard small { display: block; }
 .dusite-home .progressCard span { font-size: 11px; color: var(--muted); }
 .dusite-home .progressCard b { font-size: 12px; margin: 7px 0; display: flex; align-items: center; gap: 6px; }
-.dusite-home .progressCard b i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--lime); }
+.dusite-home .progressCard b i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--lime-dark); }
 .dusite-home .progress { height: 6px; width: 165px; background: #e8eaf0; border-radius: 10px; overflow: hidden; }
-.dusite-home .progress i { display: block; height: 100%; background: var(--lime); border-radius: 10px; }
+.dusite-home .progress i { display: block; height: 100%; background: var(--lime-dark); border-radius: 10px; }
 .dusite-home .progressCard small { font-size: 10px; color: var(--muted); margin-top: 10px; }
 
 .dusite-home .summary { height: 145px; padding: 18px 22px; }
