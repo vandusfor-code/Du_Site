@@ -18,7 +18,7 @@ async function obtenerTareasPendientes(
 
   const [auditoriasR, duacademyR, radicacionesR, lineaAmigaR] = await Promise.allSettled([
     moduloIds.includes("metricas") ? obtenerAuditoriasConEstado(usuario) : Promise.resolve([]),
-    moduloIds.includes("quiz") ? obtenerDatosCompletos(usuario) : Promise.resolve(null),
+    moduloIds.includes("quiz") ? obtenerDatosCompletos(nombre) : Promise.resolve(null),
     moduloIds.includes("radicaciones") ? obtenerNotificacionesRadicaciones(nombre) : Promise.resolve([]),
     moduloIds.includes("linea-amiga") ? obtenerNotificacionesLineaAmiga(nombre) : Promise.resolve([]),
   ]);

@@ -9,7 +9,7 @@ export default async function QuizPage() {
   let perfil;
   let error: string | null = null;
   try {
-    perfil = await obtenerPerfil(session.user.usuario);
+    perfil = await obtenerPerfil(session.user.nombre);
   } catch (e) {
     error = e instanceof Error ? e.message : "Error al cargar tu perfil de DuAcademy";
   }

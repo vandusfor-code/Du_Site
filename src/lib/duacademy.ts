@@ -43,11 +43,11 @@ export interface Perfil {
   rol: string;
 }
 
-export async function obtenerPerfil(usuario: string): Promise<Perfil | null> {
+export async function obtenerPerfil(nombre: string): Promise<Perfil | null> {
   const id = sheetId();
   const data = await readRange(id, "USUARIOS");
-  const uNorm = usuario.trim().toLowerCase();
-  const row = data.slice(1).find((r) => texto(r, 2).trim().toLowerCase() === uNorm);
+  const nNorm = nombre.trim().toLowerCase();
+  const row = data.slice(1).find((r) => texto(r, 1).trim().toLowerCase() === nNorm);
   if (!row) return null;
   return { nombre: texto(row, 1), email: texto(row, 2), rol: texto(row, 4) };
 }
@@ -72,7 +72,7 @@ export interface DatosCompletos {
   todasLasSims: FilaObjeto[];
 }
 
-export async function obtenerDatosCompletos(email: string): Promise<DatosCompletos | null> {
+export async function obtenerDatosCompletos(nombre: string): Promise<DatosCompletos | null> {
   const id = sheetId();
   const [usuarios, cursosRaw, simsRaw, progresoRaw] = await Promise.all([
     readRange(id, "USUARIOS"),
@@ -81,9 +81,11 @@ export async function obtenerDatosCompletos(email: string): Promise<DatosComplet
     readRange(id, "PROGRESO", { unformatted: true }),
   ]);
 
-  const eNorm = email.trim().toLowerCase();
-  const user = usuarios.slice(1).find((r) => texto(r, 2).trim().toLowerCase() === eNorm);
+  const nNorm = nombre.trim().toLowerCase();
+  const user = usuarios.slice(1).find((r) => texto(r, 1).trim().toLowerCase() === nNorm);
   if (!user) return null;
+
+  const eNorm = texto(user, 2).trim().toLowerCase();
 
   const asignadosCursos = texto(user, 6)
     ? texto(user, 6).split(",").map((s) => s.trim()).filter(Boolean)

@@ -20,9 +20,9 @@ import {
 
 async function perfilActual(): Promise<Perfil> {
   const session = await auth();
-  const usuario = session?.user?.usuario;
-  if (!usuario) throw new Error("No autenticado");
-  const perfil = await obtenerPerfil(usuario);
+  const nombre = session?.user?.nombre;
+  if (!nombre) throw new Error("No autenticado");
+  const perfil = await obtenerPerfil(nombre);
   if (!perfil) throw new Error("No se encontró tu perfil en DuAcademy");
   return perfil;
 }
@@ -37,7 +37,7 @@ async function requireAdmin(): Promise<Perfil> {
 
 export async function obtenerDatosCompletosAction(): Promise<DatosCompletos | null> {
   const perfil = await perfilActual();
-  return obtenerDatosCompletos(perfil.email);
+  return obtenerDatosCompletos(perfil.nombre);
 }
 
 export async function obtenerPreguntasAction(idCurso: string): Promise<Pregunta[]> {
