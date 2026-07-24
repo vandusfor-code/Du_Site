@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
+  BarChart3,
   Bell,
   CheckCircle2,
   ChevronDown,
@@ -12,10 +13,13 @@ import {
   ChevronRight,
   ClipboardCheck,
   Clock3,
+  FolderOpen,
   LogOut,
+  MessageSquareText,
   SlidersHorizontal,
 } from "lucide-react";
 import type { Modulo, ModuloId } from "@/lib/modulos";
+import type { GestionesMes } from "@/lib/lineaAmiga";
 import { MODULO_VISUALS } from "@/components/module-icons";
 import { useModuleSound } from "@/lib/use-module-sound";
 import "./home-view.css";
@@ -41,6 +45,7 @@ export interface HomeData {
     /** % vs. mes anterior, real; null si no hay dato del mes anterior para comparar */
     tendenciaPct: number | null;
   } | null;
+  gestionesMes: GestionesMes | null;
 }
 
 const MODULO_TONE: Record<ModuloId, string> = {
@@ -413,6 +418,40 @@ export function HomeView({
             )}
           </article>
         </aside>
+      </div>
+
+      {data?.gestionesMes && (
+        <div className="gestionesStripWrap">
+          <article className="gestionesStrip">
+            <div className="gestionesStripLabel">
+              <div className="statIcon violet">
+                <BarChart3 size={20} />
+              </div>
+              <b>Gestiones del mes</b>
+            </div>
+            <MiniStat Icon={Clock3} tone="violet" n={data.gestionesMes.pqrsfHoy} label="PQRSF hoy" />
+            <MiniStat Icon={CheckCircle2} tone="lime" n={data.gestionesMes.pqrsfMes} label="PQRSF mes" />
+            <MiniStat Icon={FolderOpen} tone="orange" n={data.gestionesMes.radicadosHoy} label="Radicados hoy" />
+            <MiniStat Icon={ClipboardCheck} tone="teal" n={data.gestionesMes.radicadosMes} label="Radicados mes" />
+            <MiniStat Icon={BarChart3} tone="violet" n={data.gestionesMes.gestionesTotalesMes} label="Gestiones totales mes" />
+            <MiniStat Icon={MessageSquareText} tone="pink" n={data.gestionesMes.pqrsfPorComunicar} label="PQRSF por comunicar" />
+            <MiniStat Icon={CheckCircle2} tone="teal" n={data.gestionesMes.pqrsfComunicados} label="PQRSF comunicados" />
+          </article>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniStat({ Icon, tone, n, label }: { Icon: typeof Clock3; tone: string; n: number; label: string }) {
+  return (
+    <div className="gestionesStat">
+      <div className={`statIcon ${tone}`}>
+        <Icon size={18} />
+      </div>
+      <div>
+        <strong>{n.toLocaleString("es-CO")}</strong>
+        <span>{label}</span>
       </div>
     </div>
   );

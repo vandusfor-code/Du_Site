@@ -490,3 +490,29 @@ export async function verificarHorarios(usuario: string): Promise<void> {
     }
   }
 }
+
+export interface GestionesMes {
+  pqrsfHoy: number;
+  pqrsfMes: number;
+  radicadosHoy: number;
+  radicadosMes: number;
+  gestionesTotalesMes: number;
+  pqrsfPorComunicar: number;
+  pqrsfComunicados: number;
+}
+
+export async function obtenerGestionesMes(): Promise<GestionesMes> {
+  const id = sheetId();
+  const fila = (await readRange(id, "CONTROL!L2:S2", { unformatted: true }))[0] ?? [];
+  const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
+
+  return {
+    pqrsfHoy: num(fila[0]),
+    pqrsfMes: num(fila[1]),
+    radicadosHoy: num(fila[3]),
+    radicadosMes: num(fila[4]),
+    gestionesTotalesMes: num(fila[5]),
+    pqrsfPorComunicar: num(fila[6]),
+    pqrsfComunicados: num(fila[7]),
+  };
+}

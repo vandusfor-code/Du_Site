@@ -5,7 +5,7 @@ import { logoutAction } from "./logout/actions";
 import { obtenerAuditoriasConEstado, obtenerConteoMesAnterior } from "@/lib/metricas";
 import { obtenerDatosCompletos } from "@/lib/duacademy";
 import { obtenerNotificaciones as obtenerNotificacionesRadicaciones } from "@/lib/radicaciones";
-import { getNotificaciones as obtenerNotificacionesLineaAmiga } from "@/lib/lineaAmiga";
+import { getNotificaciones as obtenerNotificacionesLineaAmiga, obtenerGestionesMes } from "@/lib/lineaAmiga";
 
 const TRACKABLE = ["metricas", "quiz", "radicaciones", "linea-amiga"] as const;
 
@@ -120,10 +120,11 @@ export default async function Home() {
 
   const tieneMetricas = moduloIds.includes("metricas");
 
-  const [tareas, auditoriasR, mesAnteriorR] = await Promise.allSettled([
+  const [tareas, auditoriasR, mesAnteriorR, gestionesMesR] = await Promise.allSettled([
     obtenerTareasPendientes(nombre, usuario, moduloIds),
     tieneMetricas ? obtenerAuditoriasConEstado(usuario) : Promise.resolve([]),
     tieneMetricas ? obtenerConteoMesAnterior(usuario) : Promise.resolve(0),
+    obtenerGestionesMes(),
   ]);
 
   const listaTareas = tareas.status === "fulfilled" ? tareas.value : [];
@@ -156,7 +157,9 @@ export default async function Home() {
     };
   }
 
-  const data: HomeData = { progresoPct, progresoLabel, resumen };
+  const gestionesMes = gestionesMesR.status === "fulfilled" ? gestionesMesR.value : null;
+
+  const data: HomeData = { progresoPct, progresoLabel, resumen, gestionesMes };
 
   return <HomeView nombre={nombre} modulos={modulos} logoutAction={logoutAction} tareas={listaTareas} data={data} />;
 }
