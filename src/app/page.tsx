@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { modulosPermitidos } from "@/lib/modulos";
 import { HomeView, type TareaPendiente, type HomeData } from "@/components/home-view";
 import { logoutAction } from "./logout/actions";
-import { obtenerAuditoriasConEstado, obtenerConteoMesAnterior } from "@/lib/metricas";
+import { obtenerAuditoriasConEstado, obtenerConteoMesAnterior, obtenerCronograma } from "@/lib/metricas";
 import { obtenerDatosCompletos } from "@/lib/duacademy";
 import { obtenerNotificaciones as obtenerNotificacionesRadicaciones } from "@/lib/radicaciones";
 import { getNotificaciones as obtenerNotificacionesLineaAmiga, obtenerGestionesMes } from "@/lib/lineaAmiga";
@@ -120,14 +120,48 @@ export default async function Home() {
 
   const tieneMetricas = moduloIds.includes("metricas");
 
-  const [tareas, auditoriasR, mesAnteriorR, gestionesMesR] = await Promise.allSettled([
+  const [tareas, auditoriasR, mesAnteriorR, gestionesMesR, cronogramaR] = await Promise.allSettled([
     obtenerTareasPendientes(nombre, usuario, moduloIds),
     tieneMetricas ? obtenerAuditoriasConEstado(usuario) : Promise.resolve([]),
     tieneMetricas ? obtenerConteoMesAnterior(usuario) : Promise.resolve(0),
     obtenerGestionesMes(),
+    tieneMetricas ? obtenerCronograma(nombre) : Promise.resolve([]),
   ]);
 
   const listaTareas = tareas.status === "fulfilled" ? tareas.value : [];
+  const sesiones = cronogramaR.status === "fulfilled" ? cronogramaR.value : [];
+
+  const DIAS_SEMANA = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  sesiones.forEach((s) => {
+    const fechaSesion = new Date(s.anio, s.mes, s.dia);
+    const fechaTexto = `${DIAS_SEMANA[fechaSesion.getDay()]} ${String(s.dia).padStart(2, "0")}/${String(s.mes + 1).padStart(2, "0")} · ${s.horario}`;
+    listaTareas.push({
+      id: `cronograma-${s.anio}-${s.mes}-${s.dia}-${s.horario}`,
+      titulo: `${s.actividad} con ${s.companero}`,
+      moduloId: "metricas",
+      moduloNombre: "Métricas",
+      moduloHref: "/modulos/metricas",
+      fecha: fechaTexto,
+      prioridad: "Media",
+    });
+  });
+  {
+    const rango = { Alta: 0, Media: 1, Baja: 2 } as const;
+    listaTareas.sort((a, b) => rango[a.prioridad] - rango[b.prioridad]);
+  }
+
+  const hoyBase = new Date();
+  const diasMarcados = new Map<number, string[]>();
+  sesiones
+    .filter((s) => s.anio === hoyBase.getFullYear() && s.mes === hoyBase.getMonth())
+    .forEach((s) => {
+      const detalle = `${s.actividad} con ${s.companero} · ${s.horario}`;
+      diasMarcados.set(s.dia, [...(diasMarcados.get(s.dia) ?? []), detalle]);
+    });
+  const calendario: HomeData["calendario"] = Array.from(diasMarcados.entries()).map(([dia, detalles]) => ({
+    dia,
+    detalle: detalles.join(" · "),
+  }));
 
   // "Tu progreso": módulos con seguimiento real (Métricas, DuAcademy, Radicaciones, Línea Amiga)
   // que el asesor tiene asignados y que hoy no tienen ningún pendiente.
@@ -159,7 +193,7 @@ export default async function Home() {
 
   const gestionesMes = gestionesMesR.status === "fulfilled" ? gestionesMesR.value : null;
 
-  const data: HomeData = { progresoPct, progresoLabel, resumen, gestionesMes };
+  const data: HomeData = { progresoPct, progresoLabel, resumen, gestionesMes, calendario };
 
   return <HomeView nombre={nombre} modulos={modulos} logoutAction={logoutAction} tareas={listaTareas} data={data} />;
 }

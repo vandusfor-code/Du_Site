@@ -157,9 +157,12 @@
 .dusite-home .calHead div { display: flex; gap: 14px; color: var(--text-tertiary); }
 .dusite-home .dow, .dusite-home .week { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; }
 .dusite-home .dow { margin: 20px 0 6px; color: var(--text-tertiary); font-size: 10px; font-weight: 600; }
-.dusite-home .week span { height: 32px; display: grid; place-items: center; font-size: 12px; font-weight: 500; border-radius: 50%; transition: background 150ms ease; }
+.dusite-home .week span { position: relative; height: 32px; display: grid; place-items: center; font-size: 12px; font-weight: 500; border-radius: 50%; transition: background 150ms ease; }
 .dusite-home .week span:not(.today):hover { background: var(--bg-subtle); cursor: default; }
 .dusite-home .week .today { background: var(--brand-purple); color: #fff; font-weight: 600; }
+.dusite-home .week span.hasEvent { cursor: help; }
+.dusite-home .week span.hasEvent::after { content: ""; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--metrics); }
+.dusite-home .week span.hasEvent.today::after { background: #fff; }
 
 .dusite-home .pending { padding: 20px 22px 8px; }
 .dusite-home .pendingHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }

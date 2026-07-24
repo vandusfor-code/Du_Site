@@ -336,3 +336,47 @@ export async function guardarCompromiso(
     return "ERROR";
   }
 }
+
+/* ===================== */
+/* CRONOGRAMA */
+/* ===================== */
+
+export interface SesionCronograma {
+  anio: number;
+  mes: number;
+  dia: number;
+  horario: string;
+  actividad: string;
+  companero: string;
+  link: string;
+}
+
+export async function obtenerCronograma(nombre: string): Promise<SesionCronograma[]> {
+  const id = sheetId();
+  const data = await readRange(id, "Cronograma!A2:G", { unformatted: true });
+  const nNorm = nombre.trim().toLowerCase();
+  const resultado: SesionCronograma[] = [];
+
+  for (const row of data) {
+    const agente1 = texto(row, 4).trim();
+    const agente2 = texto(row, 5).trim();
+    const esAgente1 = agente1.toLowerCase() === nNorm;
+    const esAgente2 = agente2.toLowerCase() === nNorm;
+    if (!esAgente1 && !esAgente2) continue;
+
+    const fecha = parseSheetDate(row[0]);
+    if (!fecha) continue;
+
+    resultado.push({
+      anio: fecha.getUTCFullYear(),
+      mes: fecha.getUTCMonth(),
+      dia: fecha.getUTCDate(),
+      horario: texto(row, 2),
+      actividad: texto(row, 3),
+      companero: esAgente1 ? agente2 : agente1,
+      link: texto(row, 6),
+    });
+  }
+
+  return resultado;
+}

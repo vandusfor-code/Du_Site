@@ -46,6 +46,8 @@ export interface HomeData {
     tendenciaPct: number | null;
   } | null;
   gestionesMes: GestionesMes | null;
+  /** Días del mes actual con sesiones de Cronograma (Role Play / Escuchas) asignadas. */
+  calendario: { dia: number; detalle: string }[];
 }
 
 const MODULO_TONE: Record<ModuloId, string> = {
@@ -183,6 +185,8 @@ export function HomeView({
   const progresoPct = data?.progresoPct ?? 0;
   const progresoMensaje =
     progresoPct >= 80 ? "¡Estás haciendo un gran trabajo! 💚" : progresoPct >= 50 ? "Vas por buen camino, sigue así." : "Aún tienes pendientes por resolver.";
+
+  const diasMarcadosMap = new Map((data?.calendario ?? []).map((c) => [c.dia, c.detalle]));
 
   return (
     <div className="dusite-home">
@@ -370,11 +374,15 @@ export function HomeView({
             </div>
             {semanas.map((semana, i) => (
               <div className="week" key={i}>
-                {semana.map((d, j) => (
-                  <span key={j} className={d === diaActual ? "today" : ""}>
-                    {d ?? ""}
-                  </span>
-                ))}
+                {semana.map((d, j) => {
+                  const marcado = d ? diasMarcadosMap.get(d) : undefined;
+                  const clases = [d === diaActual ? "today" : "", marcado ? "hasEvent" : ""].filter(Boolean).join(" ");
+                  return (
+                    <span key={j} className={clases || undefined} title={marcado}>
+                      {d ?? ""}
+                    </span>
+                  );
+                })}
               </div>
             ))}
           </article>
