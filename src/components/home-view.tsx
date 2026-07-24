@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Clock3, LogOut } from "lucide-react";
 import type { Modulo, ModuloId } from "@/lib/modulos";
+import { useModuleSound } from "@/lib/use-module-sound";
 
 export interface TareaPendiente {
   id: string;
@@ -213,7 +214,7 @@ export function HomeView({
 }) {
   const saludo = useSaludo();
   const primerNombre = nombre.split(" ")[0] || nombre;
-  const [soundOn, setSoundOn] = useState(true);
+  const { soundOn, toggleSound, playClick } = useModuleSound();
   const alertas = tareas.filter((t) => t.prioridad === "Alta").length;
 
   const { countdown: turnoCountdown, label: turnoLabel } = useTurnoCountdown(data?.turno.horario ?? null);
@@ -241,8 +242,8 @@ export function HomeView({
           <span style={{ fontSize: 12, fontWeight: 700, color: "#8B90A0", padding: "8px 16px" }}>Analítica</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <SoundIcon on={soundOn} onClick={() => setSoundOn((v) => !v)} />
-          <Link href="#pendientes" style={{ position: "relative", color: "#6B7280", cursor: "pointer", display: "flex" }}>
+          <SoundIcon on={soundOn} onClick={toggleSound} />
+          <Link href="#pendientes" onClick={playClick} style={{ position: "relative", color: "#6B7280", cursor: "pointer", display: "flex" }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
               <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.7 21a2 2 0 01-3.4 0" />
@@ -268,7 +269,7 @@ export function HomeView({
         }}
       >
         {/* Left column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="home-fade" style={{ display: "flex", flexDirection: "column", gap: 16, animationDelay: "0s" }}>
           <div style={{ background: "#fff", borderRadius: 22, padding: 24, boxShadow: "0 4px 20px rgba(43,35,79,0.05)" }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: "#1A1535", marginBottom: 4 }}>Hola, {primerNombre}.</div>
             <div style={{ fontSize: 12, color: "#9AA0AC", fontWeight: 500, lineHeight: 1.5, marginBottom: 18 }}>
@@ -296,7 +297,12 @@ export function HomeView({
                 <div style={{ fontSize: 13, fontWeight: 800, color: "#1A1535" }}>{data?.progresoLabel ?? "—"}</div>
               </div>
             </div>
-            <Link href="#pendientes" style={{ display: "block", background: "#2B234F", color: "#CCFF00", textAlign: "center", padding: 12, borderRadius: 13, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+            <Link
+              href="#pendientes"
+              onClick={playClick}
+              className="home-btn"
+              style={{ display: "block", background: "#2B234F", color: "#CCFF00", textAlign: "center", padding: 12, borderRadius: 13, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
+            >
               Ver agenda
             </Link>
           </div>
@@ -308,7 +314,7 @@ export function HomeView({
           {data?.turno.horario && (
             <div style={{ background: "linear-gradient(155deg,#2B234F,#1A1535)", borderRadius: 22, padding: "20px 22px", position: "relative", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#CCFF00" }} />
+                <span className="home-pulse-lime" style={{ width: 6, height: 6, borderRadius: "50%", background: "#CCFF00" }} />
                 <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 9.5, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase" }}>Tu turno</span>
               </div>
               <div style={{ color: "#fff", fontSize: 26, fontWeight: 900, letterSpacing: -0.8, fontVariantNumeric: "tabular-nums" }}>{turnoCountdown}</div>
@@ -318,11 +324,16 @@ export function HomeView({
         </div>
 
         {/* Middle column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+        <div className="home-fade" style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0, animationDelay: "0.08s" }}>
           {(tieneModulo("metricas") || tieneModulo("pqrsf-data")) && (
             <div style={{ display: "grid", gridTemplateColumns: tieneModulo("metricas") && tieneModulo("pqrsf-data") ? "2fr 1fr" : "1fr", gap: 14, minWidth: 0 }}>
               {tieneModulo("metricas") && (
-                <Link href={hrefModulo("metricas")} style={{ background: "#fff", borderRadius: 18, padding: 18, minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)", display: "block" }}>
+                <Link
+                  href={hrefModulo("metricas")}
+                  onClick={playClick}
+                  className="home-card"
+                  style={{ background: "#fff", borderRadius: 18, padding: 18, minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)", display: "block" }}
+                >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                     <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>
                       {data?.calidad?.label ?? "Métricas"}
@@ -343,7 +354,12 @@ export function HomeView({
                 </Link>
               )}
               {tieneModulo("pqrsf-data") && (
-                <Link href={hrefModulo("pqrsf-data")} style={{ background: "#fff", borderRadius: 18, padding: 18, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)", display: "flex", flexDirection: "column" }}>
+                <Link
+                  href={hrefModulo("pqrsf-data")}
+                  onClick={playClick}
+                  className="home-card"
+                  style={{ background: "#fff", borderRadius: 18, padding: 18, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)", display: "flex", flexDirection: "column" }}
+                >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                     <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>PQRSF DATA</span>
                     <span style={{ color: "#C4C9D6", fontSize: 13 }}>→</span>
@@ -379,7 +395,12 @@ export function HomeView({
               }}
             >
               {tieneModulo("radicaciones") && (
-                <Link href={hrefModulo("radicaciones")} style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}>
+                <Link
+                  href={hrefModulo("radicaciones")}
+                  onClick={playClick}
+                  className="home-card"
+                  style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}
+                >
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                     <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Radicaciones</span>
                   </div>
@@ -398,7 +419,12 @@ export function HomeView({
                 </Link>
               )}
               {tieneModulo("quiz") && (
-                <Link href={hrefModulo("quiz")} style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}>
+                <Link
+                  href={hrefModulo("quiz")}
+                  onClick={playClick}
+                  className="home-card"
+                  style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}
+                >
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                     <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Du Academy</span>
                   </div>
@@ -416,9 +442,14 @@ export function HomeView({
                 </Link>
               )}
               {tieneModulo("linea-amiga") && (
-                <Link href={hrefModulo("linea-amiga")} style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}>
+                <Link
+                  href={hrefModulo("linea-amiga")}
+                  onClick={playClick}
+                  className="home-card"
+                  style={{ background: "#fff", borderRadius: 18, padding: 16, cursor: "pointer", minWidth: 0, boxShadow: "0 4px 16px rgba(43,35,79,0.05)" }}
+                >
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
+                    <span className="home-pulse-green" style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
                     <span style={{ fontSize: 10.5, fontWeight: 800, color: "#9AA0AC", letterSpacing: 0.8, textTransform: "uppercase" }}>Línea Amiga</span>
                   </div>
                   {data?.cardLineaAmiga ? (
@@ -504,7 +535,7 @@ export function HomeView({
         </div>
 
         {/* Right column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="home-fade" style={{ display: "flex", flexDirection: "column", gap: 16, animationDelay: "0.16s" }}>
           <div style={{ background: "#fff", borderRadius: 22, padding: 20, boxShadow: "0 4px 20px rgba(43,35,79,0.05)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <span style={{ fontSize: 13.5, fontWeight: 800, color: "#1A1535" }}>{mesLabel}</span>
@@ -555,6 +586,8 @@ export function HomeView({
                   <Link
                     key={a.id}
                     href={a.moduloHref}
+                    onClick={playClick}
+                    className="home-task"
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -583,6 +616,22 @@ export function HomeView({
       </div>
 
       <style>{`
+        @keyframes duFadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes duPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); } 50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); } }
+        @keyframes duPulseLime { 0%, 100% { box-shadow: 0 0 0 0 rgba(204,255,0,0.5); } 50% { box-shadow: 0 0 0 6px rgba(204,255,0,0); } }
+
+        .home-fade { animation: duFadeUp 0.45s cubic-bezier(0.16,1,0.3,1) both; }
+
+        .home-card, .home-task, .home-btn {
+          transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .home-card:hover { transform: translateY(-3px); }
+        .home-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(43,35,79,0.25); }
+        .home-task:hover { background: #FAFAFB; }
+
+        .home-pulse-green { animation: duPulse 2s infinite; }
+        .home-pulse-lime { animation: duPulseLime 2s infinite; }
+
         @media (max-width: 1080px) {
           .home-grid { grid-template-columns: 1fr !important; }
         }
