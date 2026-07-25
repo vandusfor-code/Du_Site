@@ -516,3 +516,18 @@ export async function obtenerGestionesMes(): Promise<GestionesMes> {
     pqrsfComunicados: num(fila[7]),
   };
 }
+
+export interface ResumenGestion {
+  devueltos: number;
+  campana: number;
+  respondidos: number;
+  porResponder: number;
+}
+
+// Pendiente: el 2026-07-26 el usuario indicó que aún no existen las
+// columnas/pestañas para estos 4 conteos por agente (las va a crear él mismo
+// y luego nos dice dónde quedaron). Hasta entonces devolvemos ceros reales
+// (no hay nada que contar todavía) en vez de inventar números.
+export async function obtenerResumenGestion(_agente: string): Promise<ResumenGestion> {
+  return { devueltos: 0, campana: 0, respondidos: 0, porResponder: 0 };
+}

@@ -7,17 +7,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertOctagon,
-  BarChart3,
   Bell,
   BellRing,
   Brain,
   CheckCircle,
   Clock,
   ExternalLink,
+  FileText,
   History,
+  Megaphone,
   MessageCircle,
   MessageSquare,
   Power,
+  Reply,
   Search,
   Send,
   User,
@@ -35,6 +37,7 @@ import {
   buscarSimilitudPQRSFAction,
   obtenerHorarioHoyAction,
   verificarHorariosAction,
+  obtenerResumenGestionAction,
 } from "./actions";
 import type {
   ResultadoHistorial,
@@ -43,6 +46,7 @@ import type {
   SugerenciaPQRSF,
   HorarioHoy,
   PQRSFEncontrado,
+  ResumenGestion,
 } from "@/lib/lineaAmiga";
 import { SoundToggleButton } from "@/components/module-shell";
 
@@ -157,6 +161,33 @@ function Autocomplete({
   );
 }
 
+function ResumenCard({
+  Icon,
+  tipo,
+  valor,
+}: {
+  Icon: typeof FileText;
+  tipo: string;
+  valor: number;
+}) {
+  return (
+    <div className="resumen-card">
+      <div className="resumen-icon">
+        <Icon size={20} />
+      </div>
+      <div className="resumen-label">
+        PQRSF
+        <br />
+        {tipo}
+      </div>
+      <div className="resumen-valor">{valor}</div>
+      <button type="button" className="resumen-link">
+        Ver detalles <ExternalLink size={11} />
+      </button>
+    </div>
+  );
+}
+
 export default function LineaAmigaDashboard({
   nombre,
   sugerenciasUrl,
@@ -175,6 +206,7 @@ export default function LineaAmigaDashboard({
   const [guardando, setGuardando] = useState(false);
 
   const [historial, setHistorial] = useState<ResultadoHistorial>({ historial: [], hoy: 0 });
+  const [resumenGestion, setResumenGestion] = useState<ResumenGestion>({ devueltos: 0, campana: 0, respondidos: 0, porResponder: 0 });
 
   const [chat, setChat] = useState<MensajeChat[]>([]);
   const [chatMsg, setChatMsg] = useState("");
@@ -265,6 +297,7 @@ export default function LineaAmigaDashboard({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial única al montar, no deriva de props/estado
     cargarNotificaciones();
     obtenerHorarioHoyAction().then(setSchedule);
+    obtenerResumenGestionAction().then(setResumenGestion);
 
     const pollChat = setInterval(cargarChat, 5000);
     const pollNotif = setInterval(cargarNotificaciones, 10000);
@@ -383,7 +416,6 @@ export default function LineaAmigaDashboard({
     <div className="linea-scope">
       <div className="bg-blobs">
         <div className="blob blob-1" />
-        <div className="blob blob-2" />
       </div>
 
       <audio ref={audioNotifRef} src={SND_NOTIF} preload="auto" />
@@ -539,6 +571,16 @@ export default function LineaAmigaDashboard({
                   {guardando && <div className="spinner" style={{ display: "block" }} />}
                 </button>
               </div>
+
+              <div className="resumen-gestion">
+                <div className="resumen-titulo">Resumen de gestión</div>
+                <div className="resumen-grid">
+                  <ResumenCard Icon={FileText} tipo="Devueltos" valor={resumenGestion.devueltos} />
+                  <ResumenCard Icon={Megaphone} tipo="Campaña" valor={resumenGestion.campana} />
+                  <ResumenCard Icon={Reply} tipo="Respondidos" valor={resumenGestion.respondidos} />
+                  <ResumenCard Icon={Clock} tipo="por responder" valor={resumenGestion.porResponder} />
+                </div>
+              </div>
             </div>
 
             <aside>
@@ -576,7 +618,12 @@ export default function LineaAmigaDashboard({
                     <div style={{ fontSize: 40, fontWeight: 900, margin: "4px 0" }}>{historial.hoy}</div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--brand-lime)" }}>Registros Completados</div>
                   </div>
-                  <BarChart3 size={48} style={{ opacity: 0.2 }} />
+                  <div className="mini-bars" aria-hidden="true">
+                    <i style={{ height: "35%" }} />
+                    <i style={{ height: "55%" }} />
+                    <i style={{ height: "75%" }} />
+                    <i style={{ height: "100%" }} />
+                  </div>
                 </div>
               </div>
 

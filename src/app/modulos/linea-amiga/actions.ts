@@ -13,6 +13,7 @@ import {
   buscarSimilitudPQRSF,
   obtenerHorarioHoy,
   verificarHorarios,
+  obtenerResumenGestion,
   type DatosPQRSF,
   type ResultadoGuardarPQRSF,
   type PQRSFEncontrado,
@@ -21,6 +22,7 @@ import {
   type Notificacion,
   type SugerenciaPQRSF,
   type HorarioHoy,
+  type ResumenGestion,
 } from "@/lib/lineaAmiga";
 
 async function agenteActual(): Promise<string> {
@@ -83,4 +85,9 @@ export async function obtenerHorarioHoyAction(): Promise<HorarioHoy | null> {
 export async function verificarHorariosAction(): Promise<void> {
   const agente = await agenteActual();
   await verificarHorarios(agente);
+}
+
+export async function obtenerResumenGestionAction(): Promise<ResumenGestion> {
+  const agente = await agenteActual();
+  return obtenerResumenGestion(agente);
 }
