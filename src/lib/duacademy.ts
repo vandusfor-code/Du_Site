@@ -1,5 +1,5 @@
 import "server-only";
-import { readRange, appendRow, updateRange, formatSheetDate } from "@/lib/sheets";
+import { readRange, appendRow, updateRange, formatSheetDate, parseSheetDate, hoyEnBogota } from "@/lib/sheets";
 import { enviarCorreoMasivo } from "@/lib/mailer";
 import { correoRecordatorioModulos } from "@/lib/emailTemplates";
 
@@ -31,6 +31,25 @@ function filasAObjetos(data: unknown[][]): FilaObjeto[] {
 function numeroONaN(valor: unknown): number {
   if (typeof valor === "number") return valor;
   return parseFloat((valor ?? "").toString());
+}
+
+// Días consecutivos con al menos una actividad, terminando hoy (o ayer si hoy
+// todavía no hay actividad, para no romper la racha antes de que acabe el día).
+function calcularRacha(fechas: Date[]): number {
+  if (fechas.length === 0) return 0;
+  const dias = new Set(fechas.map((f) => `${f.getFullYear()}-${f.getMonth()}-${f.getDate()}`));
+
+  const hoy = hoyEnBogota();
+  const cursor = new Date(hoy.anio, hoy.mes, hoy.dia);
+  const claveHoy = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
+  if (!dias.has(claveHoy)) cursor.setDate(cursor.getDate() - 1);
+
+  let racha = 0;
+  while (dias.has(`${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`)) {
+    racha++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return racha;
 }
 
 /* ===================== */
@@ -70,6 +89,8 @@ export interface DatosCompletos {
   historial: HistorialItem[];
   todosLosCursos: FilaObjeto[];
   todasLasSims: FilaObjeto[];
+  /** Días consecutivos con actividad registrada en PROGRESO, terminando hoy. */
+  racha: number;
 }
 
 export async function obtenerDatosCompletos(nombre: string): Promise<DatosCompletos | null> {
@@ -97,20 +118,23 @@ export async function obtenerDatosCompletos(nombre: string): Promise<DatosComple
   const todosLosCursos = filasAObjetos(cursosRaw);
   const todasLasSims = filasAObjetos(simsRaw);
 
-  const historial: HistorialItem[] = progresoRaw
-    .slice(1)
-    .filter((r) => texto(r, 1).trim().toLowerCase() === eNorm)
-    .map((h) => {
-      const notaExamen = numeroONaN(h[4]);
-      const notaIA = numeroONaN(h[6]);
-      const valorNota = !isNaN(notaExamen) ? notaExamen : !isNaN(notaIA) ? notaIA : 0;
-      const notaFinal = valorNota > 1 ? valorNota / 100 : valorNota;
-      return {
-        idItem: texto(h, 2),
-        fecha: formatSheetDate(h[3], "dd/MM/yyyy HH:mm:ss"),
-        nota: notaFinal,
-      };
-    });
+  const filasProgresoUsuario = progresoRaw.slice(1).filter((r) => texto(r, 1).trim().toLowerCase() === eNorm);
+
+  const historial: HistorialItem[] = filasProgresoUsuario.map((h) => {
+    const notaExamen = numeroONaN(h[4]);
+    const notaIA = numeroONaN(h[6]);
+    const valorNota = !isNaN(notaExamen) ? notaExamen : !isNaN(notaIA) ? notaIA : 0;
+    const notaFinal = valorNota > 1 ? valorNota / 100 : valorNota;
+    return {
+      idItem: texto(h, 2),
+      fecha: formatSheetDate(h[3], "dd/MM/yyyy HH:mm:ss"),
+      nota: notaFinal,
+    };
+  });
+
+  const fechasActividad = filasProgresoUsuario
+    .map((h) => parseSheetDate(h[3]))
+    .filter((d): d is Date => d !== null);
 
   return {
     nombre: texto(user, 1),
@@ -120,7 +144,57 @@ export async function obtenerDatosCompletos(nombre: string): Promise<DatosComple
     historial,
     todosLosCursos,
     todasLasSims,
+    racha: calcularRacha(fechasActividad),
   };
+}
+
+/* ===================== */
+/* LEADERBOARD */
+/* ===================== */
+
+export interface LeaderboardEntry {
+  nombre: string;
+  completados: number;
+  racha: number;
+}
+
+export async function obtenerLeaderboard(): Promise<LeaderboardEntry[]> {
+  const id = sheetId();
+  const [usuarios, progreso] = await Promise.all([
+    readRange(id, "USUARIOS"),
+    readRange(id, "PROGRESO", { unformatted: true }),
+  ]);
+
+  const nombrePorEmail = new Map<string, string>();
+  usuarios.slice(1).forEach((r) => {
+    const email = texto(r, 2).trim().toLowerCase();
+    if (email) nombrePorEmail.set(email, texto(r, 1) || email);
+  });
+
+  const porEmail = new Map<string, { items: Set<string>; fechas: Date[] }>();
+  progreso.slice(1).forEach((r) => {
+    const email = texto(r, 1).trim().toLowerCase();
+    if (!email) return;
+    if (!porEmail.has(email)) porEmail.set(email, { items: new Set(), fechas: [] });
+    const entry = porEmail.get(email)!;
+    const idItem = texto(r, 2).trim();
+    if (idItem) entry.items.add(idItem);
+    const fecha = parseSheetDate(r[3]);
+    if (fecha) entry.fechas.push(fecha);
+  });
+
+  const resultado: LeaderboardEntry[] = [];
+  porEmail.forEach((data, email) => {
+    if (data.items.size === 0) return;
+    resultado.push({
+      nombre: nombrePorEmail.get(email) || email,
+      completados: data.items.size,
+      racha: calcularRacha(data.fechas),
+    });
+  });
+
+  resultado.sort((a, b) => b.completados - a.completados);
+  return resultado.slice(0, 5);
 }
 
 /* ===================== */

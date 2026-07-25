@@ -11,11 +11,13 @@ import {
   obtenerDatosAdmin,
   asignarModulosUsuario,
   enviarCorreoGeneral,
+  obtenerLeaderboard,
   type Perfil,
   type DatosCompletos,
   type Pregunta,
   type MensajeIA,
   type DatosAdmin,
+  type LeaderboardEntry,
 } from "@/lib/duacademy";
 
 async function perfilActual(): Promise<Perfil> {
@@ -38,6 +40,11 @@ async function requireAdmin(): Promise<Perfil> {
 export async function obtenerDatosCompletosAction(): Promise<DatosCompletos | null> {
   const perfil = await perfilActual();
   return obtenerDatosCompletos(perfil.nombre);
+}
+
+export async function obtenerLeaderboardAction(): Promise<LeaderboardEntry[]> {
+  await perfilActual();
+  return obtenerLeaderboard();
 }
 
 export async function obtenerPreguntasAction(idCurso: string): Promise<Pregunta[]> {

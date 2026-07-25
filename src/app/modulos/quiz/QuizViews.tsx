@@ -1,7 +1,20 @@
 "use client";
 
-import { useEffect, useState, type RefObject } from "react";
-import type { HistorialItem, Pregunta, FilaObjeto, DatosAdmin } from "@/lib/duacademy";
+import { useEffect, useState, type RefObject, type ComponentType } from "react";
+import {
+  ArrowRight,
+  BookOpen,
+  CircleCheck,
+  Star,
+  Flame,
+  PlaySquare,
+  PieChart,
+  GraduationCap,
+  ListChecks,
+  Search,
+  Trophy,
+} from "lucide-react";
+import type { HistorialItem, Pregunta, FilaObjeto, DatosAdmin, LeaderboardEntry } from "@/lib/duacademy";
 
 const LETRAS = ["A", "B", "C", "D"] as const;
 
@@ -26,6 +39,87 @@ function BotonVolver({ onClick }: { onClick: () => void }) {
 /* DASHBOARD */
 /* ===================== */
 
+function StatCard({
+  Icon,
+  tone,
+  label,
+  value,
+  sub,
+}: {
+  Icon: ComponentType<{ size?: number }>;
+  tone: "violet" | "green" | "yellow" | "pink";
+  label: string;
+  value: string | number;
+  sub: string;
+}) {
+  const tones: Record<string, string> = {
+    violet: "bg-indigo-100 text-indigo-600",
+    green: "bg-emerald-100 text-emerald-600",
+    yellow: "bg-amber-100 text-amber-600",
+    pink: "bg-rose-100 text-rose-600",
+  };
+  return (
+    <div className="stat-card flex items-center gap-4">
+      <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${tones[tone]}`}>
+        <Icon size={20} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{label}</p>
+        <p className="text-xl font-extrabold text-slate-800 tracking-tight">{value}</p>
+        <p className="text-[9px] text-slate-400 font-medium truncate">{sub}</p>
+      </div>
+    </div>
+  );
+}
+
+function TarjetaModulo({
+  idEtiqueta,
+  tipoEtiqueta,
+  titulo,
+  imagen,
+  completado,
+  aprobado,
+  notaPct,
+  onClick,
+}: {
+  idEtiqueta: string;
+  tipoEtiqueta: "Módulo" | "Simulación";
+  titulo: string;
+  imagen: string | null;
+  completado: boolean;
+  aprobado: boolean;
+  notaPct: number;
+  onClick: () => void;
+}) {
+  return (
+    <div onClick={onClick} className="course-card cursor-pointer group">
+      <div className="w-full h-28 rounded-[1.2rem] overflow-hidden bg-indigo-50 flex items-center justify-center text-3xl">
+        {imagen ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imagen} alt={titulo} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+        ) : (
+          "🎧"
+        )}
+      </div>
+      <div className="pt-3 px-1 pb-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="course-tag">{tipoEtiqueta}</span>
+          {completado && (
+            <span className={`${aprobado ? "badge-aprobado" : "badge-reprobado"} text-[7px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest shrink-0`}>
+              {aprobado ? "Aprobado" : "No Aprobado"}
+            </span>
+          )}
+        </div>
+        <h4 className="font-extrabold text-slate-800 text-[13px] mt-2 mb-1 leading-snug group-hover:text-indigo-600 transition-colors line-clamp-2">{titulo}</h4>
+        <div className="flex items-center gap-2 mt-3">
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{idEtiqueta}</span>
+          {completado && <span className="text-[9px] font-bold text-slate-400 ml-auto">{notaPct.toFixed(0)}%</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DashboardView({
   nombre,
   cargando,
@@ -34,6 +128,7 @@ export function DashboardView({
   statModulos,
   statCompletados,
   statPromedio,
+  statRacha,
   historial,
   todosLosCursos,
   todasLasSims,
@@ -41,6 +136,7 @@ export function DashboardView({
   onSearch,
   onAbrirModulo,
   onAbrirSimulacion,
+  proximoPendiente,
 }: {
   nombre: string;
   cargando: boolean;
@@ -49,6 +145,7 @@ export function DashboardView({
   statModulos: number;
   statCompletados: number;
   statPromedio: string;
+  statRacha: number;
   historial: HistorialItem[];
   todosLosCursos: FilaObjeto[];
   todasLasSims: FilaObjeto[];
@@ -56,58 +153,106 @@ export function DashboardView({
   onSearch: (q: string) => void;
   onAbrirModulo: (curso: FilaObjeto) => void;
   onAbrirSimulacion: (sim: FilaObjeto) => void;
+  proximoPendiente: { tipo: "curso" | "sim"; item: FilaObjeto } | null;
 }) {
+  const porcentajeCompletado = statModulos > 0 ? Math.round((statCompletados / statModulos) * 100) : 0;
+
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="hero-gradient rounded-[2rem] p-10 text-white relative overflow-hidden mb-8 shadow-2xl">
+      <div className="db-hero rounded-[2rem] p-10 relative overflow-hidden mb-8">
         <div className="relative z-10 max-w-lg">
-          <span className="inline-block px-4 py-1.5 bg-[#CCFF00] text-[#2B234F] rounded-full text-[9px] font-extrabold uppercase tracking-widest mb-4">
-            Plataforma de Éxito
-          </span>
-          <h2 className="text-3xl font-extrabold leading-tight mb-3 text-white tracking-tighter">
+          <span className="db-eyebrow">PLATAFORMA DE ÉXITO</span>
+          <h2 className="db-hero-title">
             Domina tus habilidades
             <br />
-            de Gestión.
+            de <em>Gestión.</em>
           </h2>
-          <p className="text-indigo-200 text-sm font-medium opacity-80 leading-relaxed">
+          <p className="db-hero-sub">
             Aprende a tu ritmo con módulos interactivos diseñados para la excelencia operativa, {nombre.split(" ")[0]}.
           </p>
+          <div className="flex flex-wrap gap-3 mt-6">
+            <button
+              type="button"
+              disabled={!proximoPendiente}
+              onClick={() =>
+                proximoPendiente &&
+                (proximoPendiente.tipo === "curso" ? onAbrirModulo(proximoPendiente.item) : onAbrirSimulacion(proximoPendiente.item))
+              }
+              className="db-btn-primary"
+            >
+              Continuar aprendiendo <ArrowRight size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => document.getElementById("db-modulos")?.scrollIntoView({ behavior: "smooth" })}
+              className="db-btn-secondary"
+            >
+              Explorar módulos
+            </button>
+          </div>
         </div>
-        <div className="absolute right-[-5%] top-[-10%] w-72 h-72 bg-indigo-500/20 rounded-full blur-[100px]" />
-        <div className="absolute right-[15%] bottom-[-20%] w-56 h-56 bg-[#CCFF00]/10 rounded-full blur-[80px]" />
+        <div className="db-hero-art" aria-hidden="true">
+          <span className="db-float-icon db-i1">
+            <PlaySquare size={22} />
+          </span>
+          <span className="db-float-icon db-i2">
+            <PieChart size={22} />
+          </span>
+          <span className="db-float-icon db-i3">
+            <BookOpen size={22} />
+          </span>
+          <span className="db-float-icon db-i4">
+            <GraduationCap size={22} />
+          </span>
+          <span className="db-float-icon db-i5">
+            <ListChecks size={22} />
+          </span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="stat-card flex items-center gap-4">
-          <div className="w-11 h-11 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 text-lg">📚</div>
-          <div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Módulos</p>
-            <p className="text-xl font-extrabold text-slate-800 tracking-tight">{statModulos}</p>
-          </div>
-        </div>
-        <div className="stat-card flex items-center gap-4">
-          <div className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 text-lg">✅</div>
-          <div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Completados</p>
-            <p className="text-xl font-extrabold text-slate-800 tracking-tight">{statCompletados}</p>
-          </div>
-        </div>
-        <div className="stat-card flex items-center gap-4">
-          <div className="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 text-lg">⭐</div>
-          <div>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Promedio</p>
-            <p className="text-xl font-extrabold text-slate-800 tracking-tight">{statPromedio}</p>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        <StatCard Icon={BookOpen} tone="violet" label="Módulos" value={statModulos} sub="Disponibles" />
+        <StatCard Icon={CircleCheck} tone="green" label="Completados" value={statCompletados} sub={`${porcentajeCompletado}% del total`} />
+        <StatCard Icon={Star} tone="yellow" label="Promedio General" value={statPromedio} sub="Rendimiento" />
+        <StatCard Icon={Flame} tone="pink" label="Racha Actual" value={statRacha} sub={statRacha === 1 ? "Día consecutivo" : "Días consecutivos"} />
       </div>
 
-      <div className="flex items-center gap-4 mb-6 px-2">
-        <h3 className="text-lg font-extrabold text-slate-800 tracking-tight whitespace-nowrap">Módulos de Aprendizaje</h3>
+      {proximoPendiente && (
+        <section className="mb-8">
+          <div className="db-section-head">
+            <h3>Continúa aprendiendo</h3>
+          </div>
+          <article
+            onClick={() =>
+              proximoPendiente.tipo === "curso" ? onAbrirModulo(proximoPendiente.item) : onAbrirSimulacion(proximoPendiente.item)
+            }
+            className="db-continue-card"
+          >
+            <div className="db-continue-thumb">
+              {proximoPendiente.tipo === "curso" && proximoPendiente.item.URL_IMAGEN ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={proximoPendiente.item.URL_IMAGEN} alt="" />
+              ) : (
+                <span>{proximoPendiente.tipo === "curso" ? "📘" : "🎧"}</span>
+              )}
+            </div>
+            <div className="flex-grow min-w-0">
+              <span className="db-status-badge">PENDIENTE</span>
+              <h4>{proximoPendiente.item.TITULO}</h4>
+              <p>{proximoPendiente.tipo === "curso" ? "Módulo" : "Simulación"} · {proximoPendiente.tipo === "curso" ? proximoPendiente.item.ID_MODULO : proximoPendiente.item.ID_SIMULACION}</p>
+            </div>
+            <button type="button" className="db-continue-btn">
+              Comenzar
+            </button>
+          </article>
+        </section>
+      )}
+
+      <div id="db-modulos" className="flex items-center gap-4 mb-6 px-2">
+        <h3 className="text-lg font-extrabold text-slate-800 tracking-tight whitespace-nowrap">Tus módulos</h3>
         <div className="h-px bg-slate-200 flex-grow opacity-40" />
         <div className="relative">
-          <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             placeholder="Buscar..."
@@ -119,43 +264,29 @@ export function DashboardView({
       </div>
 
       {cargando ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="skeleton h-36 rounded-[2rem]" />
-          <div className="skeleton h-36 rounded-[2rem]" />
-          <div className="skeleton h-36 rounded-[2rem]" />
-          <div className="skeleton h-36 rounded-[2rem]" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="skeleton h-52 rounded-[1.5rem]" />
+          <div className="skeleton h-52 rounded-[1.5rem]" />
+          <div className="skeleton h-52 rounded-[1.5rem]" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {cursos.map((curso) => {
             const notaData = historial.find((h) => h.idItem === (curso.ID_MODULO || "").trim());
             const completado = !!notaData;
             const notaPct = notaData ? notaData.nota * 100 : 0;
-            const aprobado = notaPct >= 70;
             return (
-              <div key={curso.ID_MODULO} onClick={() => onAbrirModulo(curso)} className="course-card p-6 flex gap-6 cursor-pointer group">
-                <div className="w-32 h-32 rounded-[1.5rem] overflow-hidden shrink-0 bg-slate-100 shadow-inner">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={curso.URL_IMAGEN || "https://via.placeholder.com/150"} alt={curso.TITULO} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                </div>
-                <div className="flex-grow py-1">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-[8px] font-extrabold text-indigo-500 uppercase tracking-widest">{curso.ID_MODULO}</span>
-                    {completado && (
-                      <span className={`${aprobado ? "badge-aprobado" : "badge-reprobado"} text-[7px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest`}>
-                        {aprobado ? "Aprobado" : "No Aprobado"}
-                      </span>
-                    )}
-                  </div>
-                  <h4 className="font-extrabold text-slate-800 text-sm mb-2 leading-snug group-hover:text-indigo-600 transition-colors">{curso.TITULO}</h4>
-                  <div className="flex items-center gap-3 mt-4">
-                    <div className="flex-grow h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className={`h-full ${aprobado ? "bg-indigo-500" : "bg-rose-500"} transition-all duration-1000`} style={{ width: completado ? "100%" : "0%" }} />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400">{notaPct.toFixed(0)}%</span>
-                  </div>
-                </div>
-              </div>
+              <TarjetaModulo
+                key={curso.ID_MODULO}
+                idEtiqueta={curso.ID_MODULO}
+                tipoEtiqueta="Módulo"
+                titulo={curso.TITULO}
+                imagen={curso.URL_IMAGEN || null}
+                completado={completado}
+                aprobado={notaPct >= 70}
+                notaPct={notaPct}
+                onClick={() => onAbrirModulo(curso)}
+              />
             );
           })}
 
@@ -163,33 +294,23 @@ export function DashboardView({
             const notaData = historial.find((h) => h.idItem === (sim.ID_SIMULACION || "").trim());
             const completado = !!notaData;
             const notaPct = notaData ? notaData.nota * 100 : 0;
-            const aprobado = notaPct >= 70;
             return (
-              <div key={sim.ID_SIMULACION} onClick={() => onAbrirSimulacion(sim)} className="course-card p-6 flex gap-6 cursor-pointer group">
-                <div className="w-32 h-32 rounded-[1.5rem] overflow-hidden shrink-0 bg-indigo-50 flex items-center justify-center text-4xl">🎧</div>
-                <div className="flex-grow py-1">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-[8px] font-extrabold text-indigo-500 uppercase tracking-widest">{sim.ID_SIMULACION}</span>
-                    {completado && (
-                      <span className={`${aprobado ? "badge-aprobado" : "badge-reprobado"} text-[7px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest`}>
-                        {aprobado ? "Aprobado" : "No Aprobado"}
-                      </span>
-                    )}
-                  </div>
-                  <h4 className="font-extrabold text-slate-800 text-sm mb-2 leading-snug group-hover:text-indigo-600 transition-colors">{sim.TITULO}</h4>
-                  <div className="flex items-center gap-3 mt-4">
-                    <div className="flex-grow h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className={`h-full ${aprobado ? "bg-indigo-500" : "bg-rose-500"} transition-all duration-1000`} style={{ width: completado ? "100%" : "0%" }} />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400">{notaPct.toFixed(0)}%</span>
-                  </div>
-                </div>
-              </div>
+              <TarjetaModulo
+                key={sim.ID_SIMULACION}
+                idEtiqueta={sim.ID_SIMULACION}
+                tipoEtiqueta="Simulación"
+                titulo={sim.TITULO}
+                imagen={null}
+                completado={completado}
+                aprobado={notaPct >= 70}
+                notaPct={notaPct}
+                onClick={() => onAbrirSimulacion(sim)}
+              />
             );
           })}
 
           {cursos.length === 0 && sims.length === 0 && (
-            <p className="text-sm text-slate-400 font-medium col-span-2 text-center py-16">
+            <p className="text-sm text-slate-400 font-medium col-span-full text-center py-16">
               {todosLosCursos.length + todasLasSims.length === 0
                 ? "Aún no tienes módulos asignados."
                 : "No se encontraron módulos con ese criterio de búsqueda."}
@@ -444,6 +565,71 @@ export function SimulacionView({
         </div>
       </div>
     </section>
+  );
+}
+
+/* ===================== */
+/* PANEL DERECHO (perfil, racha, leaderboard) */
+/* ===================== */
+
+export function RightSidebar({
+  nombre,
+  racha,
+  leaderboard,
+}: {
+  nombre: string;
+  racha: number;
+  leaderboard: LeaderboardEntry[];
+}) {
+  const mensajeRacha =
+    racha === 0
+      ? "Completa un módulo hoy para empezar tu racha."
+      : `Llevas ${racha} ${racha === 1 ? "día" : "días"} aprendiendo consecutivos. ¡Sigue así!`;
+
+  return (
+    <aside className="db-rightbar w-80 border-l p-7 flex flex-col shrink-0 overflow-y-auto custom-scrollbar z-20" style={{ background: "var(--bg-card)", borderColor: "var(--border-light)" }}>
+      <div className="db-profile">
+        <div className="db-profile-avatar">
+          {nombre.charAt(0).toUpperCase()}
+          <i />
+        </div>
+        <h2>{nombre}</h2>
+        <p>
+          <i /> AGENTE ACTIVO
+        </p>
+      </div>
+
+      <article className="db-streak-card">
+        <h3>{racha > 0 ? "¡Vas excelente! 🔥" : "Comienza tu racha 🔥"}</h3>
+        <p>{mensajeRacha}</p>
+      </article>
+
+      <article className="db-side-card">
+        <div className="db-side-title">
+          <h3>Leaderboard</h3>
+        </div>
+        {leaderboard.length === 0 ? (
+          <p className="text-[10px] text-slate-400 font-medium py-2">Aún no hay actividad registrada.</p>
+        ) : (
+          leaderboard.map((entry, i) => (
+            <div className="db-leader" key={entry.nombre}>
+              <b>{i + 1}</b>
+              <span className="db-leader-avatar">{entry.nombre.charAt(0).toUpperCase()}</span>
+              <div>
+                <strong>{entry.nombre}</strong>
+                <small>
+                  <Flame size={11} /> {entry.racha} {entry.racha === 1 ? "día" : "días"}
+                </small>
+              </div>
+              <span className="db-points">
+                <Trophy size={13} />
+                {entry.completados}
+              </span>
+            </div>
+          ))
+        )}
+      </article>
+    </aside>
   );
 }
 

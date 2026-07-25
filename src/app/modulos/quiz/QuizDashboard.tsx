@@ -13,6 +13,7 @@ import {
   obtenerDatosAdminAction,
   asignarModulosUsuarioAction,
   enviarCorreoGeneralAction,
+  obtenerLeaderboardAction,
 } from "./actions";
 import type {
   DatosCompletos,
@@ -20,6 +21,7 @@ import type {
   MensajeIA,
   DatosAdmin,
   FilaObjeto,
+  LeaderboardEntry,
 } from "@/lib/duacademy";
 import {
   DashboardView,
@@ -30,6 +32,7 @@ import {
   AdminView,
   ModalAsignacion,
   HistorySidebar,
+  RightSidebar,
 } from "./QuizViews";
 import { useModuleSound } from "@/lib/use-module-sound";
 import { SoundToggleButton } from "@/components/module-shell";
@@ -78,6 +81,8 @@ export default function QuizDashboard({
   const [adminData, setAdminData] = useState<DatosAdmin | null>(null);
   const [modalAsesor, setModalAsesor] = useState<{ email: string; nombre: string; cursos: string; sims: string } | null>(null);
 
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+
   const mostrarNotificacion = useCallback((msg: string, error = false) => {
     setNotif({ msg, error });
     if (notifTimeout.current) clearTimeout(notifTimeout.current);
@@ -107,6 +112,7 @@ export default function QuizDashboard({
 
     cargarDashboard();
     actualizarPingConexionAction();
+    obtenerLeaderboardAction().then(setLeaderboard);
     const heartbeat = setInterval(actualizarPingConexionAction, 5 * 60 * 1000);
     return () => clearInterval(heartbeat);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -268,6 +274,16 @@ export default function QuizDashboard({
     ? userData.historial.reduce((a, b) => a + b.nota, 0) / userData.historial.length
     : 0;
 
+  const proximoPendiente = useMemo(() => {
+    if (!userData) return null;
+    const hechos = new Set(userData.historial.map((h) => h.idItem));
+    const curso = cursosAsignados.find((c) => !hechos.has((c.ID_MODULO || "").trim()));
+    if (curso) return { tipo: "curso" as const, item: curso };
+    const sim = simsAsignadas.find((s) => !hechos.has((s.ID_SIMULACION || "").trim()));
+    if (sim) return { tipo: "sim" as const, item: sim };
+    return null;
+  }, [userData, cursosAsignados, simsAsignadas]);
+
   return (
     <div className="duacademy-scope flex h-screen overflow-hidden" data-theme={theme} style={{ background: "var(--bg-main)" }}>
       <div className="flex h-screen overflow-hidden w-full">
@@ -292,6 +308,7 @@ export default function QuizDashboard({
               statModulos={cursosAsignados.length + simsAsignadas.length}
               statCompletados={userData?.historial.length ?? 0}
               statPromedio={(promedio * 100).toFixed(0) + "%"}
+              statRacha={userData?.racha ?? 0}
               historial={userData?.historial ?? []}
               todosLosCursos={userData?.todosLosCursos ?? []}
               todasLasSims={userData?.todasLasSims ?? []}
@@ -299,6 +316,7 @@ export default function QuizDashboard({
               onSearch={setSearchQuery}
               onAbrirModulo={abrirModulo}
               onAbrirSimulacion={abrirSimulacion}
+              proximoPendiente={proximoPendiente}
             />
           )}
 
@@ -358,7 +376,10 @@ export default function QuizDashboard({
           )}
         </main>
 
-        {!esAdmin && (
+        {!esAdmin && vista === "dashboard" && (
+          <RightSidebar nombre={nombre} racha={userData?.racha ?? 0} leaderboard={leaderboard} />
+        )}
+        {!esAdmin && vista !== "dashboard" && (
           <HistorySidebar nombre={nombre} historial={userData?.historial ?? []} todosLosCursos={userData?.todosLosCursos ?? []} todasLasSims={userData?.todasLasSims ?? []} />
         )}
       </div>
