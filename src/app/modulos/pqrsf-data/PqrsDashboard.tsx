@@ -3,323 +3,185 @@
 import "./pqrs.css";
 
 import Link from "next/link";
-import { useState } from "react";
-import { buscarAction } from "./actions";
-import type { ModoBusqueda, OpcionResultado } from "@/lib/pqrs";
+import { useMemo, useState } from "react";
+import { Search, X } from "lucide-react";
+import type { RegistroPqrsf } from "@/lib/pqrs";
 import { useModuleSound } from "@/lib/use-module-sound";
 import { SoundToggleButton } from "@/components/module-shell";
 
-const REGLAS_ORO = [
-  "Garantizar claridad absoluta antes de radicar.",
-  "Validar el área de destino según la naturaleza del trámite.",
-  "Evitar duplicidad en el sistema PQRSF.",
-  "Verificar exhaustivamente la veracidad de los datos.",
-  "El registro debe realizarse estrictamente a nombre del trabajador.",
-];
+const LIMITE_FILAS = 300;
 
-export default function PqrsDashboard({ nombre }: { nombre: string }) {
-  const [mode, setMode] = useState<ModoBusqueda>("PQRSF");
+function normalizar(texto: string): string {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+export default function PqrsDashboard({
+  nombre,
+  registros,
+  error,
+}: {
+  nombre: string;
+  registros: RegistroPqrsf[];
+  error: string | null;
+}) {
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [options, setOptions] = useState<OpcionResultado[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [rulesShown, setRulesShown] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [accordionOpen, setAccordionOpen] = useState(false);
-  const { soundOn, toggleSound, playClick, playNotify } = useModuleSound();
+  const [seleccionado, setSeleccionado] = useState<RegistroPqrsf | null>(null);
+  const { soundOn, toggleSound, playClick } = useModuleSound();
 
-  async function search() {
-    if (!query.trim()) return;
+  const filtrados = useMemo(() => {
+    const q = normalizar(query.trim());
+    if (!q) return registros;
+    return registros.filter((r) =>
+      [r.radicado, r.tipo, r.dirigidoA, r.resumen, r.radicador, r.canal].some((v) => normalizar(v).includes(q))
+    );
+  }, [registros, query]);
+
+  const visibles = filtrados.slice(0, LIMITE_FILAS);
+
+  function abrirRegistro(r: RegistroPqrsf) {
     playClick();
-    setLoading(true);
-    setError(null);
-    setOptions(null);
-
-    const res = await buscarAction(query, mode);
-    setLoading(false);
-
-    if (res.error) {
-      setError(res.error);
-    } else if (res.options && res.options.length > 0) {
-      playNotify();
-      setOptions(res.options);
-      setCurrentIdx(0);
-      if (!rulesShown && mode === "PQRSF") {
-        setModalOpen(true);
-        setRulesShown(true);
-      }
-    } else {
-      setError(`No se encontraron resultados relacionados en la base de datos de ${mode}.`);
-    }
+    setSeleccionado(r);
   }
-
-  function handleEnter(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") search();
-  }
-
-  function cambiarModo(nuevo: ModoBusqueda) {
-    setMode(nuevo);
-    setOptions(null);
-    setError(null);
-  }
-
-  const actual = options?.[currentIdx];
 
   return (
     <div className="pqrs-scope">
-      <div className="container">
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 30,
-            padding: "0 10px",
-          }}
-        >
-          <div className="header">
-            <h1>
-              PEOPLE ACADEMY <span style={{ color: "var(--morado-claro)" }}>PRO</span>
-            </h1>
-            <div style={{ marginTop: 5 }}>
-              <div className="user-chip">ID: {nombre}</div>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <SoundToggleButton soundOn={soundOn} toggleSound={toggleSound} />
-            <Link href="/" className="btn-outline">
-              Volver al inicio
-            </Link>
+      <header className="pqrs-topbar">
+        <div className="pqrs-brand">
+          <div className="pqrs-brand-mark">P</div>
+          <div>
+            <b>PQRSF DATA</b>
+            <span>Listado de radicados · {nombre}</span>
           </div>
         </div>
+        <div className="pqrs-topbar-actions">
+          <SoundToggleButton soundOn={soundOn} toggleSound={toggleSound} />
+          <Link href="/" className="pqrs-btn-outline" onClick={playClick}>
+            Volver al inicio
+          </Link>
+        </div>
+      </header>
 
-        <div className="card" style={{ padding: 25 }}>
-          <div className="search-tabs">
-            <button
-              className={`tab-btn ${mode === "PQRSF" ? "active" : ""}`}
-              onClick={() => cambiarModo("PQRSF")}
-            >
-              PQRSF
-            </button>
-            <button
-              className={`tab-btn ${mode === "GENERAL" ? "active" : ""}`}
-              onClick={() => cambiarModo("GENERAL")}
-            >
-              Búsqueda General
-            </button>
-          </div>
-
-          <label className="label-neon">
-            {mode === "PQRSF" ? "Ingresar consulta del usuario" : "Consultar base de conocimiento general"}
-          </label>
-          <div className="search-wrapper">
+      <div className="pqrs-container">
+        <div className="pqrs-search-row">
+          <div className="pqrs-search-wrapper">
+            <Search size={17} className="pqrs-search-icon" />
             <input
               type="text"
-              className="search-input"
-              placeholder={
-                mode === "PQRSF"
-                  ? "Ej: No me llegó el pago de la cuota monetaria..."
-                  : "Ej: Requisitos para afiliación independiente..."
-              }
+              className="pqrs-search-input"
+              placeholder="Buscar por radicado, tipo, área, resumen, radicador o canal..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={handleEnter}
             />
-            <button className="btn-primary search-btn" onClick={search} disabled={loading}>
-              Analizar
-            </button>
+            {query && (
+              <button type="button" className="pqrs-search-clear" onClick={() => setQuery("")} aria-label="Limpiar búsqueda">
+                <X size={15} />
+              </button>
+            )}
           </div>
-
-          {loading && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 25 }}>
-              <div className="loader-ring" />
-              <p style={{ fontSize: 12, color: "var(--morado-claro)", marginTop: 10, letterSpacing: 2 }}>
-                PROCESANDO CON INTELIGENCIA ARTIFICIAL...
-              </p>
-            </div>
-          )}
+          <div className="pqrs-count">
+            {filtrados.length} de {registros.length} radicados
+          </div>
         </div>
 
-        {error && <p style={{ color: "#ff4d4d", textAlign: "center" }}>{error}</p>}
-
-        {actual && (
-          <div className={`card result-container fade-up`} style={mode === "GENERAL" ? { borderLeftColor: "#00e5ff" } : undefined}>
-            {mode === "GENERAL" ? (
-              <>
-                <div style={{ marginBottom: 25 }}>
-                  <span className="label-neon" style={{ color: "#0e7490" }}>
-                    Respuesta / Qué decir
-                  </span>
-                  <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text-main)", lineHeight: 1.4 }}>
-                    {actual.accion}
-                  </div>
-                </div>
-
-                <div className="result-grid">
-                  <div>
-                    <span className="label-neon">Tema de Consulta</span>
-                    <div className="value-text" style={{ opacity: 0.7 }}>
-                      {actual.resumen_caso}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="label-neon">Referencia / Área</span>
-                    <div className="value-text">{actual.dirigido}</div>
-                  </div>
-                </div>
-
-                <div className="nav-controls">
-                  <div
-                    className="source-badge"
-                    style={{ background: "rgba(14, 116, 144, 0.1)", color: "#0e7490", borderColor: "rgba(14, 116, 144, 0.3)" }}
-                  >
-                    {actual.fuente}
-                  </div>
-                  <NavButtons
-                    total={options!.length}
-                    idx={currentIdx}
-                    onPrev={() => setCurrentIdx((i) => Math.max(0, i - 1))}
-                    onNext={() => setCurrentIdx((i) => Math.min(options!.length - 1, i + 1))}
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="resumen-box">
-                  <span className="label-neon">Resumen del Caso</span>
-                  {actual.resumen_caso}
-                </div>
-
-                <div style={{ marginBottom: 30 }}>
-                  <h2 style={{ margin: 0, color: "var(--text-main)", fontSize: 26, fontWeight: 700 }}>{actual.tipo}</h2>
-                  <p style={{ color: "var(--text-muted)", marginTop: 8, fontSize: 14, textTransform: "uppercase", letterSpacing: 1 }}>
-                    {actual.clasificacion}
-                  </p>
-                </div>
-
-                <div className="result-grid">
-                  <div>
-                    <span className="label-neon">Dirigido a</span>
-                    <div className="value-text" style={{ fontSize: 18, fontWeight: 600 }}>
-                      {actual.dirigido}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="label-neon">Acción Recomendada</span>
-                    <div className="value-text">{actual.accion}</div>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 30 }}>
-                  <span className="label-neon">Recordatorio</span>
-                  <div className="value-text" style={{ fontSize: 14, color: "var(--text-main)" }}>
-                    {actual.recordatorio}
-                  </div>
-                </div>
-
-                <div className="nav-controls">
-                  <div className="source-badge">{actual.fuente}</div>
-                  <NavButtons
-                    total={options!.length}
-                    idx={currentIdx}
-                    onPrev={() => setCurrentIdx((i) => Math.max(0, i - 1))}
-                    onNext={() => setCurrentIdx((i) => Math.min(options!.length - 1, i + 1))}
-                  />
-                </div>
-              </>
+        {error ? (
+          <div className="pqrs-empty pqrs-empty-error">
+            <p>No se pudo cargar el listado de PQRSF.</p>
+            <span>{error}</span>
+          </div>
+        ) : registros.length === 0 ? (
+          <div className="pqrs-empty">
+            <p>Aún no hay radicados registrados.</p>
+          </div>
+        ) : filtrados.length === 0 ? (
+          <div className="pqrs-empty">
+            <p>Sin resultados para “{query}”.</p>
+          </div>
+        ) : (
+          <div className="pqrs-table-card">
+            <div className="pqrs-table-scroll">
+              <table className="pqrs-table">
+                <thead>
+                  <tr>
+                    <th>Radicado</th>
+                    <th>Tipo de Solicitud</th>
+                    <th>Dirigido a</th>
+                    <th>Resumen</th>
+                    <th>Radicador</th>
+                    <th>Canal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibles.map((r) => (
+                    <tr key={r.radicado} onClick={() => abrirRegistro(r)} tabIndex={0}>
+                      <td className="pqrs-td-radicado">{r.radicado}</td>
+                      <td>{r.tipo}</td>
+                      <td>{r.dirigidoA}</td>
+                      <td className="pqrs-td-resumen">{r.resumen}</td>
+                      <td>{r.radicador}</td>
+                      <td>
+                        <span className="pqrs-canal-pill">{r.canal}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {filtrados.length > LIMITE_FILAS && (
+              <div className="pqrs-table-footer">
+                Mostrando los primeros {LIMITE_FILAS} de {filtrados.length} resultados. Refina tu búsqueda para ver más.
+              </div>
             )}
           </div>
         )}
-
-        <div className="banner-smart">
-          <span className="material-icons" style={{ color: "var(--morado-claro)" }}>
-            tips_and_updates
-          </span>
-          <span>
-            Recomendación: Para certificados de aportes o afiliaciones, remitir al asesor de aportes de la oficina
-            más cercana. En casos complejos, usar <strong>sercliente@cofrem.co</strong>
-          </span>
-        </div>
-
-        <div className="accordion-ng">
-          <div className="accordion-ng-header" onClick={() => setAccordionOpen((v) => !v)}>
-            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span className="material-icons" style={{ fontSize: 18, color: "var(--morado-claro)" }}>
-                gavel
-              </span>
-              REGLAS DE ORO DEL RADICADOR
-            </span>
-            <span className="material-icons">{accordionOpen ? "expand_less" : "expand_more"}</span>
-          </div>
-          <div className={`accordion-ng-content ${accordionOpen ? "open" : ""}`}>
-            <ul className="rules-list">
-              {REGLAS_ORO.map((regla) => (
-                <li key={regla}>{regla}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
-        <div style={{ textAlign: "center", marginTop: 50, opacity: 0.3, fontSize: 11 }}>
-          DESIGNED FOR EXCELLENCE BY DUVAN RAMOS
-        </div>
       </div>
 
-      {modalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content fade-up">
-            <button className="modal-close" onClick={() => setModalOpen(false)} aria-label="Cerrar">
-              ×
+      {seleccionado && (
+        <div className="pqrs-modal-overlay" onClick={() => setSeleccionado(null)}>
+          <div className="pqrs-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="pqrs-modal-close" onClick={() => setSeleccionado(null)} aria-label="Cerrar">
+              <X size={18} />
             </button>
-            <h2 style={{ color: "var(--morado-claro)", marginBottom: 5 }}>¡HOLA, {nombre.toUpperCase()}!</h2>
-            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 25 }}>
-              Antes de continuar, recuerda nuestras directrices:
-            </p>
-            <ul className="rules-list">
-              {REGLAS_ORO.map((regla) => (
-                <li key={regla}>{regla}</li>
-              ))}
-            </ul>
-            <button className="btn-primary" style={{ marginTop: 30 }} onClick={() => setModalOpen(false)}>
-              Entendido, continuar
-            </button>
+
+            <span className="pqrs-modal-eyebrow">Radicado</span>
+            <h2 className="pqrs-modal-title">{seleccionado.radicado}</h2>
+
+            <div className="pqrs-detalle-grid">
+              <div className="pqrs-detalle-item">
+                <label>Tipo de Solicitud</label>
+                <p>{seleccionado.tipo || "—"}</p>
+              </div>
+              <div className="pqrs-detalle-item">
+                <label>Dirigido a</label>
+                <p>{seleccionado.dirigidoA || "—"}</p>
+              </div>
+              <div className="pqrs-detalle-item">
+                <label>Radicador</label>
+                <p>{seleccionado.radicador || "—"}</p>
+              </div>
+              <div className="pqrs-detalle-item">
+                <label>Canal</label>
+                <p>{seleccionado.canal || "—"}</p>
+              </div>
+            </div>
+
+            <div className="pqrs-detalle-full">
+              <label>Resumen</label>
+              <p>{seleccionado.resumen || "—"}</p>
+            </div>
+            <div className="pqrs-detalle-full">
+              <label>Descripción</label>
+              <p>{seleccionado.descripcion || "—"}</p>
+            </div>
+            <div className="pqrs-detalle-full">
+              <label>Respuesta</label>
+              <p>{seleccionado.respuesta || "—"}</p>
+            </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function NavButtons({
-  total,
-  idx,
-  onPrev,
-  onNext,
-}: {
-  total: number;
-  idx: number;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
-  if (total <= 1) return null;
-  return (
-    <div style={{ display: "flex", gap: 15, alignItems: "center" }}>
-      <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 500 }}>
-        {idx + 1} de {total}
-      </span>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button className="btn-outline" onClick={onPrev} disabled={idx === 0}>
-          <span className="material-icons" style={{ fontSize: 18 }}>
-            chevron_left
-          </span>
-        </button>
-        <button className="btn-outline" onClick={onNext} disabled={idx === total - 1}>
-          <span className="material-icons" style={{ fontSize: 18 }}>
-            chevron_right
-          </span>
-        </button>
-      </div>
     </div>
   );
 }
