@@ -151,10 +151,17 @@
 /* ── Right column ── */
 .dusite-home aside { display: flex; flex-direction: column; gap: 18px; }
 .dusite-home .calendar, .dusite-home .pending { background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: var(--radius-large); box-shadow: var(--shadow-surface); }
-.dusite-home .calendar { padding: 22px 24px; }
+.dusite-home .calendar { padding: 22px 24px; transition: box-shadow 300ms ease, border-color 300ms ease; }
+.dusite-home .calendar.resaltado { border-color: var(--metrics); box-shadow: 0 0 0 3px var(--metrics-soft), var(--shadow-surface); animation: dusite-calendar-flash 1.2s ease; }
+@keyframes dusite-calendar-flash {
+  0%, 100% { background: var(--bg-surface); }
+  30% { background: var(--metrics-soft); }
+}
 .dusite-home .calHead { display: flex; justify-content: space-between; align-items: center; }
 .dusite-home .calHead h3 { font-size: 15px; margin: 0; font-weight: 600; }
-.dusite-home .calHead div { display: flex; gap: 14px; color: var(--text-tertiary); }
+.dusite-home .calHead div { display: flex; gap: 6px; color: var(--text-tertiary); }
+.dusite-home .calHead button { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; color: inherit; transition: background 150ms ease, color 150ms ease; }
+.dusite-home .calHead button:hover { background: var(--bg-subtle); color: var(--text-primary); }
 .dusite-home .dow, .dusite-home .week { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; }
 .dusite-home .dow { margin: 20px 0 6px; color: var(--text-tertiary); font-size: 10px; font-weight: 600; }
 .dusite-home .week span { position: relative; height: 32px; display: grid; place-items: center; font-size: 12px; font-weight: 500; border-radius: 50%; transition: background 150ms ease; }

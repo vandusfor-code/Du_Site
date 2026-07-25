@@ -46,8 +46,8 @@ export interface HomeData {
     tendenciaPct: number | null;
   } | null;
   gestionesMes: GestionesMes | null;
-  /** Días del mes actual con sesiones de Cronograma (Role Play / Escuchas) asignadas. */
-  calendario: { dia: number; detalle: string }[];
+  /** Días con sesiones de Cronograma (Role Play / Escuchas) asignadas, de cualquier mes. */
+  calendario: { anio: number; mes: number; dia: number; detalle: string }[];
 }
 
 const MODULO_TONE: Record<ModuloId, string> = {
@@ -73,20 +73,27 @@ function useNow() {
   return now;
 }
 
-function useCalendario() {
+function useCalendario(offsetMeses: number) {
   const [hoy, setHoy] = useState<Date | null>(null);
   useEffect(() => {
     const id = setTimeout(() => setHoy(new Date()), 0);
     return () => clearTimeout(id);
   }, []);
 
-  if (!hoy) return { mesLabel: "", semanas: [] as (number | null)[][], diaActual: -1 };
+  if (!hoy) {
+    return { mesLabel: "", semanas: [] as (number | null)[][], diaActual: -1, anioVisible: -1, mesVisible: -1 };
+  }
 
-  const mesLabelRaw = hoy.toLocaleDateString("es-CO", { month: "long", year: "numeric" });
+  const visible = new Date(hoy.getFullYear(), hoy.getMonth() + offsetMeses, 1);
+  const anioVisible = visible.getFullYear();
+  const mesVisible = visible.getMonth();
+  const esMesActual = anioVisible === hoy.getFullYear() && mesVisible === hoy.getMonth();
+
+  const mesLabelRaw = visible.toLocaleDateString("es-CO", { month: "long", year: "numeric" });
   const mesLabel = mesLabelRaw.charAt(0).toUpperCase() + mesLabelRaw.slice(1);
 
-  const primerDiaSemana = new Date(hoy.getFullYear(), hoy.getMonth(), 1).getDay();
-  const diasEnMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+  const primerDiaSemana = new Date(anioVisible, mesVisible, 1).getDay();
+  const diasEnMes = new Date(anioVisible, mesVisible + 1, 0).getDate();
 
   const celdas: (number | null)[] = [
     ...Array(primerDiaSemana).fill(null),
@@ -97,7 +104,7 @@ function useCalendario() {
   const semanas: (number | null)[][] = [];
   for (let i = 0; i < celdas.length; i += 7) semanas.push(celdas.slice(i, i + 7));
 
-  return { mesLabel, semanas, diaActual: hoy.getDate() };
+  return { mesLabel, semanas, diaActual: esMesActual ? hoy.getDate() : -1, anioVisible, mesVisible };
 }
 
 function UserMenu({ nombre, logoutAction }: { nombre: string; logoutAction: () => void }) {
@@ -173,7 +180,9 @@ export function HomeView({
   const { playClick } = useModuleSound();
   const [mostrarTodasTareas, setMostrarTodasTareas] = useState(false);
   const alertas = tareas.filter((t) => t.prioridad === "Alta").length;
-  const { mesLabel, semanas, diaActual } = useCalendario();
+  const [offsetMeses, setOffsetMeses] = useState(0);
+  const [resaltarCalendario, setResaltarCalendario] = useState(false);
+  const { mesLabel, semanas, diaActual, anioVisible, mesVisible } = useCalendario(offsetMeses);
 
   const fechaLarga = now
     ? (() => {
@@ -186,7 +195,11 @@ export function HomeView({
   const progresoMensaje =
     progresoPct >= 80 ? "¡Estás haciendo un gran trabajo! 💚" : progresoPct >= 50 ? "Vas por buen camino, sigue así." : "Aún tienes pendientes por resolver.";
 
-  const diasMarcadosMap = new Map((data?.calendario ?? []).map((c) => [c.dia, c.detalle]));
+  const diasMarcadosMap = new Map(
+    (data?.calendario ?? [])
+      .filter((c) => c.anio === anioVisible && c.mes === mesVisible)
+      .map((c) => [c.dia, c.detalle])
+  );
 
   return (
     <div className="dusite-home">
@@ -215,7 +228,9 @@ export function HomeView({
             type="button"
             onClick={() => {
               playClick();
-              document.getElementById("calendario")?.scrollIntoView({ behavior: "smooth" });
+              document.getElementById("calendario")?.scrollIntoView({ behavior: "smooth", block: "center" });
+              setResaltarCalendario(true);
+              setTimeout(() => setResaltarCalendario(false), 1200);
             }}
           >
             Calendario
@@ -359,12 +374,30 @@ export function HomeView({
         </section>
 
         <aside>
-          <article className="calendar" id="calendario">
+          <article className={`calendar${resaltarCalendario ? " resaltado" : ""}`} id="calendario">
             <div className="calHead">
               <h3>{mesLabel}</h3>
               <div>
-                <ChevronLeft size={17} />
-                <ChevronRight size={17} />
+                <button
+                  type="button"
+                  aria-label="Mes anterior"
+                  onClick={() => {
+                    playClick();
+                    setOffsetMeses((v) => v - 1);
+                  }}
+                >
+                  <ChevronLeft size={17} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Mes siguiente"
+                  onClick={() => {
+                    playClick();
+                    setOffsetMeses((v) => v + 1);
+                  }}
+                >
+                  <ChevronRight size={17} />
+                </button>
               </div>
             </div>
             <div className="dow">

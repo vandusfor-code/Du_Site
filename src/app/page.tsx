@@ -132,35 +132,41 @@ export default async function Home() {
   const sesiones = cronogramaR.status === "fulfilled" ? cronogramaR.value : [];
 
   const DIAS_SEMANA = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
-  sesiones.forEach((s) => {
-    const fechaSesion = new Date(s.anio, s.mes, s.dia);
-    const fechaTexto = `${DIAS_SEMANA[fechaSesion.getDay()]} ${String(s.dia).padStart(2, "0")}/${String(s.mes + 1).padStart(2, "0")} · ${s.horario}`;
-    listaTareas.push({
-      id: `cronograma-${s.anio}-${s.mes}-${s.dia}-${s.horario}`,
-      titulo: `${s.actividad} con ${s.companero}`,
-      moduloId: "metricas",
-      moduloNombre: "Métricas",
-      moduloHref: "/modulos/metricas",
-      fecha: fechaTexto,
-      prioridad: "Media",
+  const hoySinHora = new Date();
+  hoySinHora.setHours(0, 0, 0, 0);
+  sesiones
+    .filter((s) => new Date(s.anio, s.mes, s.dia) >= hoySinHora)
+    .forEach((s) => {
+      const fechaSesion = new Date(s.anio, s.mes, s.dia);
+      const fechaTexto = `${DIAS_SEMANA[fechaSesion.getDay()]} ${String(s.dia).padStart(2, "0")}/${String(s.mes + 1).padStart(2, "0")} · ${s.horario}`;
+      listaTareas.push({
+        id: `cronograma-${s.anio}-${s.mes}-${s.dia}-${s.horario}`,
+        titulo: `${s.actividad} con ${s.companero}`,
+        moduloId: "metricas",
+        moduloNombre: "Métricas",
+        moduloHref: "/modulos/metricas",
+        fecha: fechaTexto,
+        prioridad: "Media",
+      });
     });
-  });
   {
     const rango = { Alta: 0, Media: 1, Baja: 2 } as const;
     listaTareas.sort((a, b) => rango[a.prioridad] - rango[b.prioridad]);
   }
 
-  const hoyBase = new Date();
-  const diasMarcados = new Map<number, string[]>();
-  sesiones
-    .filter((s) => s.anio === hoyBase.getFullYear() && s.mes === hoyBase.getMonth())
-    .forEach((s) => {
-      const detalle = `${s.actividad} con ${s.companero} · ${s.horario}`;
-      diasMarcados.set(s.dia, [...(diasMarcados.get(s.dia) ?? []), detalle]);
-    });
-  const calendario: HomeData["calendario"] = Array.from(diasMarcados.entries()).map(([dia, detalles]) => ({
-    dia,
-    detalle: detalles.join(" · "),
+  const diasMarcados = new Map<string, { anio: number; mes: number; dia: number; detalles: string[] }>();
+  sesiones.forEach((s) => {
+    const clave = `${s.anio}-${s.mes}-${s.dia}`;
+    const detalle = `${s.actividad} con ${s.companero} · ${s.horario}`;
+    const existente = diasMarcados.get(clave);
+    if (existente) existente.detalles.push(detalle);
+    else diasMarcados.set(clave, { anio: s.anio, mes: s.mes, dia: s.dia, detalles: [detalle] });
+  });
+  const calendario: HomeData["calendario"] = Array.from(diasMarcados.values()).map((v) => ({
+    anio: v.anio,
+    mes: v.mes,
+    dia: v.dia,
+    detalle: v.detalles.join(" · "),
   }));
 
   // "Tu progreso": módulos con seguimiento real (Métricas, DuAcademy, Radicaciones, Línea Amiga)
