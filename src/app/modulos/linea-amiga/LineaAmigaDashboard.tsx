@@ -3,7 +3,7 @@
 import "./linea-amiga.css";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertOctagon,
@@ -161,35 +161,75 @@ function Autocomplete({
   );
 }
 
+function MiniLineChart({ puntos }: { puntos: number[] }) {
+  const gradientId = useId();
+  const w = 100;
+  const h = 46;
+  const max = Math.max(...puntos);
+  const min = Math.min(...puntos);
+  const rango = max - min || 1;
+  const stepX = w / (puntos.length - 1);
+  const coords = puntos.map((p, i) => [i * stepX, h - ((p - min) / rango) * h] as const);
+  const linea = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`).join(" ");
+  const area = `${linea} L${w},${h} L0,${h} Z`;
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--brand-lime-strong)" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="var(--brand-lime-strong)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gradientId})`} />
+      <path d={linea} fill="none" stroke="var(--brand-lime-strong)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      {coords.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r="2.6" fill="var(--brand-lime-strong)" />
+      ))}
+    </svg>
+  );
+}
+
+function MiniBarChart({ valores }: { valores: number[] }) {
+  const max = Math.max(...valores);
+  return (
+    <div className="resumen-bars" aria-hidden="true">
+      {valores.map((v, i) => (
+        <i key={i} style={{ height: `${(v / max) * 100}%` }} />
+      ))}
+    </div>
+  );
+}
+
 function ResumenCard({
   Icon,
   tipo,
   valor,
-  barras,
+  chart,
 }: {
   Icon: typeof FileText;
   tipo: string;
   valor: number;
-  barras: number[];
+  chart: { tipo: "linea"; datos: number[] } | { tipo: "barras"; datos: number[] };
 }) {
   return (
     <div className="resumen-card">
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <div className="resumen-icon">
-          <Icon size={20} />
+      <div className="resumen-top">
+        <div>
+          <div className="resumen-icon">
+            <Icon size={20} />
+          </div>
+          <div className="resumen-label">
+            PQRSF
+            <br />
+            {tipo}
+          </div>
+          <div className="resumen-valor">{valor}</div>
         </div>
-        <div className="resumen-bars" aria-hidden="true">
-          {barras.map((h, i) => (
-            <i key={i} style={{ height: `${h}%` }} />
-          ))}
+        <div className="resumen-chart">
+          {chart.tipo === "linea" ? <MiniLineChart puntos={chart.datos} /> : <MiniBarChart valores={chart.datos} />}
         </div>
       </div>
-      <div className="resumen-label">
-        PQRSF
-        <br />
-        {tipo}
-      </div>
-      <div className="resumen-valor">{valor}</div>
       <button type="button" className="resumen-link">
         Ver detalles <ExternalLink size={11} />
       </button>
@@ -584,10 +624,10 @@ export default function LineaAmigaDashboard({
               <div className="resumen-gestion">
                 <div className="resumen-titulo">Resumen de gestión</div>
                 <div className="resumen-grid">
-                  <ResumenCard Icon={FileText} tipo="Devueltos" valor={resumenGestion.devueltos} barras={[40, 65, 45, 80]} />
-                  <ResumenCard Icon={Megaphone} tipo="Campaña" valor={resumenGestion.campana} barras={[70, 40, 90, 55]} />
-                  <ResumenCard Icon={Reply} tipo="Respondidos" valor={resumenGestion.respondidos} barras={[50, 85, 35, 95]} />
-                  <ResumenCard Icon={Clock} tipo="por responder" valor={resumenGestion.porResponder} barras={[90, 55, 75, 40]} />
+                  <ResumenCard Icon={FileText} tipo="Devueltos" valor={resumenGestion.devueltos} chart={{ tipo: "linea", datos: [20, 32, 28, 42, 36, 58] }} />
+                  <ResumenCard Icon={Megaphone} tipo="Campaña" valor={resumenGestion.campana} chart={{ tipo: "barras", datos: [30, 22, 18, 25, 34, 28, 60] }} />
+                  <ResumenCard Icon={Reply} tipo="Respondidos" valor={resumenGestion.respondidos} chart={{ tipo: "linea", datos: [15, 38, 26, 48, 34, 62] }} />
+                  <ResumenCard Icon={Clock} tipo="por responder" valor={resumenGestion.porResponder} chart={{ tipo: "barras", datos: [15, 20, 24, 28, 34, 42, 52] }} />
                 </div>
               </div>
             </div>
