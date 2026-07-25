@@ -493,7 +493,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                     <div className="form-box">
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
                         <h3>Radicado: {sncResult.radicado}</h3>
-                        <span className="status-pill" style={{ background: "var(--primary)", color: "var(--primary-text)" }}>
+                        <span className="status-pill" style={{ background: "var(--primary-deep)", color: "#fff" }}>
                           {sncResult.estado}
                         </span>
                       </div>
