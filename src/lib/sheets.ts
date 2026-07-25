@@ -69,6 +69,49 @@ export async function updateRange(
   });
 }
 
+export async function appendRows(
+  spreadsheetId: string,
+  range: string,
+  rows: (string | number)[][]
+) {
+  if (rows.length === 0) return;
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range,
+    valueInputOption: "USER_ENTERED",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: { values: rows },
+  });
+}
+
+// Crea la pestaña si no existe (y le pone encabezados, si se dan). Usado por
+// procesos administrativos que esperan hojas de log/estado auto-creadas.
+export async function asegurarHoja(
+  spreadsheetId: string,
+  nombreHoja: string,
+  headers?: (string | number)[]
+) {
+  const sheets = getSheetsClient();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const existe = meta.data.sheets?.some((s) => s.properties?.title === nombreHoja);
+  if (existe) return;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests: [{ addSheet: { properties: { title: nombreHoja } } }] },
+  });
+
+  if (headers) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${nombreHoja}!A1`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [headers] },
+    });
+  }
+}
+
 /* ===================== */
 /* Fechas de Google Sheets */
 /* ===================== */
