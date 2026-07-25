@@ -165,15 +165,24 @@ function ResumenCard({
   Icon,
   tipo,
   valor,
+  barras,
 }: {
   Icon: typeof FileText;
   tipo: string;
   valor: number;
+  barras: number[];
 }) {
   return (
     <div className="resumen-card">
-      <div className="resumen-icon">
-        <Icon size={20} />
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div className="resumen-icon">
+          <Icon size={20} />
+        </div>
+        <div className="resumen-bars" aria-hidden="true">
+          {barras.map((h, i) => (
+            <i key={i} style={{ height: `${h}%` }} />
+          ))}
+        </div>
       </div>
       <div className="resumen-label">
         PQRSF
@@ -575,10 +584,10 @@ export default function LineaAmigaDashboard({
               <div className="resumen-gestion">
                 <div className="resumen-titulo">Resumen de gestión</div>
                 <div className="resumen-grid">
-                  <ResumenCard Icon={FileText} tipo="Devueltos" valor={resumenGestion.devueltos} />
-                  <ResumenCard Icon={Megaphone} tipo="Campaña" valor={resumenGestion.campana} />
-                  <ResumenCard Icon={Reply} tipo="Respondidos" valor={resumenGestion.respondidos} />
-                  <ResumenCard Icon={Clock} tipo="por responder" valor={resumenGestion.porResponder} />
+                  <ResumenCard Icon={FileText} tipo="Devueltos" valor={resumenGestion.devueltos} barras={[40, 65, 45, 80]} />
+                  <ResumenCard Icon={Megaphone} tipo="Campaña" valor={resumenGestion.campana} barras={[70, 40, 90, 55]} />
+                  <ResumenCard Icon={Reply} tipo="Respondidos" valor={resumenGestion.respondidos} barras={[50, 85, 35, 95]} />
+                  <ResumenCard Icon={Clock} tipo="por responder" valor={resumenGestion.porResponder} barras={[90, 55, 75, 40]} />
                 </div>
               </div>
             </div>
