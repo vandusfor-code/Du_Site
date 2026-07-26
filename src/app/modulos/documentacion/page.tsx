@@ -8,8 +8,9 @@ export const maxDuration = 30;
 export default async function DocumentacionPage() {
   const session = await requireModulo("documentacion");
   // El dashboard administrativo es exclusivo de coordinadores/Admin. Una asesora
-  // se decide server-side ANTES de consultar cualquier dato administrativo.
-  if (!esAdmin(session)) redirect("/");
+  // se decide server-side ANTES de consultar cualquier dato administrativo; se la
+  // envía a su lista existente (Pendientes del Home), no a un Home "pelado".
+  if (!esAdmin(session)) redirect("/#pendientes");
 
   let dashboard: Awaited<ReturnType<typeof obtenerDashboardDocumentacion>> | null = null;
   let error: string | null = null;

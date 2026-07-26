@@ -132,7 +132,12 @@ export default async function Home() {
   const nombre = session?.user?.nombre ?? "";
   const usuario = session?.user?.usuario ?? "";
   const moduloIds = session?.user?.modulos ?? [];
-  const modulos = modulosPermitidos(moduloIds);
+  const esAdmin = (session?.user?.rol ?? "").trim().toLowerCase() === "admin";
+  // La tarjeta "Documentación Operativa" es consciente del rol: una asesora no va
+  // al dashboard administrativo (que la rechazaría) sino a su lista de Pendientes.
+  const modulos = modulosPermitidos(moduloIds).map((m) =>
+    m.id === "documentacion" && !esAdmin ? { ...m, href: "/#pendientes" } : m
+  );
 
   if (!usuario) {
     return <HomeView nombre={nombre} modulos={modulos} logoutAction={logoutAction} tareas={[]} data={null} />;
