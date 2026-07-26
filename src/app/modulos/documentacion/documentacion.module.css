@@ -1,6 +1,6 @@
-.page { min-height: 100vh; background: #f7f8fc; color: #15162b; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 26px clamp(18px, 4vw, 48px) 48px; }
+.page { min-height: 100vh; background: #f7f8fc; color: #15162b; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 26px clamp(20px, 3vw, 56px) 48px; }
 .page * { box-sizing: border-box; }
-.shell { max-width: 1120px; margin: 0 auto; }
+.shell { max-width: 1780px; margin: 0 auto; }
 
 .back { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #68738c; text-decoration: none; margin-bottom: 16px; }
 .back:hover { color: #4f46e5; }
@@ -11,8 +11,11 @@
 .head p { margin: 6px 0 0 39px; color: #68738c; font-size: 13px; }
 .primary { height: 44px; border-radius: 12px; border: 0; background: #4f46e5; color: #fff; padding: 0 20px; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-family: inherit; box-shadow: 0 8px 20px rgba(79, 70, 229, .25); }
 .primary:hover { background: #4338ca; }
+.primary:disabled { opacity: .65; cursor: not-allowed; }
 
 .banner { border-radius: 10px; padding: 11px 15px; font-size: 13px; font-weight: 600; margin-bottom: 18px; background: #fff0f1; color: #d93142; border: 1px solid #ffd4d2; }
+.bannerError { background: #fff0f1; color: #d93142; border: 1px solid #ffd4d2; }
+.bannerOk { background: #eafaf1; color: #158a55; border: 1px solid #b7e6cd; }
 
 /* KPIs */
 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 22px; }
@@ -102,3 +105,27 @@
   .searchRow { grid-template-columns: 1fr; }
   .propGrid { grid-template-columns: 1fr; }
 }
+
+/* Modal: Asignar procedimiento */
+.overlay { position: fixed; inset: 0; z-index: 50; background: rgba(15, 18, 40, .45); backdrop-filter: blur(3px); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 32px 16px; }
+.modal { width: 100%; max-width: 480px; background: #fff; border-radius: 18px; box-shadow: 0 30px 70px rgba(0, 0, 0, .3); }
+.modalHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 22px 24px; border-bottom: 1px solid #edeff4; }
+.modalHead h3 { margin: 0; font-size: 18px; color: #16172a; }
+.modalSub { margin: 6px 0 0; font-size: 12.5px; color: #68738c; line-height: 1.4; }
+.closeBtn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid #e0e3eb; background: #fff; color: #667189; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; }
+.closeBtn:hover { border-color: #c3c8d6; color: #202238; }
+.closeBtn:disabled { opacity: .5; cursor: not-allowed; }
+.modalBody { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 12.5px; font-weight: 700; color: #3c4257; }
+.fieldControl { display: flex; align-items: center; gap: 10px; height: 44px; border: 1px solid #e1e4eb; border-radius: 10px; padding: 0 13px; background: #fff; color: #98a0b3; }
+.fieldControl:focus-within { border-color: #4f46e5; }
+.fieldControl select, .fieldControl input { border: 0; outline: 0; width: 100%; height: 100%; font-size: 13.5px; color: #202238; background: transparent; font-family: inherit; cursor: pointer; }
+.fieldControl input[type="text"] { cursor: text; }
+.fieldControl input[type="date"] { cursor: text; }
+.fieldControl select:disabled, .fieldControl input:disabled { cursor: not-allowed; opacity: .6; }
+.fieldError { font-size: 11.5px; font-weight: 600; color: #e0526b; }
+.modalFoot { display: flex; justify-content: flex-end; gap: 12px; padding: 18px 24px 24px; }
+.btnGhost { height: 44px; border-radius: 12px; border: 1px solid #e1e4eb; background: #fff; color: #3c4257; padding: 0 20px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; }
+.btnGhost:hover { border-color: #c3c8d6; }
+.btnGhost:disabled { opacity: .6; cursor: not-allowed; }

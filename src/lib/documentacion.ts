@@ -1,6 +1,14 @@
 import "server-only";
 import { getSupabase } from "@/lib/supabase";
-import type { DashboardDocumentacion, ProcedimientoDoc, PropuestoDoc } from "@/lib/documentacion-tipos";
+import type {
+  DashboardDocumentacion,
+  ProcedimientoDoc,
+  PropuestoDoc,
+  AplicativoOpcion,
+  AsesoraOpcion,
+  NuevaAsignacionInput,
+  ResultadoAsignacion,
+} from "@/lib/documentacion-tipos";
 
 // ============================================================
 // Documentación Operativa — capa de datos (solo lectura) sobre Supabase.
@@ -113,4 +121,97 @@ export async function obtenerDashboardDocumentacion(): Promise<DashboardDocument
     aplicativos: aplicativosFiltro,
     estados: estadosFiltro,
   };
+}
+
+// ============================================================
+// Asignación de procedimientos — escritura server-side.
+// ============================================================
+
+function normalizarTitulo(t: string): string {
+  return t.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export async function obtenerAplicativosActivos(): Promise<AplicativoOpcion[]> {
+  const sb = getSupabase();
+  const { data, error } = await sb.from("aplicativos").select("id, nombre").eq("activo", true);
+  if (error) throw new Error(`Supabase: ${error.message}`);
+  return ((data ?? []) as FilaAplicativo[])
+    .map((a) => ({ id: a.id, nombre: a.nombre ?? "—" }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
+export async function obtenerAsesorasDoc(): Promise<AsesoraOpcion[]> {
+  const sb = getSupabase();
+  const { data, error } = await sb.from("asesoras").select("id, nombre");
+  if (error) throw new Error(`Supabase: ${error.message}`);
+  return ((data ?? []) as FilaAsesora[])
+    .map((a) => ({ id: a.id, nombre: a.nombre ?? "—" }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
+export async function crearProcedimientoYAsignacion(
+  input: NuevaAsignacionInput,
+  usuario: string
+): Promise<ResultadoAsignacion> {
+  const titulo = input.titulo.trim().replace(/\s+/g, " ");
+  if (!titulo) return { ok: false, error: "El nombre del procedimiento es obligatorio." };
+  if (!input.aplicativoId) return { ok: false, error: "Selecciona un aplicativo." };
+  if (!input.asesoraId) return { ok: false, error: "Selecciona una asesora responsable." };
+
+  const sb = getSupabase();
+
+  const { data: existentes, error: errDup } = await sb
+    .from("procedimientos")
+    .select("titulo")
+    .eq("aplicativo_id", input.aplicativoId);
+
+  if (errDup) {
+    console.error("[documentacion] error comprobando duplicados:", errDup.message);
+    return { ok: false, error: "No se pudo verificar el procedimiento. Intenta de nuevo." };
+  }
+
+  const tituloNormalizado = normalizarTitulo(titulo);
+  const yaExiste = ((existentes ?? []) as { titulo: string | null }[]).some(
+    (p) => normalizarTitulo(p.titulo ?? "") === tituloNormalizado
+  );
+  if (yaExiste) {
+    return { ok: false, error: "Ya existe un procedimiento con este nombre para el aplicativo seleccionado." };
+  }
+
+  const { data: nuevoProc, error: errProc } = await sb
+    .from("procedimientos")
+    .insert({
+      aplicativo_id: input.aplicativoId,
+      titulo,
+      estado: "pendiente",
+      version: 1,
+      creado_por: usuario,
+    })
+    .select("id")
+    .single();
+
+  if (errProc || !nuevoProc) {
+    console.error("[documentacion] error creando procedimiento:", errProc?.message);
+    return { ok: false, error: "No se pudo crear el procedimiento. Intenta de nuevo." };
+  }
+
+  const { error: errAsig } = await sb.from("asignaciones_documentacion").insert({
+    procedimiento_id: nuevoProc.id,
+    asesora_id: input.asesoraId,
+    asignado_por: usuario,
+    fecha_asignacion: new Date().toISOString().slice(0, 10),
+    fecha_limite: input.fechaLimite || null,
+    estado: "pendiente",
+  });
+
+  if (errAsig) {
+    console.error("[documentacion] error creando asignación, revirtiendo procedimiento:", errAsig.message);
+    const { error: errRollback } = await sb.from("procedimientos").delete().eq("id", nuevoProc.id);
+    if (errRollback) {
+      console.error("[documentacion] error en rollback de procedimiento huérfano:", errRollback.message);
+    }
+    return { ok: false, error: "No se pudo asignar el procedimiento. Intenta de nuevo." };
+  }
+
+  return { ok: true };
 }

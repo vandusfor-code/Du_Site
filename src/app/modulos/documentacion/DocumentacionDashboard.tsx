@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import type { DashboardDocumentacion, ProcedimientoDoc } from "@/lib/documentacion-tipos";
 import { ESTADO_META, estadoLabel } from "@/lib/documentacion-tipos";
+import { obtenerDashboardDocumentacionAction } from "./actions";
+import AsignarProcedimientoModal from "./AsignarProcedimientoModal";
 import s from "./documentacion.module.css";
 
 const PAGE_SIZE = 5;
@@ -49,8 +51,25 @@ export default function DocumentacionDashboard({
   const [fApp, setFApp] = useState("");
   const [fEstado, setFEstado] = useState("");
   const [pagina, setPagina] = useState(1);
+  const [data, setData] = useState(dashboardInicial);
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
-  const data = dashboardInicial;
+  async function recargarDashboard() {
+    try {
+      const r = await obtenerDashboardDocumentacionAction();
+      setData(r);
+    } catch {
+      // el dashboard actual permanece visible si la recarga falla
+    }
+  }
+
+  async function alAsignar() {
+    setModalAbierto(false);
+    await recargarDashboard();
+    setToast("Procedimiento asignado correctamente.");
+    setTimeout(() => setToast(null), 4000);
+  }
 
   const filtrados = useMemo(() => {
     if (!data) return [] as ProcedimientoDoc[];
@@ -98,10 +117,11 @@ export default function DocumentacionDashboard({
             <div className={s.title}><BookOpen size={26} /><h1>Documentación Operativa</h1></div>
             <p>Centraliza, documenta y valida el conocimiento operativo de los aplicativos.</p>
           </div>
-          <button className={s.primary} onClick={proximamente}><Plus size={17} /> Asignar procedimiento</button>
+          <button className={s.primary} onClick={() => setModalAbierto(true)}><Plus size={17} /> Asignar procedimiento</button>
         </header>
 
         {errorInicial && <div className={s.banner}>{errorInicial}</div>}
+        {toast && <div className={`${s.banner} ${s.bannerOk}`}>{toast}</div>}
 
         {data && (
           <>
@@ -127,7 +147,7 @@ export default function DocumentacionDashboard({
                 <div className={s.empty}>
                   <div className={s.emptyIcon}><BookOpen size={26} /></div>
                   <p>Aún no hay procedimientos documentados.</p>
-                  <button className={s.primary} onClick={proximamente}><Plus size={17} /> Asignar procedimiento</button>
+                  <button className={s.primary} onClick={() => setModalAbierto(true)}><Plus size={17} /> Asignar procedimiento</button>
                 </div>
               ) : (
                 <>
@@ -250,6 +270,10 @@ export default function DocumentacionDashboard({
           </>
         )}
       </div>
+
+      {modalAbierto && (
+        <AsignarProcedimientoModal onClose={() => setModalAbierto(false)} onAsignado={alAsignar} />
+      )}
     </div>
   );
 }

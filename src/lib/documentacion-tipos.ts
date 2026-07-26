@@ -47,3 +47,24 @@ export interface DashboardDocumentacion {
   aplicativos: string[];
   estados: string[];
 }
+
+export interface AplicativoOpcion {
+  id: string;
+  nombre: string;
+}
+
+export interface AsesoraOpcion {
+  id: string;
+  nombre: string;
+}
+
+export interface NuevaAsignacionInput {
+  aplicativoId: string;
+  titulo: string;
+  asesoraId: string;
+  fechaLimite: string | null; // "YYYY-MM-DD" o null
+}
+
+export type ResultadoAsignacion =
+  | { ok: true }
+  | { ok: false; error: string };
