@@ -195,6 +195,15 @@ export const ESTADO_ASESORA_LABEL: Record<string, string> = {
   archivado: "Archivado",
 };
 
+// Estados en los que la asesora puede EDITAR su procedimiento. Fuera de estos
+// (en_revision, aprobado, archivado) el editor es de solo lectura y las Server
+// Actions de escritura deben rechazar cambios.
+export const ESTADOS_EDITABLES = ["pendiente", "en_elaboracion", "correccion_requerida"];
+
+export function estadoEsEditable(estado: string | null | undefined): boolean {
+  return ESTADOS_EDITABLES.includes((estado ?? "").trim());
+}
+
 // Acción según el estado real del procedimiento. Todas navegan al editor [id].
 export function accionPorEstado(estado: string): string {
   switch (estado) {

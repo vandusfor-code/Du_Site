@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireModulo } from "@/lib/auth-helpers";
 import { resolverAsesoraId } from "@/lib/documentacion-identidad";
 import { obtenerAsignacionPropia, marcarInicioSiCorresponde, obtenerDetalleProcedimiento } from "@/lib/documentacion-editor";
-import { formatearFecha } from "@/lib/documentacion-tipos";
+import { formatearFecha, estadoEsEditable } from "@/lib/documentacion-tipos";
 import DocumentarProcedimiento from "./DocumentarProcedimiento";
 
 export const maxDuration = 30;
@@ -30,6 +30,7 @@ export default async function DocumentarProcedimientoPage({
       procedimientoId={id}
       detalleInicial={detalle}
       fechaLimite={formatearFecha(asignacion.fechaLimite)}
+      editable={estadoEsEditable(detalle.estado)}
     />
   );
 }

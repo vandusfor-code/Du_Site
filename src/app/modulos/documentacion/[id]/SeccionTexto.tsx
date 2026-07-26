@@ -9,8 +9,8 @@ export default function SeccionTexto({
   placeholder,
   valor,
   onCambiar,
-  onGuardar,
   opcional,
+  soloLectura,
 }: {
   numero: number;
   pregunta: string;
@@ -18,8 +18,8 @@ export default function SeccionTexto({
   placeholder: string;
   valor: string;
   onCambiar: (v: string) => void;
-  onGuardar: () => void;
   opcional?: { noAplica: boolean; onNoAplicaChange: (v: boolean) => void };
+  soloLectura?: boolean;
 }) {
   const deshabilitado = !!opcional?.noAplica;
 
@@ -40,6 +40,7 @@ export default function SeccionTexto({
             type="checkbox"
             checked={opcional.noAplica}
             onChange={(e) => opcional.onNoAplicaChange(e.target.checked)}
+            disabled={soloLectura}
           />
           No aplica
         </label>
@@ -51,7 +52,7 @@ export default function SeccionTexto({
           placeholder={placeholder}
           value={valor}
           onChange={(e) => onCambiar(e.target.value)}
-          onBlur={onGuardar}
+          readOnly={soloLectura}
         />
       )}
     </div>

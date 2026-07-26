@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   formatearFecha,
   calcularProgreso,
+  type ResultadoAsignacion,
   type DetalleProcedimiento,
   type PasoProcedimiento,
   type ValidacionProcedimiento,
@@ -92,6 +93,39 @@ export async function marcarInicioSiCorresponde(asignacion: AsignacionPropia, pr
     const { error: e3 } = await sb.from("procedimientos").update({ estado: "en_elaboracion" }).eq("id", procedimientoId);
     if (e3) throw new Error(`Supabase: ${e3.message}`);
   }
+}
+
+// ── Enviar a revisión (cierre del flujo de la asesora) ──
+// Verifica server-side el 8/8 con la MISMA calcularProgreso y transiciona
+// en_elaboracion|correccion_requerida → en_revision en procedimientos y en la
+// asignación. No confía en ningún progreso enviado por el cliente.
+export async function enviarARevision(
+  procedimientoId: string,
+  asignacion: AsignacionPropia
+): Promise<ResultadoAsignacion> {
+  if (asignacion.estado !== "en_elaboracion" && asignacion.estado !== "correccion_requerida") {
+    return { ok: false, error: "Este procedimiento no está en un estado que permita enviarse a revisión." };
+  }
+
+  const detalle = await obtenerDetalleProcedimiento(procedimientoId);
+  const progreso = calcularProgreso(detalle);
+  if (progreso.completadas < 8) {
+    return { ok: false, error: "Debes completar las 8 secciones antes de enviar a revisión." };
+  }
+
+  const sb = getSupabase();
+  const { error: e1 } = await sb.from("procedimientos").update({ estado: "en_revision" }).eq("id", procedimientoId);
+  if (e1) {
+    console.error("[documentacion] error al enviar a revisión (procedimientos):", e1.message);
+    return { ok: false, error: "No se pudo enviar a revisión. Intenta nuevamente." };
+  }
+  const { error: e2 } = await sb.from("asignaciones_documentacion").update({ estado: "en_revision" }).eq("id", asignacion.id);
+  if (e2) {
+    console.error("[documentacion] error al enviar a revisión (asignacion), revirtiendo procedimiento:", e2.message);
+    await sb.from("procedimientos").update({ estado: asignacion.estado }).eq("id", procedimientoId);
+    return { ok: false, error: "No se pudo enviar a revisión. Intenta nuevamente." };
+  }
+  return { ok: true };
 }
 
 // ── Detalle completo ──

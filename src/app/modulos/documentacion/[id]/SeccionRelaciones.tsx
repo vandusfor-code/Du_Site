@@ -38,6 +38,7 @@ export default function SeccionRelaciones({
   onAgregarPropuesta,
   onEliminar,
   procesando,
+  soloLectura,
 }: {
   relaciones: RelacionProcedimiento[];
   noAplica: boolean;
@@ -47,6 +48,7 @@ export default function SeccionRelaciones({
   onAgregarPropuesta: (condicion: string, nombre: string) => void;
   onEliminar: (id: string) => void;
   procesando: boolean;
+  soloLectura?: boolean;
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
 
@@ -76,11 +78,11 @@ export default function SeccionRelaciones({
 
       <div className={s.opcionesRadio}>
         <label className={`${s.radioCard} ${!noAplica ? s.radioCardActiva : ""}`}>
-          <input type="radio" checked={!noAplica} onChange={() => onNoAplicaChange(false)} />
+          <input type="radio" checked={!noAplica} onChange={() => onNoAplicaChange(false)} disabled={soloLectura} />
           Sí
         </label>
         <label className={`${s.radioCard} ${noAplica ? s.radioCardActiva : ""}`}>
-          <input type="radio" checked={noAplica} onChange={() => onNoAplicaChange(true)} />
+          <input type="radio" checked={noAplica} onChange={() => onNoAplicaChange(true)} disabled={soloLectura} />
           No aplica
         </label>
       </div>
@@ -89,14 +91,16 @@ export default function SeccionRelaciones({
         <>
           <div className={s.seccionHead} style={{ marginBottom: 12 }}>
             <b style={{ fontSize: 13.5 }}>Relaciones identificadas</b>
-            <button
-              className={s.btnFantasma}
-              type="button"
-              disabled={procesando || !!draft}
-              onClick={() => setDraft(DRAFT_VACIO)}
-            >
-              <Plus size={15} /> Agregar relación
-            </button>
+            {!soloLectura && (
+              <button
+                className={s.btnFantasma}
+                type="button"
+                disabled={procesando || !!draft}
+                onClick={() => setDraft(DRAFT_VACIO)}
+              >
+                <Plus size={15} /> Agregar relación
+              </button>
+            )}
           </div>
 
           {relaciones.length === 0 && !draft && <div className={s.listaVacia}>Aún no has identificado relaciones.</div>}
@@ -127,9 +131,11 @@ export default function SeccionRelaciones({
                   </span>
                 </div>
               </div>
-              <button className={s.btnIcono} onClick={() => onEliminar(r.id)} title="Eliminar" type="button">
-                <Trash2 size={15} />
-              </button>
+              {!soloLectura && (
+                <button className={s.btnIcono} onClick={() => onEliminar(r.id)} title="Eliminar" type="button">
+                  <Trash2 size={15} />
+                </button>
+              )}
             </div>
           ))}
 

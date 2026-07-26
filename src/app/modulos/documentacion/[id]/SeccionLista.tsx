@@ -22,6 +22,7 @@ export default function SeccionLista({
   onGuardarItem,
   onEliminar,
   procesando,
+  soloLectura,
 }: {
   numero: number;
   pregunta: string;
@@ -35,6 +36,7 @@ export default function SeccionLista({
   onGuardarItem: (id: string, descripcion: string) => void;
   onEliminar: (id: string) => void;
   procesando: boolean;
+  soloLectura?: boolean;
 }) {
   return (
     <div>
@@ -45,7 +47,7 @@ export default function SeccionLista({
           </h3>
           <p className={s.seccionSub}>{subtitulo}</p>
         </div>
-        {!noAplica && (
+        {!noAplica && !soloLectura && (
           <button className={s.btnFantasma} onClick={onAgregar} disabled={procesando} type="button">
             <Plus size={15} /> {placeholderNuevo}
           </button>
@@ -53,7 +55,7 @@ export default function SeccionLista({
       </div>
 
       <label className={s.noAplicaCheck} style={{ marginBottom: 14 }}>
-        <input type="checkbox" checked={noAplica} onChange={(e) => onNoAplicaChange(e.target.checked)} />
+        <input type="checkbox" checked={noAplica} onChange={(e) => onNoAplicaChange(e.target.checked)} disabled={soloLectura} />
         No aplica
       </label>
 
@@ -71,11 +73,14 @@ export default function SeccionLista({
                   onChange={(e) => onCambiarLocal(it.id, e.target.value)}
                   onBlur={() => onGuardarItem(it.id, it.descripcion)}
                   placeholder="Describe este punto…"
+                  readOnly={soloLectura}
                 />
               </div>
-              <button className={s.btnIcono} onClick={() => onEliminar(it.id)} title="Eliminar" type="button">
-                <Trash2 size={15} />
-              </button>
+              {!soloLectura && (
+                <button className={s.btnIcono} onClick={() => onEliminar(it.id)} title="Eliminar" type="button">
+                  <Trash2 size={15} />
+                </button>
+              )}
             </div>
           ))
         ))}

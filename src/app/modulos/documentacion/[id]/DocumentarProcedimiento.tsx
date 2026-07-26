@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, BookOpen, Calendar, Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, BookOpen, Calendar, Check, ChevronLeft, ChevronRight, Loader2, Lock, Send } from "lucide-react";
+// (Link removido: "Volver" ahora guarda antes de navegar mediante router)
 import type { DetalleProcedimiento } from "@/lib/documentacion-tipos";
 import { ESTADO_META, estadoLabel, SECCIONES_DOC, calcularProgreso } from "@/lib/documentacion-tipos";
 import {
+  enviarARevisionAction,
   guardarTextoSeccionAction,
   guardarTextoOpcionalAction,
   marcarNoAplicaAction,
@@ -39,20 +41,27 @@ export default function DocumentarProcedimiento({
   procedimientoId,
   detalleInicial,
   fechaLimite,
+  editable,
 }: {
   procedimientoId: string;
   detalleInicial: DetalleProcedimiento;
   fechaLimite: string;
+  editable: boolean;
 }) {
+  const router = useRouter();
   const [detalle, setDetalle] = useState<DetalleProcedimiento>(detalleInicial);
   const [seccionActual, setSeccionActual] = useState(1);
   const [guardado, setGuardado] = useState<EstadoGuardado>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
+  const [avanzando, setAvanzando] = useState(false); // bloquea SOLO la navegación (evita doble clic)
+  const [enviando, setEnviando] = useState(false);
 
   const progreso = calcularProgreso(detalle);
   const metaEstado = ESTADO_META[detalle.estado] ?? { label: estadoLabel(detalle.estado), tone: "neutral" };
+  const completo = progreso.completadas === progreso.total;
 
+  // Indicador para operaciones de fondo (pasos, listas, capturas). No bloquea la navegación.
   async function conIndicador<T>(fn: () => Promise<T>): Promise<T | undefined> {
     setProcesando(true);
     setGuardado("guardando");
@@ -70,23 +79,53 @@ export default function DocumentarProcedimiento({
     }
   }
 
-  // ── Sección 1 y 2 ──
-  async function guardarParaQueSirve() {
-    await conIndicador(() => guardarTextoSeccionAction(procedimientoId, "para_que_sirve", detalle.paraQueSirve));
-  }
-  async function guardarCuandoSeUtiliza() {
-    await conIndicador(() => guardarTextoSeccionAction(procedimientoId, "cuando_se_utiliza", detalle.cuandoSeUtiliza));
+  // Guarda SOLO la sección de texto actual (1,2,4,8). Es el único punto de guardado
+  // de texto (sin autosave onBlur) para eliminar el doble clic y las carreras.
+  async function guardarSeccionActual(): Promise<boolean> {
+    if (!editable) return true;
+    const necesita =
+      seccionActual === 1 ||
+      seccionActual === 2 ||
+      (seccionActual === 4 && !detalle.resultadoNoAplica) ||
+      (seccionActual === 8 && !detalle.observacionesNoAplica);
+    if (!necesita) return true;
+    setGuardado("guardando");
+    setErrorMsg(null);
+    try {
+      if (seccionActual === 1) await guardarTextoSeccionAction(procedimientoId, "para_que_sirve", detalle.paraQueSirve);
+      else if (seccionActual === 2) await guardarTextoSeccionAction(procedimientoId, "cuando_se_utiliza", detalle.cuandoSeUtiliza);
+      else if (seccionActual === 4) await guardarTextoOpcionalAction(procedimientoId, "resultado_esperado", detalle.resultadoEsperado);
+      else if (seccionActual === 8) await guardarTextoOpcionalAction(procedimientoId, "observaciones", detalle.observaciones);
+      setGuardado("guardado");
+      return true;
+    } catch (e) {
+      setGuardado("error");
+      setErrorMsg(e instanceof Error ? e.message : "No se pudo guardar. Intenta de nuevo.");
+      return false;
+    }
   }
 
   // ── Sección 3: pasos ──
   async function agregarPasoHandler() {
+    // Optimista: el paso aparece de inmediato con un id temporal; al confirmar el
+    // servidor se sustituye por el id real (o se revierte si falla).
+    const tempId = `temp-${crypto.randomUUID()}`;
+    setDetalle((d) => ({
+      ...d,
+      pasos: [...d.pasos, { id: tempId, orden: d.pasos.length + 1, instruccion: "", imagenPath: null, imagenNoAplica: false, imagenUrl: null }],
+    }));
     const nuevo = await conIndicador(() => agregarPasoAction(procedimientoId));
-    if (nuevo) setDetalle((d) => ({ ...d, pasos: [...d.pasos, nuevo] }));
+    if (nuevo) {
+      setDetalle((d) => ({ ...d, pasos: d.pasos.map((p) => (p.id === tempId ? { ...nuevo, instruccion: p.instruccion } : p)) }));
+    } else {
+      setDetalle((d) => ({ ...d, pasos: d.pasos.filter((p) => p.id !== tempId) }));
+    }
   }
   function cambiarInstruccionLocal(id: string, v: string) {
     setDetalle((d) => ({ ...d, pasos: d.pasos.map((p) => (p.id === id ? { ...p, instruccion: v } : p)) }));
   }
   async function guardarInstruccion(id: string, v: string) {
+    if (id.startsWith("temp-")) return; // paso aún no confirmado por el servidor
     await conIndicador(() => actualizarInstruccionPasoAction(procedimientoId, id, v));
   }
   async function eliminarPasoHandler(id: string) {
@@ -135,9 +174,6 @@ export default function DocumentarProcedimiento({
   // ── Sección 4: resultado ──
   function cambiarResultadoLocal(v: string) {
     setDetalle((d) => ({ ...d, resultadoEsperado: v }));
-  }
-  async function guardarResultado() {
-    await conIndicador(() => guardarTextoOpcionalAction(procedimientoId, "resultado_esperado", detalle.resultadoEsperado));
   }
   async function noAplicaResultadoHandler(v: boolean) {
     setDetalle((d) => ({ ...d, resultadoNoAplica: v, resultadoEsperado: v ? "" : d.resultadoEsperado }));
@@ -216,33 +252,64 @@ export default function DocumentarProcedimiento({
   function cambiarObservacionesLocal(v: string) {
     setDetalle((d) => ({ ...d, observaciones: v }));
   }
-  async function guardarObservaciones() {
-    await conIndicador(() => guardarTextoOpcionalAction(procedimientoId, "observaciones", detalle.observaciones));
-  }
   async function noAplicaObservacionesHandler(v: boolean) {
     setDetalle((d) => ({ ...d, observacionesNoAplica: v, observaciones: v ? "" : d.observaciones }));
     await conIndicador(() => marcarNoAplicaAction(procedimientoId, "observaciones", v));
   }
 
-  // ── Navegación ──
-  async function flushSeccionActual() {
-    if (seccionActual === 1) await guardarParaQueSirve();
-    else if (seccionActual === 2) await guardarCuandoSeUtiliza();
-    else if (seccionActual === 4 && !detalle.resultadoNoAplica) await guardarResultado();
-    else if (seccionActual === 8 && !detalle.observacionesNoAplica) await guardarObservaciones();
-  }
+  // ── Navegación ── (bloqueada por `avanzando`, no por `procesando`: el primer clic siempre cuenta)
   async function irASeccion(n: number) {
-    await flushSeccionActual();
-    setSeccionActual(n);
+    if (avanzando || n === seccionActual) {
+      if (n !== seccionActual) setSeccionActual(n);
+      return;
+    }
+    setAvanzando(true);
+    try {
+      const ok = await guardarSeccionActual();
+      if (ok) setSeccionActual(n); // si el guardado falla, permanece en la sección
+    } finally {
+      setAvanzando(false);
+    }
+  }
+
+  async function volver() {
+    if (editable) await guardarSeccionActual();
+    router.push("/modulos/documentacion");
+  }
+
+  async function enviarRevision() {
+    if (enviando) return;
+    setEnviando(true);
+    setErrorMsg(null);
+    const okGuardar = await guardarSeccionActual();
+    if (!okGuardar) {
+      setEnviando(false);
+      return;
+    }
+    try {
+      const r = await enviarARevisionAction(procedimientoId);
+      if (r.ok) {
+        router.push("/modulos/documentacion");
+        router.refresh();
+      } else {
+        setGuardado("error");
+        setErrorMsg(r.error);
+        setEnviando(false);
+      }
+    } catch {
+      setGuardado("error");
+      setErrorMsg("No se pudo enviar a revisión. Intenta nuevamente.");
+      setEnviando(false);
+    }
   }
 
   return (
     <div className={s.page}>
       <div className={s.shell}>
         <div className={s.topbar}>
-          <Link href="/modulos/documentacion" className={s.back}>
+          <button type="button" className={s.back} onClick={volver}>
             <ArrowLeft size={14} /> Volver
-          </Link>
+          </button>
           <div className={s.guardado}>
             <span
               className={`${s.guardadoLinea} ${
@@ -326,6 +393,12 @@ export default function DocumentarProcedimiento({
         </div>
 
         <div className={s.card}>
+          {!editable && (
+            <div className={s.readonlyBanner}>
+              <Lock size={15} />
+              <span>Este procedimiento está {ESTADO_META[detalle.estado]?.label?.toLowerCase() ?? "en revisión"} y no puede editarse. Puedes consultarlo.</span>
+            </div>
+          )}
           {errorMsg && guardado === "error" && <div className={s.error}>{errorMsg}</div>}
 
           {seccionActual === 1 && (
@@ -336,7 +409,7 @@ export default function DocumentarProcedimiento({
               placeholder="Escribe para qué sirve…"
               valor={detalle.paraQueSirve}
               onCambiar={(v) => setDetalle((d) => ({ ...d, paraQueSirve: v }))}
-              onGuardar={guardarParaQueSirve}
+              soloLectura={!editable}
             />
           )}
           {seccionActual === 2 && (
@@ -347,7 +420,7 @@ export default function DocumentarProcedimiento({
               placeholder="Escribe en qué casos se utiliza…"
               valor={detalle.cuandoSeUtiliza}
               onCambiar={(v) => setDetalle((d) => ({ ...d, cuandoSeUtiliza: v }))}
-              onGuardar={guardarCuandoSeUtiliza}
+              soloLectura={!editable}
             />
           )}
           {seccionActual === 3 && (
@@ -362,6 +435,7 @@ export default function DocumentarProcedimiento({
               onQuitarCaptura={quitarCapturaHandler}
               onNoAplicaCaptura={noAplicaCapturaHandler}
               procesando={procesando}
+              soloLectura={!editable}
             />
           )}
           {seccionActual === 4 && (
@@ -372,8 +446,8 @@ export default function DocumentarProcedimiento({
               placeholder="Escribe el resultado esperado…"
               valor={detalle.resultadoEsperado}
               onCambiar={cambiarResultadoLocal}
-              onGuardar={guardarResultado}
               opcional={{ noAplica: detalle.resultadoNoAplica, onNoAplicaChange: noAplicaResultadoHandler }}
+              soloLectura={!editable}
             />
           )}
           {seccionActual === 5 && (
@@ -390,6 +464,7 @@ export default function DocumentarProcedimiento({
               onGuardarItem={guardarValidacion}
               onEliminar={eliminarValidacionHandler}
               procesando={procesando}
+              soloLectura={!editable}
             />
           )}
           {seccionActual === 6 && (
@@ -402,6 +477,7 @@ export default function DocumentarProcedimiento({
               onAgregarPropuesta={agregarRelacionPropuestaHandler}
               onEliminar={eliminarRelacionHandler}
               procesando={procesando}
+              soloLectura={!editable}
             />
           )}
           {seccionActual === 7 && (
@@ -418,6 +494,7 @@ export default function DocumentarProcedimiento({
               onGuardarItem={guardarError}
               onEliminar={eliminarErrorHandler}
               procesando={procesando}
+              soloLectura={!editable}
             />
           )}
           {seccionActual === 8 && (
@@ -428,23 +505,32 @@ export default function DocumentarProcedimiento({
               placeholder="Escribe la observación…"
               valor={detalle.observaciones}
               onCambiar={cambiarObservacionesLocal}
-              onGuardar={guardarObservaciones}
               opcional={{ noAplica: detalle.observacionesNoAplica, onNoAplicaChange: noAplicaObservacionesHandler }}
+              soloLectura={!editable}
             />
           )}
 
           <div className={s.footer}>
-            <button className={s.btnFantasma} onClick={() => irASeccion(Math.max(1, seccionActual - 1))} disabled={seccionActual === 1 || procesando} type="button">
+            <button className={s.btnFantasma} onClick={() => irASeccion(Math.max(1, seccionActual - 1))} disabled={seccionActual === 1 || avanzando} type="button">
               <ChevronLeft size={15} /> Anterior
             </button>
-            <button
-              className={s.btnPrimario}
-              onClick={() => irASeccion(Math.min(8, seccionActual + 1))}
-              disabled={procesando}
-              type="button"
-            >
-              {seccionActual < 8 ? "Guardar y continuar" : "Guardar"} <ChevronRight size={15} />
-            </button>
+
+            {seccionActual < 8 ? (
+              <button className={s.btnPrimario} onClick={() => irASeccion(seccionActual + 1)} disabled={avanzando} type="button">
+                {editable ? "Guardar y continuar" : "Siguiente"} <ChevronRight size={15} />
+              </button>
+            ) : editable ? (
+              <button
+                className={s.btnPrimario}
+                onClick={enviarRevision}
+                disabled={enviando || !completo}
+                title={!completo ? "Completa las 8 secciones para enviar a revisión" : undefined}
+                type="button"
+              >
+                {enviando ? <Loader2 size={15} className={s.spin} /> : <Send size={15} />}
+                {enviando ? "Enviando…" : "Enviar a revisión"}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

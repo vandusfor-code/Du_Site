@@ -16,6 +16,7 @@ export default function SeccionPasos({
   onQuitarCaptura,
   onNoAplicaCaptura,
   procesando,
+  soloLectura,
 }: {
   pasos: PasoProcedimiento[];
   onAgregar: () => void;
@@ -27,6 +28,7 @@ export default function SeccionPasos({
   onQuitarCaptura: (id: string) => void;
   onNoAplicaCaptura: (id: string, noAplica: boolean) => void;
   procesando: boolean;
+  soloLectura?: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pasoActivoRef = useRef<string | null>(null);
@@ -79,9 +81,11 @@ export default function SeccionPasos({
           <h3 className={s.seccionTitulo}>3. ¿Cómo se realiza?</h3>
           <p className={s.seccionSub}>Describe cada paso en el orden exacto en que debe ejecutarse.</p>
         </div>
-        <button className={s.btnFantasma} onClick={onAgregar} disabled={procesando} type="button">
-          <Plus size={15} /> Agregar paso
-        </button>
+        {!soloLectura && (
+          <button className={s.btnFantasma} onClick={onAgregar} disabled={procesando} type="button">
+            <Plus size={15} /> Agregar paso
+          </button>
+        )}
       </div>
 
       <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={alSeleccionarArchivo} />
@@ -93,13 +97,13 @@ export default function SeccionPasos({
           <div
             key={p.id}
             className={`${s.pasoFila} ${arrastrando === p.id ? s.pasoFilaArrastrando : ""}`}
-            draggable
-            onDragStart={() => setArrastrando(p.id)}
+            draggable={!soloLectura}
+            onDragStart={() => !soloLectura && setArrastrando(p.id)}
             onDragOver={(e) => e.preventDefault()}
-            onDrop={() => alSoltar(p.id)}
+            onDrop={() => !soloLectura && alSoltar(p.id)}
             onDragEnd={() => setArrastrando(null)}
           >
-            <div className={s.arrastre}>
+            <div className={s.arrastre} style={soloLectura ? { visibility: "hidden" } : undefined}>
               <GripVertical size={16} />
             </div>
             <div className={s.pasoNumero}>{i + 1}</div>
@@ -111,6 +115,7 @@ export default function SeccionPasos({
                 onChange={(e) => onCambiarInstruccionLocal(p.id, e.target.value)}
                 onBlur={() => onGuardarInstruccion(p.id, p.instruccion)}
                 placeholder="Describe qué debe hacer la asesora en este paso."
+                readOnly={soloLectura}
               />
             </div>
             <div>
@@ -123,9 +128,15 @@ export default function SeccionPasos({
                 <div className={s.capturaPreview}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.imagenUrl} alt={`Captura del paso ${i + 1}`} />
-                  <button className={s.capturaQuitar} onClick={() => onQuitarCaptura(p.id)} title="Quitar captura" type="button">
-                    <X size={12} />
-                  </button>
+                  {!soloLectura && (
+                    <button className={s.capturaQuitar} onClick={() => onQuitarCaptura(p.id)} title="Quitar captura" type="button">
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              ) : soloLectura ? (
+                <div className={s.dropzone} style={{ opacity: 0.5, cursor: "default" }}>
+                  <span>Sin captura</span>
                 </div>
               ) : (
                 <div className={s.dropzone} onClick={() => abrirSelector(p.id)}>
@@ -140,12 +151,15 @@ export default function SeccionPasos({
                 type="checkbox"
                 checked={p.imagenNoAplica}
                 onChange={(e) => onNoAplicaCaptura(p.id, e.target.checked)}
+                disabled={soloLectura}
               />
               No aplica
             </label>
-            <button className={s.btnIcono} onClick={() => onEliminar(p.id)} title="Eliminar paso" type="button">
-              <MoreVertical size={15} />
-            </button>
+            {!soloLectura && (
+              <button className={s.btnIcono} onClick={() => onEliminar(p.id)} title="Eliminar paso" type="button">
+                <MoreVertical size={15} />
+              </button>
+            )}
           </div>
         ))
       )}
