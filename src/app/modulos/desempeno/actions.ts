@@ -3,10 +3,10 @@
 import { auth } from "@/auth";
 import {
   obtenerDashboardDesempeno,
-  guardarSnapshotDesempeno,
+  cerrarMes,
   type DashboardDesempeno,
   type DesempenoFiltros,
-  type ResultadoSnapshot,
+  type ResultadoCierre,
 } from "@/lib/desempeno";
 
 async function requireDesempeno(): Promise<void> {
@@ -21,7 +21,7 @@ export async function obtenerDashboardDesempenoAction(filtros: DesempenoFiltros)
   return obtenerDashboardDesempeno(filtros);
 }
 
-export async function guardarSnapshotAction(): Promise<ResultadoSnapshot> {
+export async function cerrarMesAction(): Promise<ResultadoCierre> {
   await requireDesempeno();
-  return guardarSnapshotDesempeno();
+  return cerrarMes();
 }

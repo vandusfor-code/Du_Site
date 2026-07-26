@@ -38,6 +38,8 @@ export interface FuncionarioDesempeno {
 export interface DesempenoFiltros {
   area?: string;
   busqueda?: string;
+  /** "" = mes en curso (TO vivo); "YYYY-MM" = un mes cerrado del histórico. */
+  mes?: string;
 }
 
 export interface FilaTabla {
@@ -47,8 +49,9 @@ export interface FilaTabla {
   valores: Partial<Record<CampoDesempeno, string>>;
 }
 
-export interface ResultadoSnapshot {
-  fecha: string;
+export interface ResultadoCierre {
+  mes: string;
+  mesLabel: string;
   guardados: number;
   actualizados: number;
 }
@@ -88,4 +91,10 @@ export interface DashboardDesempeno {
   areasDisponibles: string[];
   labels: Record<string, string>;
   bloquesDesconocidos: number;
+  /** true si se está viendo un mes cerrado del histórico. */
+  esHistorico: boolean;
+  /** Etiqueta del período mostrado ("Mes en curso" o "Julio 2026"). */
+  mesActualLabel: string;
+  /** Opciones del selector de mes. */
+  mesesDisponibles: { value: string; label: string }[];
 }

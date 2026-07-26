@@ -9,7 +9,7 @@ import {
   type DesempenoFiltros,
   type FilaTabla,
   type DashboardDesempeno,
-  type ResultadoSnapshot,
+  type ResultadoCierre,
 } from "@/lib/desempeno-tipos";
 
 export {
@@ -21,17 +21,14 @@ export {
   type DesempenoFiltros,
   type FilaTabla,
   type DashboardDesempeno,
-  type ResultadoSnapshot,
+  type ResultadoCierre,
 };
 
 // ============================================================
-// DESEMPEÑO — lee la hoja "TO" (mismo spreadsheet que Consolidado).
-// La hoja tiene BLOQUES apilados por área, cada uno con su fila de
-// encabezado (col A = "Usuario") y columnas distintas. La detección es
-// dinámica: no se hardcodean rangos ni filas.
-// Sheets es la fuente de verdad (PEC, PENC, Bono Ganado ya calculados);
-// aquí solo se consume, organiza, filtra y visualiza. No se recalculan
-// reglas de negocio.
+// DESEMPEÑO — lee la hoja "TO" (mes en curso) y guarda cierres
+// mensuales manuales en "Historico_Desempeno" para poder ver meses
+// anteriores y calcular tendencias reales. Sheets es la fuente de
+// verdad (PEC/PENC/Bono ya calculados); aquí no se recalcula nada.
 // ============================================================
 
 function sheetId(): string {
@@ -51,7 +48,6 @@ function norm(s: unknown): string {
     .replace(/[̀-ͯ]/g, "");
 }
 
-// Mapea el texto de un encabezado a un campo canónico.
 function encabezadoACampo(h: string): CampoDesempeno | null {
   const n = norm(h);
   if (n === "usuario") return "usuario";
@@ -79,8 +75,6 @@ function encabezadoACampo(h: string): CampoDesempeno | null {
   return null;
 }
 
-// Determina el área canónica de un bloque a partir del valor del campo Área
-// de sus filas y, como respaldo, de la firma de columnas presentes.
 function detectarArea(campos: Set<CampoDesempeno>, valoresArea: string[]): Area | null {
   for (const v of valoresArea) {
     const n = norm(v);
@@ -90,7 +84,6 @@ function detectarArea(campos: Set<CampoDesempeno>, valoresArea: string[]): Area 
     if (n.includes("radicacion")) return "Radicación";
     if (n.includes("g. empleo") || n.includes("empleo")) return "G. Empleo";
   }
-  // Respaldo por firma de columnas.
   if (campos.has("radicadosPct") || campos.has("sncRecibidos") || campos.has("cantidadRadicados")) return "Radicación";
   if (campos.has("calidadLlamada") || campos.has("errorRespuesta")) return "Encuestas";
   if (campos.has("pqrsfCreados") || campos.has("pqrsfDevueltos")) return "Línea amiga / Chat";
@@ -103,12 +96,10 @@ interface BloqueTO {
   funcionarios: FuncionarioDesempeno[];
 }
 
-// Parsea toda la hoja TO en bloques por área.
 async function leerBloquesTO(): Promise<{ bloques: BloqueTO[]; desconocidos: number }> {
   const data = await readRange(sheetId(), `${TAB_TO}!A:Z`);
   const bloques: BloqueTO[] = [];
   let desconocidos = 0;
-
   let i = 0;
   while (i < data.length) {
     const fila = data[i] ?? [];
@@ -116,7 +107,6 @@ async function leerBloquesTO(): Promise<{ bloques: BloqueTO[]; desconocidos: num
       i++;
       continue;
     }
-    // Fila de encabezado → nuevo bloque.
     const mapaCol: { idx: number; campo: CampoDesempeno }[] = [];
     fila.forEach((h, idx) => {
       const campo = encabezadoACampo(String(h));
@@ -124,26 +114,19 @@ async function leerBloquesTO(): Promise<{ bloques: BloqueTO[]; desconocidos: num
     });
     const campos = mapaCol.map((m) => m.campo);
 
-    // Filas de datos hasta el próximo encabezado.
     const funcionariosRaw: { usuario: string; funcionario: string; fecha: string; area: string; valores: Partial<Record<CampoDesempeno, string>> }[] = [];
     let j = i + 1;
     for (; j < data.length; j++) {
       const r = data[j] ?? [];
-      if (norm(r[0]) === "usuario") break; // siguiente bloque
+      if (norm(r[0]) === "usuario") break;
       const usuario = String(r[0] ?? "").trim();
-      if (!usuario) continue; // fila vacía → ignorar
+      if (!usuario) continue;
       const valores: Partial<Record<CampoDesempeno, string>> = {};
       for (const { idx, campo } of mapaCol) {
         const val = String(r[idx] ?? "").trim();
         if (val) valores[campo] = val;
       }
-      funcionariosRaw.push({
-        usuario,
-        funcionario: valores.funcionario ?? usuario,
-        fecha: valores.fecha ?? "",
-        area: valores.area ?? "",
-        valores,
-      });
+      funcionariosRaw.push({ usuario, funcionario: valores.funcionario ?? usuario, fecha: valores.fecha ?? "", area: valores.area ?? "", valores });
     }
 
     const area = detectarArea(new Set(campos), funcionariosRaw.map((f) => f.area));
@@ -158,11 +141,10 @@ async function leerBloquesTO(): Promise<{ bloques: BloqueTO[]; desconocidos: num
     });
     i = j;
   }
-
   return { bloques, desconocidos };
 }
 
-/* ── Parsers numéricos (respetan vacío/No aplica → null) ── */
+/* ── Parsers ── */
 function parsePct(v: string | undefined): number | null {
   if (!v) return null;
   const n = parseFloat(v.replace("%", "").replace(",", ".").trim());
@@ -178,8 +160,30 @@ function parseMoney(v: string | undefined): number | null {
 function fmtMoney(n: number): string {
   return "$" + n.toLocaleString("es-CO");
 }
+// dd/MM/yyyy o yyyy-MM-dd → "YYYY-MM"
+function fechaAMes(fecha: string): string | null {
+  const f = (fecha ?? "").trim();
+  let m = f.match(/^(\d{4})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}`;
+  m = f.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return `${m[3]}-${m[2]}`;
+  return null;
+}
+const MESES_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+function mesLabel(ym: string): string {
+  const m = ym.match(/^(\d{4})-(\d{2})$/);
+  if (!m) return ym;
+  const nombre = MESES_ES[parseInt(m[2], 10) - 1] ?? m[2];
+  return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${m[1]}`;
+}
+function mesActualBogota(): string {
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota", year: "numeric", month: "2-digit" }).format(new Date());
+  return p.slice(0, 7);
+}
+function hoyBogotaISO(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
 
-/* ── Indicadores a promediar por área (campo → etiqueta) ── */
 const INDICADORES_POR_AREA: Record<Area, CampoDesempeno[]> = {
   "Línea amiga / Chat": ["pec", "penc", "productividad", "adherencia"],
   "G. Empleo": ["pec", "penc", "productividad", "adherencia"],
@@ -187,8 +191,6 @@ const INDICADORES_POR_AREA: Record<Area, CampoDesempeno[]> = {
   "Radicación": ["productividad", "radicadosPct", "snc", "precision", "adherencia"],
   "G. Empleo Cofrem": ["pec", "penc"],
 };
-
-/* ── Columnas de tabla por área (además de #, Funcionario, Área) ── */
 const COLUMNAS_POR_AREA: Record<Area, CampoDesempeno[]> = {
   "Línea amiga / Chat": ["pec", "penc", "productividad", "adherencia", "bono", "pqrsfCreados", "pqrsfDevueltos", "auditorias"],
   "G. Empleo": ["pec", "penc", "productividad", "adherencia", "bono"],
@@ -197,22 +199,80 @@ const COLUMNAS_POR_AREA: Record<Area, CampoDesempeno[]> = {
   "G. Empleo Cofrem": ["pec", "penc", "auditorias"],
 };
 
-// Promedio de un campo (porcentaje) sobre un conjunto de funcionarios,
-// ignorando vacíos / "No aplica" (no los cuenta como 0).
 function promedioPct(funcs: FuncionarioDesempeno[], campo: CampoDesempeno): number | null {
   const nums = funcs.map((f) => parsePct(f.valores[campo])).filter((n): n is number => n !== null);
   if (nums.length === 0) return null;
   return Math.round((nums.reduce((s, n) => s + n, 0) / nums.length) * 10) / 10;
 }
 
+/* ── Histórico: headers y helpers ── */
+const HISTORICO_HEADERS = [
+  "mes", "usuario", "funcionario", "area",
+  "pec", "penc", "productividad", "adherencia", "bono", "auditorias",
+  "pqrsfCreados", "pqrsfDevueltos", "precision", "errorRespuesta",
+  "radicadosPct", "snc", "sncRecibidos", "cantidadRadicados", "correccion", "sncSolucionados",
+  "satisfaccion", "calidadLlamada", "cerrado_el",
+];
+const HIST_CAMPOS = HISTORICO_HEADERS.slice(4, 22) as CampoDesempeno[];
+const HIST_LAST_COL = "W"; // 23 columnas → A:W
+
+async function leerHistorico(): Promise<unknown[][]> {
+  try {
+    return await readRange(sheetId(), `${TAB_HISTORICO}!A:${HIST_LAST_COL}`);
+  } catch {
+    return [];
+  }
+}
+
+// Reconstruye la lista de funcionarios de un mes cerrado desde el histórico.
+function funcsDeHistorico(data: unknown[][], mes: string): FuncionarioDesempeno[] {
+  if (data.length < 2) return [];
+  const idx = Object.fromEntries(HISTORICO_HEADERS.map((h, i) => [h, i])) as Record<string, number>;
+  const out: FuncionarioDesempeno[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const r = data[i];
+    if (String(r[idx.mes] ?? "").trim() !== mes) continue;
+    const area = String(r[idx.area] ?? "").trim() as Area;
+    const valores: Partial<Record<CampoDesempeno, string>> = {};
+    for (const c of HIST_CAMPOS) {
+      const v = String(r[idx[c]] ?? "").trim();
+      if (v) valores[c] = v;
+    }
+    out.push({ usuario: String(r[idx.usuario] ?? "").trim(), funcionario: String(r[idx.funcionario] ?? "").trim(), area, fecha: mes, valores });
+  }
+  return out;
+}
+
+/* ── Agregación común (sirve para vivo o histórico) ── */
+function agregar(funcs: FuncionarioDesempeno[]) {
+  const total = funcs.length;
+  const penc = funcs.filter((f) => parsePct(f.valores.penc) !== null && parsePct(f.valores.penc)! > 0).length;
+  const pec = promedioPct(funcs, "pec");
+  const pencProm = promedioPct(funcs, "penc");
+  const bonos = funcs.reduce((s, f) => s + (parseMoney(f.valores.bono) ?? 0), 0);
+  return { total, penc, pec, pencProm, bonos };
+}
+
 export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}): Promise<DashboardDesempeno> {
-  const { bloques, desconocidos } = await leerBloquesTO();
-
-  const todos: FuncionarioDesempeno[] = [];
-  for (const b of bloques) if (b.area) todos.push(...b.funcionarios);
-
   const fArea = (filtros.area ?? "").trim();
+  const fMes = (filtros.mes ?? "").trim();
   const fBusqueda = norm(filtros.busqueda ?? "");
+
+  const histData = await leerHistorico();
+  const mesesHist = Array.from(new Set(histData.slice(1).map((r) => String(r[0] ?? "").trim()).filter(Boolean))).sort();
+
+  // Fuente: mes cerrado (histórico) o mes en curso (TO vivo).
+  const esHistorico = fMes !== "" && mesesHist.includes(fMes);
+  let todos: FuncionarioDesempeno[];
+  let desconocidos = 0;
+  if (esHistorico) {
+    todos = funcsDeHistorico(histData, fMes);
+  } else {
+    const bloques = await leerBloquesTO();
+    desconocidos = bloques.desconocidos;
+    todos = [];
+    for (const b of bloques.bloques) if (b.area) todos.push(...b.funcionarios);
+  }
 
   const filtrados = todos.filter((f) => {
     if (fArea && f.area !== fArea) return false;
@@ -220,185 +280,99 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     return true;
   });
 
-  // ── KPIs ──
-  const funcionariosActivos = filtrados.length;
-  const pecPromedio = promedioPct(filtrados, "pec");
-  const pencPromedio = promedioPct(filtrados, "penc");
-  const bonosGenerados = filtrados.reduce((s, f) => s + (parseMoney(f.valores.bono) ?? 0), 0);
+  const agg = agregar(filtrados);
 
-  // ── Indicadores por área (promedios reales) ──
-  const areaParaIndicadores: Area | null = (AREAS_ORDEN as readonly string[]).includes(fArea) ? (fArea as Area) : null;
-  let indicadores: { nombre: string; pct: number }[];
-  if (areaParaIndicadores) {
-    indicadores = INDICADORES_POR_AREA[areaParaIndicadores]
-      .map((campo) => ({ nombre: LABELS[campo], pct: promedioPct(filtrados, campo) ?? 0 }));
-  } else {
-    // "Todos": indicadores comunes.
-    indicadores = (["pec", "penc", "productividad", "adherencia"] as CampoDesempeno[])
-      .map((campo) => ({ nombre: LABELS[campo], pct: promedioPct(filtrados, campo) ?? 0 }));
-  }
+  // Indicadores por área.
+  const areaSel: Area | null = (AREAS_ORDEN as readonly string[]).includes(fArea) ? (fArea as Area) : null;
+  const camposInd = areaSel ? INDICADORES_POR_AREA[areaSel] : (["pec", "penc", "productividad", "adherencia"] as CampoDesempeno[]);
+  const indicadores = camposInd.map((c) => ({ nombre: LABELS[c], pct: promedioPct(filtrados, c) ?? 0 }));
 
-  // ── Ranking: por bono descendente (real) ──
+  // Ranking por bono desc.
   const ranking = [...filtrados]
     .sort((a, b) => (parseMoney(b.valores.bono) ?? 0) - (parseMoney(a.valores.bono) ?? 0))
     .slice(0, 5)
-    .map((f) => ({
-      funcionario: f.funcionario,
-      pec: f.valores.pec ?? "—",
-      penc: f.valores.penc ?? "—",
-      bono: f.valores.bono ?? "—",
-    }));
+    .map((f) => ({ funcionario: f.funcionario, pec: f.valores.pec ?? "—", penc: f.valores.penc ?? "—", bono: f.valores.bono ?? "—" }));
 
-  // ── Bonificación por área ──
+  // Bonificación por área.
   const montoPorArea = new Map<string, number>();
-  for (const f of filtrados) {
-    const m = parseMoney(f.valores.bono) ?? 0;
-    montoPorArea.set(f.area, (montoPorArea.get(f.area) ?? 0) + m);
-  }
+  for (const f of filtrados) montoPorArea.set(f.area, (montoPorArea.get(f.area) ?? 0) + (parseMoney(f.valores.bono) ?? 0));
   const porArea = Array.from(montoPorArea.entries())
-    .filter(([, monto]) => monto > 0)
+    .filter(([, m]) => m > 0)
     .sort((a, b) => b[1] - a[1])
-    .map(([area, monto]) => ({
-      area,
-      monto,
-      montoLabel: fmtMoney(monto),
-      pct: bonosGenerados > 0 ? Math.round((monto / bonosGenerados) * 1000) / 10 : 0,
-    }));
+    .map(([area, monto]) => ({ area, monto, montoLabel: fmtMoney(monto), pct: agg.bonos > 0 ? Math.round((monto / agg.bonos) * 1000) / 10 : 0 }));
 
-  // ── Tabla: columnas dinámicas según área seleccionada ──
-  let columnas: CampoDesempeno[];
-  if (areaParaIndicadores) {
-    columnas = COLUMNAS_POR_AREA[areaParaIndicadores];
-  } else {
-    columnas = ["pec", "penc", "productividad", "adherencia", "bono"];
+  // Tabla con columnas dinámicas.
+  const columnas = areaSel ? COLUMNAS_POR_AREA[areaSel] : (["pec", "penc", "productividad", "adherencia", "bono"] as CampoDesempeno[]);
+  const filas: FilaTabla[] = filtrados.map((f) => ({ usuario: f.usuario, funcionario: f.funcionario, area: f.area, valores: f.valores }));
+
+  // ── Serie mensual (para tendencias y sparklines) ──
+  // Agregados de cada mes cerrado (filtrados por área) + punto vivo si es "en curso".
+  const serie: { mes: string; funcs: number; pec: number; penc: number; bonos: number }[] = [];
+  for (const mes of mesesHist) {
+    const fh = funcsDeHistorico(histData, mes).filter((f) => !fArea || f.area === fArea);
+    if (fh.length === 0) continue;
+    const a = agregar(fh);
+    serie.push({ mes, funcs: a.total, pec: a.pec ?? 0, penc: a.pencProm ?? 0, bonos: a.bonos });
   }
-  const filas: FilaTabla[] = filtrados.map((f) => ({
-    usuario: f.usuario,
-    funcionario: f.funcionario,
-    area: f.area,
-    valores: f.valores,
-  }));
+  // Si estamos viendo el mes en curso, agregamos el punto vivo al final.
+  const mesVivo = mesActualBogota();
+  if (!esHistorico && !mesesHist.includes(mesVivo)) {
+    serie.push({ mes: mesVivo, funcs: agg.total, pec: agg.pec ?? 0, penc: agg.pencProm ?? 0, bonos: agg.bonos });
+  }
+  // Si vemos un mes histórico puntual, recortamos la serie hasta ese mes.
+  const serieVista = esHistorico ? serie.filter((p) => p.mes <= fMes) : serie;
 
-  // ── Histórico (tendencias + sparklines) ──
-  const hist = await leerHistorico(fArea);
+  const deltaPts = (arr: number[]) => (arr.length < 2 ? null : Math.round((arr[arr.length - 1] - arr[arr.length - 2]) * 10) / 10);
+  const deltaPct = (arr: number[]) => {
+    if (arr.length < 2) return null;
+    const prev = arr[arr.length - 2];
+    if (prev === 0) return null;
+    return Math.round(((arr[arr.length - 1] - prev) / prev) * 1000) / 10;
+  };
+  const sf = serieVista.map((p) => p.funcs);
+  const sp = serieVista.map((p) => p.pec);
+  const sn = serieVista.map((p) => p.penc);
+  const sb = serieVista.map((p) => p.bonos);
+  const hayHistorico = serieVista.length >= 2;
+
+  // Opciones del selector de mes.
+  const mesesDisponibles = [
+    { value: "", label: "Mes en curso" },
+    ...mesesHist.slice().reverse().map((m) => ({ value: m, label: mesLabel(m) })),
+  ];
 
   return {
     kpi: {
-      funcionariosActivos,
-      pecPromedio,
-      pencPromedio,
-      bonosGenerados,
-      bonosGeneradosLabel: fmtMoney(bonosGenerados),
-      tendencia: hist.tendencia,
-      sparklines: hist.sparklines,
-      hayHistorico: hist.hayHistorico,
+      funcionariosActivos: agg.total,
+      pecPromedio: agg.pec,
+      pencPromedio: agg.pencProm,
+      bonosGenerados: agg.bonos,
+      bonosGeneradosLabel: fmtMoney(agg.bonos),
+      tendencia: { funcionarios: deltaPct(sf), pec: deltaPts(sp), penc: deltaPts(sn), bonos: deltaPct(sb) },
+      sparklines: { funcionarios: sf.slice(-8), pec: sp.slice(-8), penc: sn.slice(-8), bonos: sb.slice(-8) },
+      hayHistorico,
     },
     indicadores,
     ranking,
-    bonificacion: {
-      total: bonosGenerados,
-      totalLabel: fmtMoney(bonosGenerados),
-      porArea,
-    },
+    bonificacion: { total: agg.bonos, totalLabel: fmtMoney(agg.bonos), porArea },
     tabla: { columnas, filas },
     areasDisponibles: AREAS_ORDEN.filter((a) => todos.some((f) => f.area === a)),
     labels: LABELS,
     bloquesDesconocidos: desconocidos,
+    esHistorico,
+    mesActualLabel: esHistorico ? mesLabel(fMes) : "Mes en curso",
+    mesesDisponibles,
   };
 }
 
 /* ===================== */
-/* HISTÓRICO (SNAPSHOTS) */
+/* CERRAR MES (snapshot manual) */
 /* ===================== */
 
-const HISTORICO_HEADERS = [
-  "fecha", "usuario", "funcionario", "area",
-  "pec", "penc", "productividad", "adherencia", "bono", "auditorias",
-  "pqrsfCreados", "pqrsfDevueltos", "precision", "errorRespuesta",
-  "radicadosPct", "snc", "sncRecibidos", "cantidadRadicados", "correccion", "sncSolucionados",
-  "satisfaccion", "calidadLlamada",
-];
-const HIST_CAMPOS = HISTORICO_HEADERS.slice(4) as CampoDesempeno[];
-
-function hoyBogotaISO(): string {
-  const p = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  return p; // YYYY-MM-DD
-}
-
-// Lee el histórico y arma tendencias + sparklines para los filtros dados.
-async function leerHistorico(fArea: string): Promise<{
-  tendencia: DashboardDesempeno["kpi"]["tendencia"];
-  sparklines: DashboardDesempeno["kpi"]["sparklines"];
-  hayHistorico: boolean;
-}> {
-  const vacio = {
-    tendencia: { funcionarios: null, pec: null, penc: null, bonos: null },
-    sparklines: { funcionarios: [], pec: [], penc: [], bonos: [] },
-    hayHistorico: false,
-  };
-  let data: unknown[][];
-  try {
-    data = await readRange(sheetId(), `${TAB_HISTORICO}!A:V`);
-  } catch {
-    return vacio;
-  }
-  if (data.length < 2) return vacio;
-
-  const idx = Object.fromEntries(HISTORICO_HEADERS.map((h, i) => [h, i])) as Record<string, number>;
-  // Agrupar por fecha (aplicando filtro de área).
-  const porFecha = new Map<string, { funcs: number; pec: number[]; penc: number[]; bonos: number }>();
-  for (let i = 1; i < data.length; i++) {
-    const r = data[i];
-    const area = String(r[idx.area] ?? "").trim();
-    if (fArea && area !== fArea) continue;
-    const fecha = String(r[idx.fecha] ?? "").trim();
-    if (!fecha) continue;
-    if (!porFecha.has(fecha)) porFecha.set(fecha, { funcs: 0, pec: [], penc: [], bonos: 0 });
-    const g = porFecha.get(fecha)!;
-    g.funcs++;
-    const pec = parsePct(String(r[idx.pec] ?? ""));
-    const penc = parsePct(String(r[idx.penc] ?? ""));
-    if (pec !== null) g.pec.push(pec);
-    if (penc !== null) g.penc.push(penc);
-    g.bonos += parseMoney(String(r[idx.bono] ?? "")) ?? 0;
-  }
-  const fechas = Array.from(porFecha.keys()).sort();
-  if (fechas.length < 2) return { ...vacio, hayHistorico: false };
-
-  const avg = (a: number[]) => (a.length ? Math.round((a.reduce((s, n) => s + n, 0) / a.length) * 10) / 10 : 0);
-  const serieFuncs = fechas.map((f) => porFecha.get(f)!.funcs);
-  const seriePec = fechas.map((f) => avg(porFecha.get(f)!.pec));
-  const seriePenc = fechas.map((f) => avg(porFecha.get(f)!.penc));
-  const serieBonos = fechas.map((f) => porFecha.get(f)!.bonos);
-
-  const deltaPts = (s: number[]) => (s.length < 2 ? null : Math.round((s[s.length - 1] - s[s.length - 2]) * 10) / 10);
-  const deltaPct = (s: number[]) => {
-    if (s.length < 2) return null;
-    const prev = s[s.length - 2];
-    if (prev === 0) return null;
-    return Math.round(((s[s.length - 1] - prev) / prev) * 1000) / 10;
-  };
-
-  return {
-    tendencia: {
-      funcionarios: deltaPct(serieFuncs),
-      pec: deltaPts(seriePec),
-      penc: deltaPts(seriePenc),
-      bonos: deltaPct(serieBonos),
-    },
-    sparklines: {
-      funcionarios: serieFuncs.slice(-8),
-      pec: seriePec.slice(-8),
-      penc: seriePenc.slice(-8),
-      bonos: serieBonos.slice(-8),
-    },
-    hayHistorico: true,
-  };
-}
-
-// Guarda/actualiza el snapshot de HOY (upsert por fecha+usuario+área).
-// No duplica filas: si ya existe la clave para hoy, la actualiza.
-export async function guardarSnapshotDesempeno(): Promise<ResultadoSnapshot> {
+// Guarda/actualiza el cierre de un mes en el histórico (upsert por mes+usuario+área).
+// El mes se toma de la columna Fecha de TO (lo que representan los datos); si no
+// se puede determinar, usa el mes calendario actual.
+export async function cerrarMes(): Promise<ResultadoCierre> {
   const id = sheetId();
   await asegurarHoja(id, TAB_HISTORICO, HISTORICO_HEADERS);
 
@@ -406,49 +380,43 @@ export async function guardarSnapshotDesempeno(): Promise<ResultadoSnapshot> {
   const funcs: FuncionarioDesempeno[] = [];
   for (const b of bloques) if (b.area) funcs.push(...b.funcionarios);
 
-  const fecha = hoyBogotaISO();
-  const existentes = await readRange(id, `${TAB_HISTORICO}!A:V`);
-  const idx = Object.fromEntries(HISTORICO_HEADERS.map((h, i) => [h, i])) as Record<string, number>;
+  // Mes de los datos (moda de la columna Fecha), respaldo: mes actual.
+  const conteoMes = new Map<string, number>();
+  for (const f of funcs) {
+    const ym = fechaAMes(f.fecha);
+    if (ym) conteoMes.set(ym, (conteoMes.get(ym) ?? 0) + 1);
+  }
+  let mes = mesActualBogota();
+  let mejor = 0;
+  for (const [ym, c] of conteoMes) if (c > mejor) { mejor = c; mes = ym; }
 
-  const mapaFila = new Map<string, number>(); // clave → fila (1-based)
+  const existentes = await leerHistorico();
+  const idx = Object.fromEntries(HISTORICO_HEADERS.map((h, i) => [h, i])) as Record<string, number>;
+  const mapaFila = new Map<string, number>();
   for (let i = 1; i < existentes.length; i++) {
     const r = existentes[i];
-    const clave = `${String(r[idx.fecha] ?? "").trim()}||${String(r[idx.usuario] ?? "").trim()}||${String(r[idx.area] ?? "").trim()}`;
+    const clave = `${String(r[idx.mes] ?? "").trim()}||${String(r[idx.usuario] ?? "").trim()}||${String(r[idx.area] ?? "").trim()}`;
     mapaFila.set(clave, i + 1);
   }
 
+  const hoy = hoyBogotaISO();
   const filaDe = (f: FuncionarioDesempeno): (string | number)[] => [
-    fecha, f.usuario, f.funcionario, f.area,
+    mes, f.usuario, f.funcionario, f.area,
     ...HIST_CAMPOS.map((c) => f.valores[c] ?? ""),
+    hoy,
   ];
 
   const nuevas: (string | number)[][] = [];
   const updates: { fila: number; valores: (string | number)[] }[] = [];
   for (const f of funcs) {
-    const clave = `${fecha}||${f.usuario}||${f.area}`;
+    const clave = `${mes}||${f.usuario}||${f.area}`;
     if (mapaFila.has(clave)) updates.push({ fila: mapaFila.get(clave)!, valores: filaDe(f) });
     else nuevas.push(filaDe(f));
   }
-
   for (const u of updates) {
-    await updateRange(id, `${TAB_HISTORICO}!A${u.fila}:V${u.fila}`, [u.valores]);
+    await updateRange(id, `${TAB_HISTORICO}!A${u.fila}:${HIST_LAST_COL}${u.fila}`, [u.valores]);
   }
-  if (nuevas.length > 0) await appendRows(id, `${TAB_HISTORICO}!A:V`, nuevas);
+  if (nuevas.length > 0) await appendRows(id, `${TAB_HISTORICO}!A:${HIST_LAST_COL}`, nuevas);
 
-  return { fecha, guardados: nuevas.length, actualizados: updates.length };
-}
-
-// Guarda el snapshot de hoy solo si aún no existe ninguna fila de hoy.
-// Pensado para llamarse automáticamente al abrir el módulo (1 vez/día).
-export async function asegurarSnapshotDeHoy(): Promise<void> {
-  const id = sheetId();
-  try {
-    const existentes = await readRange(id, `${TAB_HISTORICO}!A:D`);
-    const hoy = hoyBogotaISO();
-    const yaHay = existentes.slice(1).some((r) => String(r[0] ?? "").trim() === hoy);
-    if (yaHay) return;
-  } catch {
-    // La hoja no existe todavía; guardarSnapshotDesempeno la crea.
-  }
-  await guardarSnapshotDesempeno();
+  return { mes, mesLabel: mesLabel(mes), guardados: nuevas.length, actualizados: updates.length };
 }

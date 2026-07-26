@@ -5,11 +5,11 @@ import Link from "next/link";
 import {
   Users, BadgeCheck, AlertTriangle, DollarSign, Download, Search, SlidersHorizontal,
   Eye, Trophy, Target, BarChart3, Medal, ChevronDown, ClipboardCheck,
-  LogOut, Loader2, X, Camera,
+  LogOut, Loader2, X, CalendarCheck,
 } from "lucide-react";
 import type { DashboardDesempeno, DesempenoFiltros, FilaTabla, CampoDesempeno } from "@/lib/desempeno-tipos";
 import { AREAS_ORDEN } from "@/lib/desempeno-tipos";
-import { obtenerDashboardDesempenoAction, guardarSnapshotAction } from "./actions";
+import { obtenerDashboardDesempenoAction, cerrarMesAction } from "./actions";
 import s from "./desempeno.module.css";
 
 const AREA_COLOR: Record<string, string> = {
@@ -65,6 +65,7 @@ export default function DesempenoDashboard({
   const [error] = useState(errorInicial);
   const [area, setArea] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [mes, setMes] = useState("");
   const [cargando, setCargando] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [detalle, setDetalle] = useState<FilaTabla | null>(null);
@@ -72,6 +73,21 @@ export default function DesempenoDashboard({
   const [guardando, setGuardando] = useState(false);
   const primera = useRef(true);
   const PAGE_SIZE = 10;
+
+  async function recargar(next: { area: string; busqueda: string; mes: string }) {
+    setCargando(true);
+    try {
+      const filtros: DesempenoFiltros = {
+        area: next.area || undefined,
+        busqueda: next.busqueda || undefined,
+        mes: next.mes || undefined,
+      };
+      const r = await obtenerDashboardDesempenoAction(filtros);
+      setData(r);
+    } finally {
+      setCargando(false);
+    }
+  }
 
   useEffect(() => {
     if (primera.current) {
@@ -81,23 +97,25 @@ export default function DesempenoDashboard({
     setPagina(1);
     let vig = true;
     setCargando(true);
-    const filtros: DesempenoFiltros = { area: area || undefined, busqueda: busqueda || undefined };
+    const filtros: DesempenoFiltros = { area: area || undefined, busqueda: busqueda || undefined, mes: mes || undefined };
     obtenerDashboardDesempenoAction(filtros)
       .then((r) => vig && setData(r))
       .finally(() => vig && setCargando(false));
     return () => {
       vig = false;
     };
-  }, [area, busqueda]);
+  }, [area, busqueda, mes]);
 
-  async function guardarSnapshot() {
+  async function cerrarMesActual() {
+    if (!confirm("¿Cerrar el mes? Se guardará el estado actual de la hoja TO en el histórico (podrás verlo luego en el selector de mes).")) return;
     setGuardando(true);
     setSnap(null);
     try {
-      const r = await guardarSnapshotAction();
-      setSnap({ tipo: "ok", msg: `Snapshot de ${r.fecha}: ${r.guardados} nuevos, ${r.actualizados} actualizados.` });
+      const r = await cerrarMesAction();
+      setSnap({ tipo: "ok", msg: `Mes ${r.mesLabel} cerrado: ${r.guardados} guardados, ${r.actualizados} actualizados.` });
+      await recargar({ area, busqueda, mes });
     } catch (e) {
-      setSnap({ tipo: "error", msg: e instanceof Error ? e.message : "Error al guardar snapshot" });
+      setSnap({ tipo: "error", msg: e instanceof Error ? e.message : "Error al cerrar el mes" });
     } finally {
       setGuardando(false);
     }
@@ -176,11 +194,16 @@ export default function DesempenoDashboard({
         <header className={s.top}>
           <div>
             <div className={s.title}><BarChart3 size={25} /><h1>Métricas de desempeño</h1></div>
-            <p>Monitorea indicadores, cumplimiento y bonificación del equipo.</p>
+            <p>Monitorea indicadores, cumplimiento y bonificación del equipo · <b>{data?.mesActualLabel ?? "Mes en curso"}</b></p>
           </div>
           <div className={s.filters}>
-            <button onClick={guardarSnapshot} disabled={guardando} title="Guardar snapshot histórico de hoy">
-              {guardando ? <Loader2 size={15} className={s.spin} /> : <Camera size={15} />} Guardar snapshot
+            <select className={s.select} value={mes} onChange={(e) => setMes(e.target.value)} title="Período">
+              {(data?.mesesDisponibles ?? [{ value: "", label: "Mes en curso" }]).map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <button onClick={cerrarMesActual} disabled={guardando || data?.esHistorico} title="Guardar el mes en curso en el histórico">
+              {guardando ? <Loader2 size={15} className={s.spin} /> : <CalendarCheck size={15} />} Cerrar mes
             </button>
             <button className={s.primary} onClick={exportar}><Download size={15} />Exportar</button>
           </div>
