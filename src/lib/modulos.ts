@@ -1,4 +1,4 @@
-export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz";
+export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin";
 
 export interface Modulo {
   id: ModuloId;
@@ -43,6 +43,13 @@ export const MODULOS: Modulo[] = [
     descripcion: "Formación, evaluaciones y simulaciones con IA.",
     href: "/modulos/quiz",
     color: "#9333ea",
+  },
+  {
+    id: "admin",
+    nombre: "Auditorías",
+    descripcion: "Carga de transcripciones, auditorías con IA e historial consolidado.",
+    href: "/admin",
+    color: "#4f46e5",
   },
 ];
 

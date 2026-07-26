@@ -4,6 +4,7 @@ import {
   GraduationCap,
   Headphones,
   Search,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuloId } from "@/lib/modulos";
@@ -22,4 +23,5 @@ export const MODULO_VISUALS: Record<ModuloId, ModuloVisual> = {
   "linea-amiga": { icon: Headphones, accentBg: "#99f6e4", accentFg: "#0f766e" },
   radicaciones: { icon: FolderOpen, accentBg: "#fed7aa", accentFg: "#c2410c" },
   quiz: { icon: GraduationCap, accentBg: "#fecdd3", accentFg: "#be123c" },
+  admin: { icon: ShieldCheck, accentBg: "#e0e7ff", accentFg: "#4f46e5" },
 };
