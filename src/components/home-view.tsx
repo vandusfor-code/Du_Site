@@ -57,6 +57,7 @@ const MODULO_TONE: Record<ModuloId, string> = {
   radicaciones: "orange",
   quiz: "pink",
   admin: "violet",
+  desempeno: "violet",
 };
 
 const PENDIENTES_VISIBLES = 5;

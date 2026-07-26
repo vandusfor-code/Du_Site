@@ -1,4 +1,4 @@
-export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin";
+export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno";
 
 export interface Modulo {
   id: ModuloId;
@@ -50,6 +50,13 @@ export const MODULOS: Modulo[] = [
     descripcion: "Carga de transcripciones, auditorías con IA e historial consolidado.",
     href: "/admin",
     color: "#4f46e5",
+  },
+  {
+    id: "desempeno",
+    nombre: "Desempeño",
+    descripcion: "Rendimiento de funcionarios, productividad, adherencia, indicadores por área, ranking y bonificación.",
+    href: "/modulos/desempeno",
+    color: "#7044ed",
   },
 ];
 

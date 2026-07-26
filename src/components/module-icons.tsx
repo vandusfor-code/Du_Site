@@ -24,4 +24,5 @@ export const MODULO_VISUALS: Record<ModuloId, ModuloVisual> = {
   radicaciones: { icon: FolderOpen, accentBg: "#fed7aa", accentFg: "#c2410c" },
   quiz: { icon: GraduationCap, accentBg: "#fecdd3", accentFg: "#be123c" },
   admin: { icon: ShieldCheck, accentBg: "#e0e7ff", accentFg: "#4f46e5" },
+  desempeno: { icon: BarChart3, accentBg: "#ede9fe", accentFg: "#7044ed" },
 };
