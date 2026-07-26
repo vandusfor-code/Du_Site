@@ -178,7 +178,8 @@ export interface PendienteDocumentacion {
   titulo: string;
   aplicativo: string;
   fechaLimite: string; // "" si no hay
-  fechaLimiteTs?: number; // epoch ms para ordenar por urgencia (no para mostrar)
+  fechaLimiteTs?: number; // epoch ms de la fecha límite (informativo, NO ordena)
+  fechaAsignacionTs?: number; // epoch ms de fecha_asignacion — recencia de la tarea
   estado: string;
   accion: "Comenzar" | "Continuar" | "Corregir";
 }

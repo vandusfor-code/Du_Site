@@ -39,8 +39,10 @@ export interface TareaPendiente {
   prioridad: "Alta" | "Media" | "Baja";
   /** Etiqueta de acción opcional (ej. "Comenzar" / "Continuar") mostrada como pill. */
   accion?: string;
-  /** Timestamp (epoch ms) de la fecha relevante para ORDENAR por urgencia. No se muestra. */
-  ordenTs?: number;
+  /** Momento real en que la tarea fue creada/asignada/notificada (epoch ms). ES el criterio de orden (más reciente primero). No se muestra. */
+  createdAtTs?: number;
+  /** Fecha límite / vencimiento / sesión (epoch ms). Solo informativo — NO participa en el orden. */
+  dueAtTs?: number;
 }
 
 export interface HomeData {

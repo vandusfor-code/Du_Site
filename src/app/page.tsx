@@ -33,14 +33,16 @@ function parseFechaRelevante(s: string | undefined | null): number | undefined {
   return isNaN(d) ? undefined : d;
 }
 
-// Orden por urgencia real: primero lo que tiene fecha (ascendente → vencidas y
-// próximas primero), luego lo que no tiene fecha; prioridad como desempate.
-function ordenarPorUrgencia(tareas: TareaPendiente[]): void {
+// Orden por RECENCIA de la tarea (bandeja de entrada): la creada/asignada/notificada
+// más recientemente va primero. Se ordena por createdAtTs DESC; las tareas sin fecha
+// de creación real van al final; prioridad solo como desempate exacto.
+// La fecha límite (dueAtTs) NO participa en este orden.
+function ordenarPorRecencia(tareas: TareaPendiente[]): void {
   tareas.sort((a, b) => {
-    const ah = a.ordenTs !== undefined;
-    const bh = b.ordenTs !== undefined;
+    const ah = a.createdAtTs !== undefined;
+    const bh = b.createdAtTs !== undefined;
     if (ah && bh) {
-      if (a.ordenTs !== b.ordenTs) return (a.ordenTs as number) - (b.ordenTs as number);
+      if (a.createdAtTs !== b.createdAtTs) return (b.createdAtTs as number) - (a.createdAtTs as number);
       return RANGO_PRIORIDAD[a.prioridad] - RANGO_PRIORIDAD[b.prioridad];
     }
     if (ah) return -1;
@@ -105,7 +107,7 @@ export default async function Home() {
         moduloHref: "/modulos/metricas",
         fecha: a.fecha,
         prioridad: "Media",
-        ordenTs: parseFechaRelevante(a.fecha),
+        createdAtTs: parseFechaRelevante(a.fecha),
       });
     });
 
@@ -143,7 +145,7 @@ export default async function Home() {
           moduloHref: "/modulos/radicaciones",
           fecha: n.fecha,
           prioridad: "Alta",
-          ordenTs: parseFechaRelevante(n.fecha),
+          createdAtTs: parseFechaRelevante(n.fecha),
         });
       });
   }
@@ -160,7 +162,7 @@ export default async function Home() {
           moduloHref: "/modulos/linea-amiga",
           fecha: n.fecha,
           prioridad: "Alta",
-          ordenTs: parseFechaRelevante(n.fecha),
+          createdAtTs: parseFechaRelevante(n.fecha),
         });
       });
   }
@@ -176,7 +178,8 @@ export default async function Home() {
         fecha: p.fechaLimite ? `Vence ${p.fechaLimite}` : "",
         prioridad: "Media",
         accion: p.accion,
-        ordenTs: p.fechaLimiteTs,
+        createdAtTs: p.fechaAsignacionTs, // recencia = cuándo se asignó, NO la fecha límite
+        dueAtTs: p.fechaLimiteTs, // informativo
       });
     });
   }
@@ -201,11 +204,13 @@ export default async function Home() {
         moduloHref: "/modulos/metricas",
         fecha: fechaTexto,
         prioridad: "Media",
-        ordenTs: ts,
+        // El cronograma no expone una fecha de creación real; la fecha/hora de la
+        // sesión es futura (dueAtTs), NO cuándo se generó la tarea. Sin createdAtTs.
+        dueAtTs: ts,
       });
     });
 
-  ordenarPorUrgencia(listaTareas);
+  ordenarPorRecencia(listaTareas);
 
   const diasMarcados = new Map<string, { anio: number; mes: number; dia: number; detalles: string[] }>();
   sesiones.forEach((s) => {

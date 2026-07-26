@@ -660,7 +660,7 @@ export async function obtenerPendientesDocumentacion(asesoraId: string | null): 
 
   const { data: asignaciones, error } = await sb
     .from("asignaciones_documentacion")
-    .select("id, procedimiento_id, fecha_limite, estado")
+    .select("id, procedimiento_id, fecha_limite, fecha_asignacion, estado")
     .eq("asesora_id", asesoraId)
     .in("estado", ["pendiente", "en_elaboracion", "correccion_requerida"]);
   if (error) throw new Error(`Supabase: ${error.message}`);
@@ -693,6 +693,7 @@ export async function obtenerPendientesDocumentacion(asesoraId: string | null): 
         aplicativo: proc.aplicativo_id ? apNombres.get(proc.aplicativo_id) ?? "—" : "—",
         fechaLimite: formatearFecha(a.fecha_limite),
         fechaLimiteTs: a.fecha_limite ? Date.parse(String(a.fecha_limite)) || undefined : undefined,
+        fechaAsignacionTs: a.fecha_asignacion ? Date.parse(String(a.fecha_asignacion)) || undefined : undefined,
         estado: a.estado ?? "pendiente",
         accion:
           a.estado === "pendiente"
