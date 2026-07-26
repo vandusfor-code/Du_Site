@@ -903,3 +903,321 @@ export async function obtenerHistorialAuditorias(filtros: {
     limitado: total > coincidencias.length,
   };
 }
+
+/* ===================== */
+/* DASHBOARD DE AUDITORÍAS (KPIs + gráficas + historial) */
+/* ===================== */
+
+const CRITERIOS: { nombre: string; col: number }[] = [
+  { nombre: "Saludo", col: COL.saludo },
+  { nombre: "Empatía", col: COL.empatia },
+  { nombre: "Sonrisa", col: COL.sonrisa },
+  { nombre: "Claridad", col: COL.claridad },
+  { nombre: "Encuesta", col: COL.encuesta },
+  { nombre: "Información", col: COL.informacion },
+  { nombre: "Proceso", col: COL.proceso },
+  { nombre: "Cierre", col: COL.cierre },
+];
+
+// Convierte "100%" | "17%" | 100 a número. Devuelve null si no es parseable.
+function parseNota(valor: string): number | null {
+  const n = parseFloat(String(valor).replace("%", "").trim());
+  return isNaN(n) ? null : n;
+}
+
+// Extrae "YYYY-MM" de una fecha en formato dd/MM/yyyy o yyyy-MM-dd. null si no.
+function periodoYM(fecha: string): string | null {
+  const iso = fechaISO(fecha);
+  return iso ? iso.slice(0, 7) : null;
+}
+
+// Normaliza una fecha (dd/MM/yyyy… o yyyy-MM-dd…) a "YYYY-MM-DD". null si no.
+function fechaISO(fecha: string): string | null {
+  const f = fecha.trim();
+  let m = f.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = f.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return null;
+}
+
+function esCumple(valor: string): boolean {
+  return valor.trim().toLowerCase() === "cumple";
+}
+function esNoCumple(valor: string): boolean {
+  return valor.trim().toLowerCase().includes("no cumple");
+}
+function esPenc(valor: string): boolean {
+  return valor.trim().toUpperCase() === "PENC";
+}
+
+export interface DashboardFiltros {
+  asesor?: string;
+  canal?: string;
+  mes?: string;
+  resultado?: string; // "OK" | "PENC"
+  busqueda?: string;
+  fechaDesde?: string; // "YYYY-MM-DD"
+  fechaHasta?: string; // "YYYY-MM-DD"
+}
+
+export interface DashboardAuditorias {
+  kpi: {
+    total: number;
+    calidadPromedio: number;
+    penc: number;
+    cumplimiento: number;
+    tendencia: {
+      total: number | null;
+      calidadPromedio: number | null;
+      penc: number | null;
+      cumplimiento: number | null;
+    };
+    sparklines: {
+      total: number[];
+      calidadPromedio: number[];
+      penc: number[];
+      cumplimiento: number[];
+    };
+  };
+  estado: {
+    pendientes: number;
+    procesadasHoy: number;
+    conError: number;
+    totalLote: number;
+    progresoPct: number;
+  };
+  criterios: { nombre: string; pct: number }[];
+  alertas: { criterio: string; cantidad: number }[];
+  historial: AuditoriaHistorial[];
+  totalHistorial: number;
+  limitado: boolean;
+  asesores: string[];
+  canales: string[];
+  meses: string[];
+}
+
+export async function obtenerDashboardAuditorias(
+  filtros: DashboardFiltros = {}
+): Promise<DashboardAuditorias> {
+  const id = sheetId();
+  const [data, transData] = await Promise.all([
+    readRange(id, "Consolidado!A2:AA"),
+    readRange(id, "Transcripciones1", { unformatted: true }),
+  ]);
+
+  const fAsesor = (filtros.asesor ?? "").trim();
+  const fCanal = (filtros.canal ?? "").trim();
+  const fMes = (filtros.mes ?? "").trim();
+  const fResultado = (filtros.resultado ?? "").trim().toUpperCase();
+  const fBusqueda = (filtros.busqueda ?? "").trim().toLowerCase();
+  const fDesde = (filtros.fechaDesde ?? "").trim();
+  const fHasta = (filtros.fechaHasta ?? "").trim();
+
+  const asesoresSet = new Set<string>();
+  const canalesSet = new Set<string>();
+  const mesesSet = new Set<string>();
+
+  // Filas que pasan los filtros, con los campos ya extraídos.
+  interface FilaAud {
+    row: unknown[];
+    asesor: string;
+    canal: string;
+    idGestion: string;
+    nota: number | null;
+    penc: boolean;
+    ym: string | null;
+  }
+  const filtradas: FilaAud[] = [];
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const idGestion = texto(row, COL.idGestion);
+    const asesor = texto(row, COL.asesor).trim();
+    if (!idGestion || !asesor) continue;
+
+    const canal = texto(row, COL.canal).trim();
+    const mes = texto(row, COL.mes).trim();
+    asesoresSet.add(asesor);
+    if (canal) canalesSet.add(canal);
+    if (mes) mesesSet.add(mes);
+
+    if (fAsesor && asesor !== fAsesor) continue;
+    if (fCanal && canal !== fCanal) continue;
+    if (fMes && mes !== fMes) continue;
+
+    const iso = fechaISO(texto(row, COL.fecha));
+    if (fDesde && (!iso || iso < fDesde)) continue;
+    if (fHasta && (!iso || iso > fHasta)) continue;
+
+    const tipoNota = texto(row, COL.tipoNota);
+    const penc = esPenc(tipoNota);
+    if (fResultado === "PENC" && !penc) continue;
+    if (fResultado === "OK" && penc) continue;
+
+    if (fBusqueda && !asesor.toLowerCase().includes(fBusqueda) && !idGestion.toLowerCase().includes(fBusqueda)) {
+      continue;
+    }
+
+    filtradas.push({
+      row,
+      asesor,
+      canal,
+      idGestion,
+      nota: parseNota(texto(row, COL.nota)),
+      penc,
+      ym: periodoYM(texto(row, COL.fecha)),
+    });
+  }
+
+  // ── KPIs sobre el conjunto filtrado ──
+  const total = filtradas.length;
+  const pencCount = filtradas.filter((f) => f.penc).length;
+  const notas = filtradas.map((f) => f.nota).filter((n): n is number => n !== null);
+  const calidadPromedio = notas.length > 0 ? Math.round((notas.reduce((s, n) => s + n, 0) / notas.length) * 10) / 10 : 0;
+  const cumplimiento = total > 0 ? Math.round(((total - pencCount) / total) * 1000) / 10 : 0;
+
+  // ── Buckets por mes (para tendencia y sparklines) ──
+  const bucketsMap = new Map<string, FilaAud[]>();
+  for (const f of filtradas) {
+    if (!f.ym) continue;
+    if (!bucketsMap.has(f.ym)) bucketsMap.set(f.ym, []);
+    bucketsMap.get(f.ym)!.push(f);
+  }
+  const ymOrdenados = Array.from(bucketsMap.keys()).sort();
+  const serie = (fn: (filas: FilaAud[]) => number) => ymOrdenados.map((ym) => fn(bucketsMap.get(ym)!));
+
+  const serieTotal = serie((filas) => filas.length);
+  const serieCalidad = serie((filas) => {
+    const ns = filas.map((f) => f.nota).filter((n): n is number => n !== null);
+    return ns.length > 0 ? Math.round((ns.reduce((s, n) => s + n, 0) / ns.length) * 10) / 10 : 0;
+  });
+  const seriePenc = serie((filas) => filas.filter((f) => f.penc).length);
+  const serieCumplimiento = serie((filas) => {
+    const p = filas.filter((f) => f.penc).length;
+    return filas.length > 0 ? Math.round(((filas.length - p) / filas.length) * 1000) / 10 : 0;
+  });
+
+  // Tendencia = último bucket vs anterior. null si no hay dos periodos.
+  const deltaPct = (s: number[]): number | null => {
+    if (s.length < 2) return null;
+    const prev = s[s.length - 2];
+    const cur = s[s.length - 1];
+    if (prev === 0) return null;
+    return Math.round(((cur - prev) / prev) * 1000) / 10;
+  };
+  const deltaPts = (s: number[]): number | null => {
+    if (s.length < 2) return null;
+    return Math.round((s[s.length - 1] - s[s.length - 2]) * 10) / 10;
+  };
+
+  // ── Cumplimiento por criterio ──
+  const criterios = CRITERIOS.map(({ nombre, col }) => {
+    let cumple = 0;
+    let noCumple = 0;
+    for (const f of filtradas) {
+      const v = texto(f.row, col);
+      if (esCumple(v)) cumple++;
+      else if (esNoCumple(v)) noCumple++;
+    }
+    const den = cumple + noCumple;
+    return { nombre, pct: den > 0 ? Math.round((cumple / den) * 100) : 0 };
+  });
+
+  // ── Alertas: criterios con más "No cumple" entre las PENC ──
+  const alertasMap = new Map<string, number>();
+  for (const f of filtradas) {
+    if (!f.penc) continue;
+    for (const { nombre, col } of CRITERIOS) {
+      if (esNoCumple(texto(f.row, col))) {
+        alertasMap.set(nombre, (alertasMap.get(nombre) ?? 0) + 1);
+      }
+    }
+  }
+  const alertasOrden = Array.from(alertasMap.entries()).sort((a, b) => b[1] - a[1]);
+  const alertas: { criterio: string; cantidad: number }[] = alertasOrden
+    .slice(0, 4)
+    .map(([criterio, cantidad]) => ({ criterio, cantidad }));
+  const restoAlertas = alertasOrden.slice(4).reduce((s, [, c]) => s + c, 0);
+  if (restoAlertas > 0) alertas.push({ criterio: "Otros", cantidad: restoAlertas });
+
+  // ── Estado (transcripciones subidas HOY) ──
+  let pendientes = 0;
+  let procesadasHoy = 0;
+  let conError = 0;
+  for (let i = 1; i < transData.length; i++) {
+    const idGestion = texto(transData[i], 1);
+    const asesor = texto(transData[i], 3);
+    const transcripcion = texto(transData[i], 2);
+    if (!idGestion || !asesor || !transcripcion) continue;
+    if (!esFechaDeHoyBogota(transData[i][0])) continue;
+    const estadoActual = texto(transData[i], 4);
+    if (estadoActual === "Procesado") procesadasHoy++;
+    else if (estadoActual === "Error") conError++;
+    else pendientes++;
+  }
+  const totalLote = pendientes + procesadasHoy + conError;
+  const progresoPct = totalLote > 0 ? Math.round((procesadasHoy / totalLote) * 100) : 0;
+
+  // ── Historial (filas más recientes primero, tope 400) ──
+  const historial: AuditoriaHistorial[] = [];
+  for (let i = filtradas.length - 1; i >= 0 && historial.length < HISTORIAL_MAX; i--) {
+    const row = filtradas[i].row;
+    historial.push({
+      fecha: texto(row, COL.fecha),
+      mes: texto(row, COL.mes),
+      asesor: texto(row, COL.asesor),
+      canal: texto(row, COL.canal),
+      tipoGestion: texto(row, COL.tipoGestion),
+      correo: texto(row, COL.correo),
+      idGestion: texto(row, COL.idGestion),
+      evaluador: texto(row, COL.evaluador),
+      saludo: texto(row, COL.saludo),
+      empatia: texto(row, COL.empatia),
+      sonrisa: texto(row, COL.sonrisa),
+      claridad: texto(row, COL.claridad),
+      encuesta: texto(row, COL.encuesta),
+      informacion: texto(row, COL.informacion),
+      proceso: texto(row, COL.proceso),
+      cierre: texto(row, COL.cierre),
+      nota: texto(row, COL.nota),
+      tipoNota: texto(row, COL.tipoNota),
+      observacion: texto(row, COL.observacion),
+      hallazgos: texto(row, COL.hallazgos),
+      mejora: texto(row, COL.mejora),
+      tipoConsulta: texto(row, COL.tipoConsulta),
+      puntajeTuteo: texto(row, COL.puntajeTuteo),
+      tonoGeneral: texto(row, COL.tonoGeneral),
+    });
+  }
+
+  return {
+    kpi: {
+      total,
+      calidadPromedio,
+      penc: pencCount,
+      cumplimiento,
+      tendencia: {
+        total: deltaPct(serieTotal),
+        calidadPromedio: deltaPts(serieCalidad),
+        penc: deltaPct(seriePenc),
+        cumplimiento: deltaPts(serieCumplimiento),
+      },
+      sparklines: {
+        total: serieTotal.slice(-6),
+        calidadPromedio: serieCalidad.slice(-6),
+        penc: seriePenc.slice(-6),
+        cumplimiento: serieCumplimiento.slice(-6),
+      },
+    },
+    estado: { pendientes, procesadasHoy, conError, totalLote, progresoPct },
+    criterios,
+    alertas,
+    historial,
+    totalHistorial: total,
+    limitado: total > historial.length,
+    asesores: Array.from(asesoresSet).sort((a, b) => a.localeCompare(b)),
+    canales: Array.from(canalesSet).sort((a, b) => a.localeCompare(b)),
+    meses: Array.from(mesesSet),
+  };
+}

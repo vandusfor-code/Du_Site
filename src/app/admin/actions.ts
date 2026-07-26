@@ -4,13 +4,12 @@ import { auth } from "@/auth";
 import {
   procesarTranscripciones,
   generarResumenCortes,
-  obtenerEstadoAuditorias,
   cargarTranscripcionesCsv,
-  obtenerHistorialAuditorias,
+  obtenerDashboardAuditorias,
   type ResultadoProcesamiento,
-  type EstadoAuditorias,
   type ResultadoCargaCsv,
-  type HistorialAuditorias,
+  type DashboardAuditorias,
+  type DashboardFiltros,
 } from "@/lib/auditorias-admin";
 
 async function requireAdminAction(): Promise<void> {
@@ -30,11 +29,6 @@ export async function generarResumenCortesAction(): Promise<number> {
   return generarResumenCortes();
 }
 
-export async function obtenerEstadoAuditoriasAction(): Promise<EstadoAuditorias> {
-  await requireAdminAction();
-  return obtenerEstadoAuditorias();
-}
-
 export async function cargarTranscripcionesAction(formData: FormData): Promise<ResultadoCargaCsv> {
   await requireAdminAction();
   const archivo = formData.get("archivo");
@@ -45,10 +39,9 @@ export async function cargarTranscripcionesAction(formData: FormData): Promise<R
   return cargarTranscripcionesCsv(contenido);
 }
 
-export async function obtenerHistorialAuditoriasAction(filtros: {
-  asesor?: string;
-  mes?: string;
-}): Promise<HistorialAuditorias> {
+export async function obtenerDashboardAuditoriasAction(
+  filtros: DashboardFiltros
+): Promise<DashboardAuditorias> {
   await requireAdminAction();
-  return obtenerHistorialAuditorias(filtros);
+  return obtenerDashboardAuditorias(filtros);
 }

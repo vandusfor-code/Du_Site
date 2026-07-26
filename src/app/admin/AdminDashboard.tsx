@@ -1,397 +1,439 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import {
+  LayoutDashboard, ClipboardCheck, Users, CircleGauge, Send, FileBarChart,
+  Bell, Settings, Upload, MoreVertical, CalendarDays,
+  Search, SlidersHorizontal, Eye, Play, TrendingUp, AlertTriangle, Target,
+  BadgeCheck, ClipboardList, ChevronDown, CheckCircle2, Clock3,
+  XCircle, Loader2, X, LogOut,
+} from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
-import { ArrowLeft, Loader2, PlayCircle, RefreshCw, Sparkles, Upload, X, History } from "lucide-react";
+import type { DashboardAuditorias, DashboardFiltros, AuditoriaHistorial } from "@/lib/auditorias-admin";
 import {
   ejecutarAuditoriasAction,
   generarResumenCortesAction,
-  obtenerEstadoAuditoriasAction,
   cargarTranscripcionesAction,
-  obtenerHistorialAuditoriasAction,
+  obtenerDashboardAuditoriasAction,
 } from "./actions";
-import type {
-  EstadoAuditorias,
-  ResultadoProcesamiento,
-  HistorialAuditorias,
-  AuditoriaHistorial,
-} from "@/lib/auditorias-admin";
+import styles from "./auditorias.module.css";
+
+/* Formateo es-CO: 1021 → "1.021", 91.4 → "91,4" */
+function fmtEntero(n: number): string {
+  return n.toLocaleString("es-CO");
+}
+function fmtDecimal(n: number): string {
+  return n.toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+}
+
+/* Convierte una serie de números a puntos "x,y ..." para el sparkline (0..100 x, 0..32 y). */
+function sparkPoints(values: number[]): string | null {
+  if (!values || values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const rango = max - min;
+  const n = values.length;
+  return values
+    .map((v, i) => {
+      const x = (i / (n - 1)) * 100;
+      const norm = rango === 0 ? 0.5 : (v - min) / rango;
+      const y = 30 - norm * 26;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+}
 
 export default function AdminDashboard({
   nombre,
-  estadoInicial,
-  historialInicial,
+  dashboardInicial,
   errorInicial,
 }: {
   nombre: string;
-  estadoInicial: EstadoAuditorias | null;
-  historialInicial: HistorialAuditorias | null;
+  dashboardInicial: DashboardAuditorias | null;
   errorInicial: string | null;
 }) {
-  const [estado, setEstado] = useState(estadoInicial);
+  const [data, setData] = useState(dashboardInicial);
   const [error, setError] = useState(errorInicial);
+  const [banner, setBanner] = useState<{ tipo: "ok" | "error"; msg: string } | null>(null);
+
+  const [filtros, setFiltros] = useState<DashboardFiltros>({});
+  const [cargando, setCargando] = useState(false);
   const [procesando, setProcesando] = useState(false);
-  const [generandoResumenes, setGenerandoResumenes] = useState(false);
-  const [refrescando, setRefrescando] = useState(false);
-  const [resultado, setResultado] = useState<ResultadoProcesamiento | null>(null);
-  const [mensajeResumenes, setMensajeResumenes] = useState<string | null>(null);
+  const [generando, setGenerando] = useState(false);
+  const [subiendo, setSubiendo] = useState(false);
 
   const inputArchivoRef = useRef<HTMLInputElement>(null);
-  const [archivoNombre, setArchivoNombre] = useState<string | null>(null);
-  const [subiendoCsv, setSubiendoCsv] = useState(false);
-  const [errorCsv, setErrorCsv] = useState<string | null>(null);
-  const [mensajeCsv, setMensajeCsv] = useState<string | null>(null);
-
-  const [historial, setHistorial] = useState(historialInicial);
-  const [filtroAsesor, setFiltroAsesor] = useState("");
-  const [filtroMes, setFiltroMes] = useState("");
-  const [cargandoHistorial, setCargandoHistorial] = useState(false);
   const [detalle, setDetalle] = useState<AuditoriaHistorial | null>(null);
+  const primeraCarga = useRef(true);
 
-  async function aplicarFiltrosHistorial(asesor: string, mes: string) {
-    setCargandoHistorial(true);
+  // Re-consulta el dashboard cuando cambian los filtros.
+  useEffect(() => {
+    if (primeraCarga.current) {
+      primeraCarga.current = false;
+      return;
+    }
+    let vigente = true;
+    setCargando(true);
+    obtenerDashboardAuditoriasAction(filtros)
+      .then((res) => {
+        if (vigente) setData(res);
+      })
+      .catch((e) => {
+        if (vigente) setError(e instanceof Error ? e.message : "Error al filtrar");
+      })
+      .finally(() => {
+        if (vigente) setCargando(false);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [filtros]);
+
+  async function refrescar() {
     try {
-      const nuevo = await obtenerHistorialAuditoriasAction({ asesor, mes });
-      setHistorial(nuevo);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar el historial");
-    } finally {
-      setCargandoHistorial(false);
+      const res = await obtenerDashboardAuditoriasAction(filtros);
+      setData(res);
+    } catch {
+      /* el banner de la acción ya informa */
     }
   }
 
-  async function refrescarEstado() {
-    setRefrescando(true);
-    setError(null);
+  function setFiltro(patch: Partial<DashboardFiltros>) {
+    setFiltros((f) => ({ ...f, ...patch }));
+  }
+
+  async function subirCsv(file: File) {
+    setSubiendo(true);
+    setBanner(null);
     try {
-      const nuevoEstado = await obtenerEstadoAuditoriasAction();
-      setEstado(nuevoEstado);
+      const fd = new FormData();
+      fd.set("archivo", file);
+      const res = await cargarTranscripcionesAction(fd);
+      setBanner({ tipo: "ok", msg: `Se cargaron ${res.cantidad} transcripción${res.cantidad === 1 ? "" : "es"} a Transcripciones1.` });
+      await refrescar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al refrescar el estado");
+      setBanner({ tipo: "error", msg: e instanceof Error ? e.message : "Error al cargar el CSV" });
     } finally {
-      setRefrescando(false);
+      setSubiendo(false);
+      if (inputArchivoRef.current) inputArchivoRef.current.value = "";
     }
   }
 
-  async function ejecutarAuditorias() {
+  async function ejecutarPendientes() {
     setProcesando(true);
-    setError(null);
-    setResultado(null);
+    setBanner(null);
     try {
       const res = await ejecutarAuditoriasAction();
-      setResultado(res);
-      await refrescarEstado();
+      const corte = res.detuvoPorTope ? " (se alcanzó el tope de 50)" : res.detuvoPorTiempo ? " (se alcanzó el límite de tiempo)" : "";
+      setBanner({ tipo: "ok", msg: `Procesadas ${res.procesadas}, errores ${res.errores}, resúmenes ${res.resumenesCortes}${corte}.` });
+      await refrescar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al ejecutar las auditorías");
+      setBanner({ tipo: "error", msg: e instanceof Error ? e.message : "Error al ejecutar auditorías" });
     } finally {
       setProcesando(false);
     }
   }
 
-  async function subirCsv() {
-    const archivo = inputArchivoRef.current?.files?.[0];
-    if (!archivo) {
-      setErrorCsv("Selecciona un archivo CSV primero.");
-      return;
-    }
-    setSubiendoCsv(true);
-    setErrorCsv(null);
-    setMensajeCsv(null);
+  async function generarCortes() {
+    setGenerando(true);
+    setBanner(null);
     try {
-      const formData = new FormData();
-      formData.set("archivo", archivo);
-      const res = await cargarTranscripcionesAction(formData);
-      setMensajeCsv(`Se cargaron ${res.cantidad} transcripción${res.cantidad === 1 ? "" : "es"} a Transcripciones1.`);
-      if (inputArchivoRef.current) inputArchivoRef.current.value = "";
-      setArchivoNombre(null);
-      await refrescarEstado();
+      const n = await generarResumenCortesAction();
+      setBanner({ tipo: "ok", msg: n > 0 ? `Se generaron resúmenes para ${n} asesor${n === 1 ? "" : "es"}.` : "No hay auditorías del día para resumir." });
     } catch (e) {
-      setErrorCsv(e instanceof Error ? e.message : "Error al cargar el archivo");
+      setBanner({ tipo: "error", msg: e instanceof Error ? e.message : "Error al generar cortes" });
     } finally {
-      setSubiendoCsv(false);
+      setGenerando(false);
     }
   }
 
-  async function generarResumenes() {
-    setGenerandoResumenes(true);
-    setError(null);
-    setMensajeResumenes(null);
-    try {
-      const generados = await generarResumenCortesAction();
-      setMensajeResumenes(
-        generados > 0
-          ? `Se generaron resúmenes para ${generados} asesor${generados === 1 ? "" : "es"} en Cortes_Envio.`
-          : "No hay auditorías del día para resumir todavía."
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al generar los resúmenes");
-    } finally {
-      setGenerandoResumenes(false);
-    }
-  }
+  const k = data?.kpi;
+  const cards = k
+    ? [
+        { title: "Auditorías totales", value: fmtEntero(k.total), tone: styles.violet, Icon: ClipboardList, spark: k.sparklines.total, trend: k.tendencia.total, unidad: "%", peor: "up" as const },
+        { title: "Calidad promedio", value: `${fmtDecimal(k.calidadPromedio)}%`, tone: styles.green, Icon: BadgeCheck, spark: k.sparklines.calidadPromedio, trend: k.tendencia.calidadPromedio, unidad: " pts", peor: "down" as const },
+        { title: "PENC", value: fmtEntero(k.penc), tone: styles.red, Icon: AlertTriangle, spark: k.sparklines.penc, trend: k.tendencia.penc, unidad: "%", peor: "down" as const },
+        { title: "Cumplimiento", value: `${fmtDecimal(k.cumplimiento)}%`, tone: styles.blue, Icon: Target, spark: k.sparklines.cumplimiento, trend: k.tendencia.cumplimiento, unidad: " pts", peor: "up" as const },
+      ]
+    : [];
+
+  const nav: [typeof LayoutDashboard, string][] = [
+    [LayoutDashboard, "Resumen"], [ClipboardCheck, "Auditorías"], [Users, "Asesores"],
+    [CircleGauge, "Criterios"], [Send, "Cortes de envío"], [FileBarChart, "Reportes"],
+    [Bell, "Alertas"], [Settings, "Configuración"],
+  ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="flex h-20 items-center justify-between border-b border-border bg-surface px-8">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight text-foreground">Panel Admin</h1>
-          <p className="text-[13px] text-muted">Sesión: {nombre}</p>
+    <div className={styles.app}>
+      <input
+        ref={inputArchivoRef}
+        type="file"
+        accept=".csv"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) subirCsv(f);
+        }}
+      />
+
+      {/* ── Sidebar ── */}
+      <aside className={styles.sidebar}>
+        <div className={styles.brand}>
+          <div className={styles.logo}>Du</div>
+          <b>Du Labs</b>
         </div>
-        <Link
-          href="/"
-          className="flex items-center gap-2 rounded-lg border border-border-strong px-4 py-2 text-[13px] font-semibold text-foreground transition-colors hover:border-brand hover:text-brand"
-        >
-          <ArrowLeft size={15} />
-          Volver al inicio
-        </Link>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-6 py-10">
-        <section className="mb-6 rounded-2xl border border-border bg-surface p-8 shadow-card">
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-tint text-brand">
-              <Upload size={20} />
-            </span>
+        <nav className={styles.nav}>
+          {nav.map(([Icon, label], i) => (
+            <button key={label} className={i === 1 ? styles.navActive : styles.navItem}>
+              <Icon size={19} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className={styles.sidebarBottom}>
+          <div className={styles.profile}>
+            <div className={styles.avatar}>{nombre.slice(0, 2).toUpperCase()}</div>
             <div>
-              <h2 className="text-[17px] font-bold text-foreground">Cargar transcripciones (CSV)</h2>
-              <p className="text-[13px] text-muted">
-                Columnas esperadas: AGENTE, CONTACT_ID, TRANSCRIPCION (separador &quot;;&quot;). Se agregan a Transcripciones1.
-              </p>
+              <strong>{nombre}</strong>
+              <small>Administrador</small>
             </div>
+            <ChevronDown size={16} />
           </div>
+          <Link href="/" className={styles.collapse}>
+            <LogOut size={16} /> Volver al inicio
+          </Link>
+        </div>
+      </aside>
 
-          {errorCsv && (
-            <div className="mt-4 rounded-lg border border-[color:var(--error)]/25 bg-error-bg px-4 py-3 text-[13px] font-medium text-error">
-              {errorCsv}
+      {/* ── Main ── */}
+      <main className={styles.main}>
+        <header className={styles.topbar}>
+          <div>
+            <div className={styles.titleLine}>
+              <TrendingUp size={25} />
+              <h1>Auditorías</h1>
             </div>
-          )}
-          {mensajeCsv && (
-            <div className="mt-4 rounded-lg border border-[color:var(--success)]/25 bg-success-bg px-4 py-3 text-[13px] font-medium text-success">
-              {mensajeCsv}
-            </div>
-          )}
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <label className="flex h-12 flex-1 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border-strong px-4 text-[13px] font-medium text-muted transition-colors hover:border-brand hover:text-foreground">
-              <input
-                ref={inputArchivoRef}
-                type="file"
-                accept=".csv"
-                className="hidden"
-                onChange={(e) => setArchivoNombre(e.target.files?.[0]?.name ?? null)}
-              />
-              {archivoNombre ?? "Seleccionar archivo .csv…"}
-            </label>
-            <button
-              type="button"
-              onClick={subirCsv}
-              disabled={subiendoCsv}
-              className="flex h-12 items-center justify-center gap-2 rounded-lg bg-brand px-5 text-[14px] font-bold text-brand-foreground shadow-brand transition-all hover:bg-brand-mid disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {subiendoCsv ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-              {subiendoCsv ? "Cargando…" : "Cargar CSV"}
-            </button>
+            <p>Supervisa la calidad de las interacciones y el desempeño de los asesores.</p>
           </div>
-        </section>
-
-        <section className="rounded-2xl border border-border bg-surface p-8 shadow-card">
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-tint text-brand">
-              <Sparkles size={20} />
-            </span>
-            <div>
-              <h2 className="text-[17px] font-bold text-foreground">Auditorías con IA</h2>
-              <p className="text-[13px] text-muted">
-                Procesa las transcripciones de hoy (Transcripciones1 → Consolidado) y genera los resúmenes de cierre en Cortes_Envio.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 flex items-center gap-4 rounded-xl border border-border bg-surface-inset px-5 py-4">
-            <div className="flex-1">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-muted">Pendientes de hoy</p>
-              <p className="mt-1 text-2xl font-extrabold text-foreground">
-                {estado ? estado.pendientesHoy : "—"}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={refrescarEstado}
-              disabled={refrescando}
-              className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-[12px] font-semibold text-foreground transition-colors hover:border-brand disabled:opacity-50"
-            >
-              <RefreshCw size={14} className={refrescando ? "animate-spin" : ""} />
-              Refrescar
-            </button>
-          </div>
-
-          {error && (
-            <div className="mt-4 rounded-lg border border-[color:var(--error)]/25 bg-error-bg px-4 py-3 text-[13px] font-medium text-error">
-              {error}
-            </div>
-          )}
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={ejecutarAuditorias}
-              disabled={procesando}
-              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-brand text-[14px] font-bold text-brand-foreground shadow-brand transition-all hover:bg-brand-mid disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {procesando ? <Loader2 size={17} className="animate-spin" /> : <PlayCircle size={17} />}
-              {procesando ? "Procesando (puede tardar varios minutos)…" : "Ejecutar auditorías pendientes"}
-            </button>
-
-            <button
-              type="button"
-              onClick={generarResumenes}
-              disabled={generandoResumenes}
-              className="flex h-12 items-center justify-center gap-2 rounded-lg border border-border-strong px-5 text-[14px] font-semibold text-foreground transition-colors hover:border-brand disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {generandoResumenes ? <Loader2 size={16} className="animate-spin" /> : null}
-              Generar resúmenes de cortes
-            </button>
-          </div>
-
-          {resultado && (
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Procesadas" value={resultado.procesadas} />
-              <Stat label="Errores" value={resultado.errores} tone={resultado.errores > 0 ? "error" : undefined} />
-              <Stat label="Resúmenes" value={resultado.resumenesCortes} />
-              <Stat
-                label="Corte"
-                value={resultado.detuvoPorTope ? "Tope 50" : resultado.detuvoPorTiempo ? "Tiempo" : "Completo"}
-              />
-            </div>
-          )}
-
-          {mensajeResumenes && (
-            <p className="mt-4 text-[13px] font-medium text-muted">{mensajeResumenes}</p>
-          )}
-        </section>
-
-        {/* ── Historial de auditorías (Consolidado) ── */}
-        <section className="mt-6 rounded-2xl border border-border bg-surface p-8 shadow-card">
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-tint text-brand">
-              <History size={20} />
-            </span>
-            <div>
-              <h2 className="text-[17px] font-bold text-foreground">Historial de auditorías</h2>
-              <p className="text-[13px] text-muted">
-                Consolidado completo. Haz clic en una fila para ver el detalle con todos los criterios.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <select
-              value={filtroAsesor}
-              onChange={(e) => {
-                setFiltroAsesor(e.target.value);
-                aplicarFiltrosHistorial(e.target.value, filtroMes);
-              }}
-              className="h-11 flex-1 rounded-lg border border-border-strong bg-surface px-3 text-[14px] font-medium text-foreground outline-none transition-colors focus:border-brand"
-            >
-              <option value="">Todos los asesores</option>
-              {historial?.asesores.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filtroMes}
-              onChange={(e) => {
-                setFiltroMes(e.target.value);
-                aplicarFiltrosHistorial(filtroAsesor, e.target.value);
-              }}
-              className="h-11 flex-1 rounded-lg border border-border-strong bg-surface px-3 text-[14px] font-medium text-foreground outline-none transition-colors focus:border-brand"
-            >
-              <option value="">Todos los meses</option>
-              {historial?.meses.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-            {(filtroAsesor || filtroMes) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setFiltroAsesor("");
-                  setFiltroMes("");
-                  aplicarFiltrosHistorial("", "");
-                }}
-                className="flex h-11 items-center justify-center gap-2 rounded-lg border border-border-strong px-4 text-[13px] font-semibold text-foreground transition-colors hover:border-brand"
-              >
-                <X size={14} />
-                Limpiar
+          <div className={styles.topActions}>
+            <div className={styles.actionRow}>
+              <button className={styles.secondary} onClick={() => inputArchivoRef.current?.click()} disabled={subiendo}>
+                {subiendo ? <Loader2 size={16} className={styles.spin} /> : <Upload size={16} />}
+                Importar CSV
               </button>
+              <button className={styles.primary} onClick={ejecutarPendientes} disabled={procesando}>
+                {procesando ? <Loader2 size={16} className={styles.spin} /> : <Play size={16} />}
+                Ejecutar pendientes
+              </button>
+              <button className={styles.iconButton} onClick={generarCortes} disabled={generando} title="Generar cortes">
+                {generando ? <Loader2 size={16} className={styles.spin} /> : <MoreVertical size={18} />}
+              </button>
+            </div>
+            <div className={styles.filterRow}>
+              <select
+                className={styles.selectButton}
+                value={filtros.mes ?? ""}
+                onChange={(e) => setFiltro({ mes: e.target.value || undefined })}
+              >
+                <option value="">Todos los meses</option>
+                {data?.meses.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <div className={styles.dateButton}>
+                <CalendarDays size={16} />
+                <input
+                  type="date"
+                  className={styles.dateInput}
+                  value={filtros.fechaDesde ?? ""}
+                  onChange={(e) => setFiltro({ fechaDesde: e.target.value || undefined })}
+                />
+                <span>–</span>
+                <input
+                  type="date"
+                  className={styles.dateInput}
+                  value={filtros.fechaHasta ?? ""}
+                  onChange={(e) => setFiltro({ fechaHasta: e.target.value || undefined })}
+                />
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {error && <div className={`${styles.banner} ${styles.bannerError}`}>{error}</div>}
+        {banner && <div className={`${styles.banner} ${banner.tipo === "ok" ? styles.bannerOk : styles.bannerError}`}>{banner.msg}</div>}
+
+        {/* ── KPIs ── */}
+        <div className={styles.statsGrid}>
+          {cards.map((c) => {
+            const points = sparkPoints(c.spark);
+            const trendOk = c.trend !== null && (c.peor === "up" ? c.trend >= 0 : c.trend <= 0);
+            const arrow = c.trend === null ? "" : c.trend > 0 ? "↑" : c.trend < 0 ? "↓" : "→";
+            return (
+              <article className={styles.statCard} key={c.title}>
+                <div className={`${styles.statIcon} ${c.tone}`}><c.Icon size={23} /></div>
+                <div className={styles.statMain}><span>{c.title}</span><strong>{c.value}</strong></div>
+                {points ? (
+                  <svg className={styles.spark} viewBox="0 0 100 32" preserveAspectRatio="none">
+                    <polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                  </svg>
+                ) : (
+                  <span />
+                )}
+                <div className={`${styles.trend} ${trendOk ? styles.positive : styles.negative}`}>
+                  {c.trend === null ? (
+                    <span>Sin dato del mes anterior</span>
+                  ) : (
+                    <>
+                      <b>{arrow} {fmtDecimal(Math.abs(c.trend))}{c.unidad}</b> vs. mes anterior
+                    </>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        {/* ── Paneles analíticos ── */}
+        <div className={styles.analyticsGrid}>
+          {/* Estado */}
+          <section className={styles.panel}>
+            <h2><TrendingUp size={18} />Estado de auditorías</h2>
+            <div className={styles.miniStats}>
+              <div><Clock3 className={styles.warnIcon} /><b>{data?.estado.pendientes ?? 0}</b><span>Pendientes</span></div>
+              <div><CheckCircle2 className={styles.goodIcon} /><b>{data?.estado.procesadasHoy ?? 0}</b><span>Procesadas hoy</span></div>
+              <div><XCircle className={styles.badIcon} /><b>{data?.estado.conError ?? 0}</b><span>Con error</span></div>
+            </div>
+            <div className={styles.progressMeta}>
+              <span><b>{data?.estado.procesadasHoy ?? 0}</b> / {data?.estado.totalLote ?? 0} procesadas</span>
+              <b>{data?.estado.progresoPct ?? 0}%</b>
+            </div>
+            <div className={styles.progress}><span style={{ width: `${data?.estado.progresoPct ?? 0}%` }} /></div>
+            <div className={styles.panelActions}>
+              <button className={styles.primary} onClick={ejecutarPendientes} disabled={procesando}>
+                {procesando ? <Loader2 size={14} className={styles.spin} /> : <Play size={14} />}
+                Ejecutar pendientes
+              </button>
+              <button className={styles.secondary} onClick={generarCortes} disabled={generando}>
+                {generando ? <Loader2 size={14} className={styles.spin} /> : null}
+                Generar cortes
+              </button>
+            </div>
+          </section>
+
+          {/* Cumplimiento por criterio */}
+          <section className={styles.panel}>
+            <div className={styles.panelHeader}>
+              <h2><FileBarChart size={18} />Cumplimiento por criterio</h2>
+              {cargando && <Loader2 size={15} className={styles.spin} />}
+            </div>
+            <div className={styles.criteria}>
+              {(data?.criterios ?? []).map((c) => (
+                <div className={styles.criterion} key={c.nombre}>
+                  <span>{c.nombre}</span>
+                  <div className={styles.bar}><i className={c.pct < 80 ? styles.barWarning : ""} style={{ width: `${c.pct}%` }} /></div>
+                  <b>{c.pct}%</b>
+                  {c.pct < 85 ? <span className={styles.down}>↓</span> : <span />}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Alertas */}
+          <section className={styles.panel}>
+            <h2><Bell size={18} />Alertas de calidad</h2>
+            <div className={styles.alertTotal}>
+              <strong>{data?.kpi.penc ?? 0}</strong>
+              <span>PENC detectados</span>
+            </div>
+            {data && data.alertas.length > 0 ? (
+              <div className={styles.alertList}>
+                {data.alertas.map((a) => (
+                  <div key={a.criterio}>
+                    <span><i className={`${styles.dot} ${styles.red}`} />{a.criterio}</span>
+                    <b>{a.cantidad}</b>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className={styles.emptyMini}>Sin incumplimientos registrados en las PENC filtradas.</p>
             )}
-          </div>
+          </section>
+        </div>
 
-          <div className="mt-4 flex items-center justify-between text-[12px] text-muted">
-            <span>
-              {historial ? (
-                <>
-                  {historial.total} auditoría{historial.total === 1 ? "" : "s"}
-                  {historial.limitado && ` · mostrando las ${historial.auditorias.length} más recientes`}
-                </>
-              ) : (
-                "—"
-              )}
-            </span>
-            {cargandoHistorial && <Loader2 size={14} className="animate-spin" />}
+        {/* ── Historial ── */}
+        <section className={`${styles.panel} ${styles.history}`}>
+          <h2><ClipboardCheck size={18} />Historial de auditorías</h2>
+          <div className={styles.tableTools}>
+            <div className={styles.search}>
+              <Search size={16} />
+              <input
+                placeholder="Buscar asesor o ID de gestión..."
+                defaultValue={filtros.busqueda ?? ""}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") setFiltro({ busqueda: (e.target as HTMLInputElement).value || undefined });
+                }}
+                onBlur={(e) => setFiltro({ busqueda: e.target.value || undefined })}
+              />
+            </div>
+            <select className={styles.tableSelectNative} value={filtros.asesor ?? ""} onChange={(e) => setFiltro({ asesor: e.target.value || undefined })}>
+              <option value="">Todos los asesores</option>
+              {data?.asesores.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+            <select className={styles.tableSelectNative} value={filtros.canal ?? ""} onChange={(e) => setFiltro({ canal: e.target.value || undefined })}>
+              <option value="">Todos los canales</option>
+              {data?.canales.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className={styles.tableSelectNative} value={filtros.mes ?? ""} onChange={(e) => setFiltro({ mes: e.target.value || undefined })}>
+              <option value="">Todos los meses</option>
+              {data?.meses.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select className={styles.tableSelectNative} value={filtros.resultado ?? ""} onChange={(e) => setFiltro({ resultado: e.target.value || undefined })}>
+              <option value="">Todos los resultados</option>
+              <option value="OK">Cumple</option>
+              <option value="PENC">PENC</option>
+            </select>
+            <button
+              className={styles.filterButton}
+              onClick={() => setFiltros({})}
+              title="Limpiar filtros"
+            >
+              <SlidersHorizontal size={16} />Limpiar
+            </button>
           </div>
-
-          <div className="mt-3 overflow-x-auto rounded-xl border border-border">
-            <table className="w-full min-w-[640px] text-left text-[13px]">
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
               <thead>
-                <tr className="border-b border-border bg-surface-inset text-[11px] font-bold uppercase tracking-wide text-muted">
-                  <th className="px-4 py-3">Fecha</th>
-                  <th className="px-4 py-3">Asesor</th>
-                  <th className="px-4 py-3">Canal</th>
-                  <th className="px-4 py-3">ID Gestión</th>
-                  <th className="px-4 py-3">Nota</th>
-                  <th className="px-4 py-3">Tipo</th>
+                <tr>
+                  <th>Fecha</th><th>Asesor</th><th>Canal</th><th>ID Gestión</th><th>Nota</th><th>Resultado</th><th>Tipo</th><th></th>
                 </tr>
               </thead>
               <tbody>
-                {historial && historial.auditorias.length > 0 ? (
-                  historial.auditorias.map((a, i) => (
-                    <tr
-                      key={`${a.idGestion}-${i}`}
-                      onClick={() => setDetalle(a)}
-                      className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-surface-inset"
-                    >
-                      <td className="px-4 py-3 text-muted">{a.fecha}</td>
-                      <td className="px-4 py-3 font-semibold text-foreground">{a.asesor}</td>
-                      <td className="px-4 py-3 text-muted">{a.canal}</td>
-                      <td className="px-4 py-3 font-mono text-[11px] text-muted">{a.idGestion.slice(0, 12)}…</td>
-                      <td className="px-4 py-3 font-bold text-foreground">{a.nota}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                            a.tipoNota.toUpperCase() === "PENC"
-                              ? "bg-error-bg text-error"
-                              : "bg-success-bg text-success"
-                          }`}
-                        >
-                          {a.tipoNota}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                {data && data.historial.length > 0 ? (
+                  data.historial.map((a, i) => {
+                    const penc = a.tipoNota.toUpperCase() === "PENC";
+                    return (
+                      <tr key={`${a.idGestion}-${i}`} className={styles.rowClickable} onClick={() => setDetalle(a)}>
+                        <td>{a.fecha}</td>
+                        <td><b>{a.asesor}</b></td>
+                        <td>{a.canal}</td>
+                        <td>{a.idGestion.slice(0, 12)}…</td>
+                        <td><b>{a.nota}</b></td>
+                        <td><span className={penc ? styles.penc : styles.ok}>{penc ? "PENC" : "Cumple"}</span></td>
+                        <td>{a.tipoConsulta}</td>
+                        <td><button className={styles.view} onClick={(e) => { e.stopPropagation(); setDetalle(a); }}><Eye size={15} />Ver</button></td>
+                      </tr>
+                    );
+                  })
                 ) : (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-muted">
-                      {cargandoHistorial ? "Cargando…" : "No hay auditorías para estos filtros."}
-                    </td>
-                  </tr>
+                  <tr><td colSpan={8} className={styles.emptyRow}>{cargando ? "Cargando…" : "No hay auditorías para estos filtros."}</td></tr>
                 )}
               </tbody>
             </table>
+          </div>
+          <div className={styles.pagination}>
+            <span>{cargando ? "Actualizando…" : ""}</span>
+            <span>
+              {data ? `Mostrando ${data.historial.length} de ${fmtEntero(data.totalHistorial)}` : "—"}
+            </span>
           </div>
         </section>
       </main>
@@ -402,122 +444,57 @@ export default function AdminDashboard({
 }
 
 function DetalleModal({ a, onClose }: { a: AuditoriaHistorial; onClose: () => void }) {
-  const criterios: { label: string; valor: string }[] = [
-    { label: "Saludo", valor: a.saludo },
-    { label: "Empatía", valor: a.empatia },
-    { label: "Sonrisa", valor: a.sonrisa },
-    { label: "Claridad", valor: a.claridad },
-    { label: "Encuesta", valor: a.encuesta },
-    { label: "Información", valor: a.informacion },
-    { label: "Proceso", valor: a.proceso },
-    { label: "Cierre", valor: a.cierre },
+  const penc = a.tipoNota.toUpperCase() === "PENC";
+  const criterios: [string, string][] = [
+    ["Saludo", a.saludo], ["Empatía", a.empatia], ["Sonrisa", a.sonrisa], ["Claridad", a.claridad],
+    ["Encuesta", a.encuesta], ["Información", a.informacion], ["Proceso", a.proceso], ["Cierre", a.cierre],
   ];
+  const critClass = (v: string) =>
+    v.toLowerCase().includes("no cumple") ? styles.critNo : v.toLowerCase().includes("no aplica") ? styles.critNa : styles.critOk;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm sm:p-8"
-      onClick={onClose}
-    >
-      <div
-        className="my-4 w-full max-w-2xl rounded-2xl border border-border bg-surface shadow-hover"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between border-b border-border p-6">
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHead}>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wide text-muted">Auditoría</p>
-            <h3 className="mt-1 text-lg font-extrabold text-foreground">{a.asesor}</h3>
-            <p className="mt-0.5 font-mono text-[12px] text-muted">{a.idGestion}</p>
+            <small>Auditoría</small>
+            <h3>{a.asesor}</h3>
+            <div className={styles.modalId}>{a.idGestion}</div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-2xl font-extrabold text-foreground">{a.nota}</p>
-              <span
-                className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                  a.tipoNota.toUpperCase() === "PENC" ? "bg-error-bg text-error" : "bg-success-bg text-success"
-                }`}
-              >
-                {a.tipoNota}
-              </span>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div className={styles.modalNota}>
+              <strong>{a.nota}</strong>
+              <div><span className={penc ? styles.penc : styles.ok}>{penc ? "PENC" : "Cumple"}</span></div>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Cerrar"
-              className="grid size-9 place-items-center rounded-lg border border-border-strong text-muted transition-colors hover:border-brand hover:text-foreground"
-            >
-              <X size={16} />
-            </button>
+            <button className={styles.closeBtn} onClick={onClose} aria-label="Cerrar"><X size={16} /></button>
           </div>
         </div>
-
-        <div className="space-y-5 p-6">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MetaItem label="Fecha" value={a.fecha} />
-            <MetaItem label="Canal" value={a.canal} />
-            <MetaItem label="Tipo consulta" value={a.tipoConsulta} />
-            <MetaItem label="Correo" value={a.correo} />
-            <MetaItem label="Tuteo" value={a.puntajeTuteo} />
-            <MetaItem label="Tono" value={a.tonoGeneral} />
-            <MetaItem label="Evaluador" value={a.evaluador} />
-            <MetaItem label="Tipo gestión" value={a.tipoGestion} />
+        <div className={styles.modalBody}>
+          <div className={styles.metaGrid}>
+            <div className={styles.metaItem}><span>Fecha</span><b>{a.fecha || "—"}</b></div>
+            <div className={styles.metaItem}><span>Canal</span><b>{a.canal || "—"}</b></div>
+            <div className={styles.metaItem}><span>Tipo consulta</span><b>{a.tipoConsulta || "—"}</b></div>
+            <div className={styles.metaItem}><span>Correo</span><b>{a.correo || "—"}</b></div>
+            <div className={styles.metaItem}><span>Tuteo</span><b>{a.puntajeTuteo || "—"}</b></div>
+            <div className={styles.metaItem}><span>Tono</span><b>{a.tonoGeneral || "—"}</b></div>
+            <div className={styles.metaItem}><span>Evaluador</span><b>{a.evaluador || "—"}</b></div>
+            <div className={styles.metaItem}><span>Tipo gestión</span><b>{a.tipoGestion || "—"}</b></div>
           </div>
-
           <div>
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">Criterios</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {criterios.map((c) => (
-                <div key={c.label} className="rounded-lg border border-border bg-surface-inset px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted">{c.label}</p>
-                  <p
-                    className={`mt-0.5 text-[13px] font-semibold ${
-                      c.valor.toLowerCase().includes("no cumple")
-                        ? "text-error"
-                        : c.valor.toLowerCase().includes("no aplica")
-                          ? "text-muted"
-                          : "text-success"
-                    }`}
-                  >
-                    {c.valor || "—"}
-                  </p>
+            <div className={styles.critGrid}>
+              {criterios.map(([nombre, valor]) => (
+                <div className={styles.critBox} key={nombre}>
+                  <span>{nombre}</span>
+                  <b className={critClass(valor)}>{valor || "—"}</b>
                 </div>
               ))}
             </div>
           </div>
-
-          <TextoBloque titulo="Observación" texto={a.observacion} />
-          <TextoBloque titulo="Hallazgos" texto={a.hallazgos} />
-          <TextoBloque titulo="Puntos de mejora" texto={a.mejora} />
+          <div className={styles.bloque}><span>Observación</span><p>{a.observacion || "—"}</p></div>
+          <div className={styles.bloque}><span>Hallazgos</span><p>{a.hallazgos || "—"}</p></div>
+          <div className={styles.bloque}><span>Puntos de mejora</span><p>{a.mejora || "—"}</p></div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function MetaItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-0.5 break-words text-[13px] font-medium text-foreground">{value || "—"}</p>
-    </div>
-  );
-}
-
-function TextoBloque({ titulo, texto }: { titulo: string; texto: string }) {
-  return (
-    <div>
-      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted">{titulo}</p>
-      <p className="whitespace-pre-line rounded-lg border border-border bg-surface-inset p-4 text-[13px] leading-relaxed text-foreground">
-        {texto || "—"}
-      </p>
-    </div>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: string | number; tone?: "error" }) {
-  return (
-    <div className="rounded-lg border border-border bg-surface-inset px-4 py-3 text-center">
-      <p className={`text-xl font-extrabold ${tone === "error" ? "text-error" : "text-foreground"}`}>{value}</p>
-      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">{label}</p>
     </div>
   );
 }
