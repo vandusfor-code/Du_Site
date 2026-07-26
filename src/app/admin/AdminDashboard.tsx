@@ -43,6 +43,19 @@ function sparkPoints(values: number[]): string | null {
     .join(" ");
 }
 
+/* Números de página a mostrar: primera, última, ventana alrededor de la actual, con "…". */
+function rangoPaginas(actual: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const paginas: (number | "…")[] = [1];
+  const desde = Math.max(2, actual - 1);
+  const hasta = Math.min(total - 1, actual + 1);
+  if (desde > 2) paginas.push("…");
+  for (let p = desde; p <= hasta; p++) paginas.push(p);
+  if (hasta < total - 1) paginas.push("…");
+  paginas.push(total);
+  return paginas;
+}
+
 export default function AdminDashboard({
   nombre,
   dashboardInicial,
@@ -65,6 +78,9 @@ export default function AdminDashboard({
   const inputArchivoRef = useRef<HTMLInputElement>(null);
   const [detalle, setDetalle] = useState<AuditoriaHistorial | null>(null);
   const primeraCarga = useRef(true);
+  const [pagina, setPagina] = useState(1);
+
+  const PAGE_SIZE = 10;
 
   // Re-consulta el dashboard cuando cambian los filtros.
   useEffect(() => {
@@ -72,6 +88,7 @@ export default function AdminDashboard({
       primeraCarga.current = false;
       return;
     }
+    setPagina(1);
     let vigente = true;
     setCargando(true);
     obtenerDashboardAuditoriasAction(filtros)
@@ -162,6 +179,14 @@ export default function AdminDashboard({
     [CircleGauge, "Criterios"], [Send, "Cortes de envío"], [FileBarChart, "Reportes"],
     [Bell, "Alertas"], [Settings, "Configuración"],
   ];
+
+  // ── Paginación del historial (10 por página) ──
+  const historialTodo = data?.historial ?? [];
+  const totalPaginas = Math.max(1, Math.ceil(historialTodo.length / PAGE_SIZE));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const inicio = (paginaActual - 1) * PAGE_SIZE;
+  const historialPagina = historialTodo.slice(inicio, inicio + PAGE_SIZE);
+  const paginasVisibles = rangoPaginas(paginaActual, totalPaginas);
 
   return (
     <div className={styles.app}>
@@ -407,11 +432,11 @@ export default function AdminDashboard({
                 </tr>
               </thead>
               <tbody>
-                {data && data.historial.length > 0 ? (
-                  data.historial.map((a, i) => {
+                {historialPagina.length > 0 ? (
+                  historialPagina.map((a, i) => {
                     const penc = a.tipoNota.toUpperCase() === "PENC";
                     return (
-                      <tr key={`${a.idGestion}-${i}`} className={styles.rowClickable} onClick={() => setDetalle(a)}>
+                      <tr key={`${a.idGestion}-${inicio + i}`} className={styles.rowClickable} onClick={() => setDetalle(a)}>
                         <td>{a.fecha}</td>
                         <td><b>{a.asesor}</b></td>
                         <td>{a.canal}</td>
@@ -431,8 +456,27 @@ export default function AdminDashboard({
           </div>
           <div className={styles.pagination}>
             <span>{cargando ? "Actualizando…" : ""}</span>
-            <span>
-              {data ? `Mostrando ${data.historial.length} de ${fmtEntero(data.totalHistorial)}` : "—"}
+            <div className={styles.pageNums}>
+              <button onClick={() => setPagina(paginaActual - 1)} disabled={paginaActual <= 1} aria-label="Anterior">‹</button>
+              {paginasVisibles.map((p, i) =>
+                p === "…" ? (
+                  <span key={`dots-${i}`} className={styles.pageDots}>…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setPagina(p)}
+                    className={p === paginaActual ? styles.pageActive : ""}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+              <button onClick={() => setPagina(paginaActual + 1)} disabled={paginaActual >= totalPaginas} aria-label="Siguiente">›</button>
+            </div>
+            <span className={styles.pageInfo}>
+              {historialTodo.length > 0
+                ? `Mostrando ${inicio + 1}-${inicio + historialPagina.length} de ${fmtEntero(data?.totalHistorial ?? historialTodo.length)}`
+                : ""}
             </span>
           </div>
         </section>

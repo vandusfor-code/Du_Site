@@ -834,6 +834,9 @@ export interface HistorialAuditorias {
 }
 
 const HISTORIAL_MAX = 400;
+// El dashboard devuelve todas las filas filtradas (con guarda de seguridad) y
+// las pagina en el cliente de 10 en 10.
+const DASHBOARD_HISTORIAL_MAX = 5000;
 
 export async function obtenerHistorialAuditorias(filtros: {
   asesor?: string;
@@ -1159,9 +1162,9 @@ export async function obtenerDashboardAuditorias(
   const totalLote = pendientes + procesadasHoy + conError;
   const progresoPct = totalLote > 0 ? Math.round((procesadasHoy / totalLote) * 100) : 0;
 
-  // ── Historial (filas más recientes primero, tope 400) ──
+  // ── Historial (filas más recientes primero) — se pagina en el cliente ──
   const historial: AuditoriaHistorial[] = [];
-  for (let i = filtradas.length - 1; i >= 0 && historial.length < HISTORIAL_MAX; i--) {
+  for (let i = filtradas.length - 1; i >= 0 && historial.length < DASHBOARD_HISTORIAL_MAX; i--) {
     const row = filtradas[i].row;
     historial.push({
       fecha: texto(row, COL.fecha),
