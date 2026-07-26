@@ -26,17 +26,47 @@ export function getSheetsClient() {
   return google.sheets({ version: "v4", auth });
 }
 
+// La API de Sheets aplica una cuota de 60 lecturas/min por usuario. En ráfagas
+// (varios módulos + navegaciones seguidas) puede devolver 429 RESOURCE_EXHAUSTED,
+// lo que hacía fallar incluso el login (buscarUsuario lee la hoja Usuarios).
+// Detectamos solo ese caso transitorio y reintentamos con backoff; cualquier otro
+// error se relanza de inmediato sin alterar el comportamiento.
+function esLimiteDeCuota(err: unknown): boolean {
+  const e = err as { code?: number | string; status?: number; response?: { status?: number }; message?: string };
+  const code = typeof e?.code === "string" ? parseInt(e.code, 10) : e?.code;
+  if (code === 429 || e?.status === 429 || e?.response?.status === 429) return true;
+  const msg = (e?.message ?? "").toString().toLowerCase();
+  return msg.includes("quota exceeded") || msg.includes("ratelimitexceeded") || msg.includes("resource_exhausted");
+}
+
+async function conReintentosDeLectura<T>(fn: () => Promise<T>, intentos = 3): Promise<T> {
+  let ultimoError: unknown;
+  for (let i = 0; i < intentos; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      ultimoError = err;
+      if (!esLimiteDeCuota(err) || i === intentos - 1) throw err;
+      const espera = 400 * 2 ** i + Math.floor(Math.random() * 250);
+      await new Promise((r) => setTimeout(r, espera));
+    }
+  }
+  throw ultimoError;
+}
+
 export async function readRange(
   spreadsheetId: string,
   range: string,
   opts?: { unformatted?: boolean }
 ): Promise<unknown[][]> {
   const sheets = getSheetsClient();
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range,
-    valueRenderOption: opts?.unformatted ? "UNFORMATTED_VALUE" : "FORMATTED_VALUE",
-  });
+  const res = await conReintentosDeLectura(() =>
+    sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range,
+      valueRenderOption: opts?.unformatted ? "UNFORMATTED_VALUE" : "FORMATTED_VALUE",
+    })
+  );
   return res.data.values ?? [];
 }
 
