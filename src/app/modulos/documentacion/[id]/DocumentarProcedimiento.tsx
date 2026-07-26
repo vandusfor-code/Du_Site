@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, BookOpen, Calendar, Check, ChevronLeft, ChevronRight, Loader2, Lock, Send } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BookOpen, Calendar, Check, ChevronLeft, ChevronRight, Loader2, Lock, Send } from "lucide-react";
 // (Link removido: "Volver" ahora guarda antes de navegar mediante router)
 import type { DetalleProcedimiento } from "@/lib/documentacion-tipos";
 import { ESTADO_META, estadoLabel, SECCIONES_DOC, calcularProgreso } from "@/lib/documentacion-tipos";
@@ -42,11 +42,13 @@ export default function DocumentarProcedimiento({
   detalleInicial,
   fechaLimite,
   editable,
+  correccionComentario,
 }: {
   procedimientoId: string;
   detalleInicial: DetalleProcedimiento;
   fechaLimite: string;
   editable: boolean;
+  correccionComentario?: string | null;
 }) {
   const router = useRouter();
   const [detalle, setDetalle] = useState<DetalleProcedimiento>(detalleInicial);
@@ -391,6 +393,17 @@ export default function DocumentarProcedimiento({
             })}
           </div>
         </div>
+
+        {correccionComentario && editable && (
+          <div className={s.correccionBanner}>
+            <AlertTriangle size={18} />
+            <div>
+              <b>Corrección solicitada</b>
+              <p>El revisor solicitó los siguientes ajustes:</p>
+              <p className={s.correccionTexto}>{correccionComentario}</p>
+            </div>
+          </div>
+        )}
 
         <div className={s.card}>
           {!editable && (

@@ -235,6 +235,14 @@ export interface MiProcedimientoFila {
   fechaAsignacionTs?: number; // para orden "Más recientes"
 }
 
+export interface RevisionAdminData {
+  detalle: DetalleProcedimiento;
+  responsable: string | null;
+  version: string;
+  fechaLimite: string; // "" si no hay
+  comentarioCorreccion: string | null; // última corrección solicitada, si existe
+}
+
 export interface MisProcedimientosData {
   kpi: {
     pendientes: number;

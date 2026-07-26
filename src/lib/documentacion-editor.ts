@@ -14,6 +14,7 @@ import {
   type PendienteDocumentacion,
   type MisProcedimientosData,
   type MiProcedimientoFila,
+  type RevisionAdminData,
 } from "@/lib/documentacion-tipos";
 
 // ============================================================
@@ -125,6 +126,144 @@ export async function enviarARevision(
     await sb.from("procedimientos").update({ estado: asignacion.estado }).eq("id", procedimientoId);
     return { ok: false, error: "No se pudo enviar a revisión. Intenta nuevamente." };
   }
+  return { ok: true };
+}
+
+// ── Revisión administrativa ──
+
+// Última corrección solicitada (para el banner de la asesora y el historial del
+// admin). Tolerante: si la tabla/consulta falla, devuelve null sin romper la vista.
+export async function obtenerCorreccionVigente(procedimientoId: string): Promise<string | null> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("revisiones_procedimiento")
+    .select("comentario, created_at")
+    .eq("procedimiento_id", procedimientoId)
+    .eq("accion", "correccion_requerida")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) {
+    console.error("[documentacion] obtenerCorreccionVigente:", error.message);
+    return null;
+  }
+  return data?.[0]?.comentario ?? null;
+}
+
+// Carga TODO lo necesario para la pantalla de revisión del admin, reutilizando
+// obtenerDetalleProcedimiento (8 secciones + URLs firmadas) + metadatos en paralelo.
+export async function obtenerRevisionAdmin(procedimientoId: string): Promise<RevisionAdminData> {
+  const sb = getSupabase();
+  const [detalle, procR, asigR, corr] = await Promise.all([
+    obtenerDetalleProcedimiento(procedimientoId),
+    sb.from("procedimientos").select("version").eq("id", procedimientoId).maybeSingle(),
+    sb
+      .from("asignaciones_documentacion")
+      .select("asesora_id, fecha_limite, fecha_asignacion")
+      .eq("procedimiento_id", procedimientoId)
+      .neq("estado", "cancelada")
+      .order("fecha_asignacion", { ascending: false })
+      .limit(1),
+    obtenerCorreccionVigente(procedimientoId),
+  ]);
+
+  const asig = asigR.data?.[0];
+  let responsable: string | null = null;
+  if (asig?.asesora_id) {
+    const { data: asesora } = await sb.from("asesoras").select("nombre").eq("id", asig.asesora_id).maybeSingle();
+    responsable = asesora?.nombre ?? null;
+  }
+
+  const versionRaw = procR.data?.version;
+  return {
+    detalle,
+    responsable,
+    version: versionRaw !== null && versionRaw !== undefined && String(versionRaw).trim() !== "" ? String(versionRaw) : "1",
+    fechaLimite: formatearFecha(asig?.fecha_limite),
+    comentarioCorreccion: corr,
+  };
+}
+
+// Aprobar: solo desde en_revision y con 8/8 recomprobado server-side. El
+// .eq("estado","en_revision") en el UPDATE evita doble aprobación.
+export async function aprobarProcedimiento(procedimientoId: string): Promise<ResultadoAsignacion> {
+  const sb = getSupabase();
+  const { data: proc, error } = await sb.from("procedimientos").select("estado").eq("id", procedimientoId).maybeSingle();
+  if (error) {
+    console.error("[documentacion] aprobar (lectura):", error.message);
+    return { ok: false, error: "No se pudo aprobar el procedimiento." };
+  }
+  if (!proc) return { ok: false, error: "Procedimiento no encontrado." };
+  if (proc.estado !== "en_revision") return { ok: false, error: "El procedimiento no está en revisión." };
+
+  const detalle = await obtenerDetalleProcedimiento(procedimientoId);
+  if (calcularProgreso(detalle).completadas < 8) {
+    return { ok: false, error: "El procedimiento no está completo (8 de 8)." };
+  }
+
+  const { error: e1 } = await sb
+    .from("procedimientos")
+    .update({ estado: "aprobado" })
+    .eq("id", procedimientoId)
+    .eq("estado", "en_revision");
+  if (e1) {
+    console.error("[documentacion] aprobar (update proc):", e1.message);
+    return { ok: false, error: "No se pudo aprobar el procedimiento." };
+  }
+  const { error: e2 } = await sb
+    .from("asignaciones_documentacion")
+    .update({ estado: "completada" })
+    .eq("procedimiento_id", procedimientoId)
+    .neq("estado", "cancelada");
+  if (e2) console.error("[documentacion] aprobar (update asignacion):", e2.message);
+  return { ok: true };
+}
+
+// Solicitar corrección: guarda el comentario en revisiones_procedimiento y pasa
+// a correccion_requerida. El .eq("estado","en_revision") evita doble solicitud.
+export async function solicitarCorreccion(
+  procedimientoId: string,
+  comentario: string,
+  revisor: string
+): Promise<ResultadoAsignacion> {
+  const texto = comentario.trim();
+  if (!texto) return { ok: false, error: "Indica qué debe corregir la asesora." };
+
+  const sb = getSupabase();
+  const { data: proc, error } = await sb.from("procedimientos").select("estado").eq("id", procedimientoId).maybeSingle();
+  if (error) {
+    console.error("[documentacion] corrección (lectura):", error.message);
+    return { ok: false, error: "No se pudo solicitar la corrección." };
+  }
+  if (!proc) return { ok: false, error: "Procedimiento no encontrado." };
+  if (proc.estado !== "en_revision") return { ok: false, error: "El procedimiento no está en revisión." };
+
+  const { error: eIns } = await sb.from("revisiones_procedimiento").insert({
+    procedimiento_id: procedimientoId,
+    revisor,
+    accion: "correccion_requerida",
+    seccion: null,
+    comentario: texto,
+  });
+  if (eIns) {
+    console.error("[documentacion] corrección (insert revisión):", eIns.message);
+    return { ok: false, error: "No se pudo guardar la corrección." };
+  }
+
+  const { error: e1 } = await sb
+    .from("procedimientos")
+    .update({ estado: "correccion_requerida" })
+    .eq("id", procedimientoId)
+    .eq("estado", "en_revision");
+  if (e1) {
+    console.error("[documentacion] corrección (update proc):", e1.message);
+    return { ok: false, error: "No se pudo solicitar la corrección." };
+  }
+  const { error: e2 } = await sb
+    .from("asignaciones_documentacion")
+    .update({ estado: "correccion_requerida" })
+    .eq("procedimiento_id", procedimientoId)
+    .neq("estado", "cancelada");
+  if (e2) console.error("[documentacion] corrección (update asignacion):", e2.message);
   return { ok: true };
 }
 

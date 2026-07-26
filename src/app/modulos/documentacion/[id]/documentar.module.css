@@ -117,6 +117,10 @@
 
 .error { border-radius: 10px; padding: 10px 14px; font-size: 12.5px; font-weight: 600; margin-bottom: 14px; background: #fff0f1; color: #d93142; border: 1px solid #ffd4d2; }
 .readonlyBanner { display: flex; align-items: center; gap: 8px; border-radius: 10px; padding: 10px 14px; font-size: 12.5px; font-weight: 600; margin-bottom: 16px; background: #f0edff; color: #4f46e5; border: 1px solid #ddd6fe; }
+.correccionBanner { display: flex; gap: 12px; align-items: flex-start; border-radius: 14px; padding: 16px 18px; margin-bottom: 18px; background: #fef6e0; color: #92600c; border: 1px solid #fbe2ad; }
+.correccionBanner b { font-size: 14px; }
+.correccionBanner p { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; }
+.correccionTexto { font-weight: 600; color: #7a4e08; white-space: pre-line; }
 
 @media (max-width: 760px) {
   .stepper { grid-template-columns: repeat(4, 1fr); row-gap: 18px; }

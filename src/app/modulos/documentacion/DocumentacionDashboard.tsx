@@ -212,8 +212,8 @@ export default function DocumentacionDashboard({
                               <td>{p.version === "—" ? <span className={s.dash}>—</span> : p.version}</td>
                               <td>
                                 <div className={s.acciones}>
-                                  <button className={s.iconBtn} onClick={proximamente} title="Ver"><Eye size={15} /></button>
-                                  <button className={s.iconBtn} onClick={proximamente} title="Más"><MoreVertical size={15} /></button>
+                                  <Link href={`/modulos/documentacion/${p.id}/revision`} className={s.iconBtn} title="Revisar"><Eye size={15} /></Link>
+                                  <Link href={`/modulos/documentacion/${p.id}/revision`} className={s.iconBtn} title="Abrir"><MoreVertical size={15} /></Link>
                                 </div>
                               </td>
                             </tr>
