@@ -764,3 +764,142 @@ export async function cargarTranscripcionesCsv(contenidoCsvRaw: string): Promise
 
   return { cantidad: filasParaInsertar.length };
 }
+
+/* ===================== */
+/* HISTORIAL DE AUDITORÍAS (CONSOLIDADO) */
+/* ===================== */
+
+// Índices de columnas en Consolidado (A=0). Coinciden con el orden en que
+// procesarTranscripciones() escribe cada fila.
+const COL = {
+  fecha: 0,
+  mes: 1,
+  asesor: 2,
+  canal: 3,
+  tipoGestion: 4,
+  correo: 5,
+  idGestion: 6,
+  evaluador: 7,
+  saludo: 8,
+  empatia: 9,
+  sonrisa: 10,
+  claridad: 11,
+  encuesta: 12,
+  informacion: 13,
+  proceso: 14,
+  cierre: 15,
+  nota: 16,
+  tipoNota: 17,
+  observacion: 18,
+  hallazgos: 19,
+  mejora: 20,
+  tipoConsulta: 23,
+  puntajeTuteo: 24,
+  tonoGeneral: 26,
+} as const;
+
+export interface AuditoriaHistorial {
+  fecha: string;
+  mes: string;
+  asesor: string;
+  canal: string;
+  tipoGestion: string;
+  correo: string;
+  idGestion: string;
+  evaluador: string;
+  saludo: string;
+  empatia: string;
+  sonrisa: string;
+  claridad: string;
+  encuesta: string;
+  informacion: string;
+  proceso: string;
+  cierre: string;
+  nota: string;
+  tipoNota: string;
+  observacion: string;
+  hallazgos: string;
+  mejora: string;
+  tipoConsulta: string;
+  puntajeTuteo: string;
+  tonoGeneral: string;
+}
+
+export interface HistorialAuditorias {
+  auditorias: AuditoriaHistorial[];
+  asesores: string[];
+  meses: string[];
+  total: number;
+  limitado: boolean;
+}
+
+const HISTORIAL_MAX = 400;
+
+export async function obtenerHistorialAuditorias(filtros: {
+  asesor?: string;
+  mes?: string;
+}): Promise<HistorialAuditorias> {
+  const id = sheetId();
+  const data = await readRange(id, "Consolidado!A2:AA");
+
+  const asesoresSet = new Set<string>();
+  const mesesSet = new Set<string>();
+  const filtroAsesor = (filtros.asesor ?? "").trim();
+  const filtroMes = (filtros.mes ?? "").trim();
+
+  // Recorremos de la fila más reciente a la más antigua (se agregan al final).
+  const coincidencias: AuditoriaHistorial[] = [];
+  let total = 0;
+
+  for (let i = data.length - 1; i >= 0; i--) {
+    const row = data[i];
+    const idGestion = texto(row, COL.idGestion);
+    const asesor = texto(row, COL.asesor).trim();
+    if (!idGestion || !asesor) continue;
+
+    if (asesor) asesoresSet.add(asesor);
+    const mes = texto(row, COL.mes).trim();
+    if (mes) mesesSet.add(mes);
+
+    if (filtroAsesor && asesor !== filtroAsesor) continue;
+    if (filtroMes && mes !== filtroMes) continue;
+
+    total++;
+    if (coincidencias.length >= HISTORIAL_MAX) continue;
+
+    coincidencias.push({
+      fecha: texto(row, COL.fecha),
+      mes,
+      asesor,
+      canal: texto(row, COL.canal),
+      tipoGestion: texto(row, COL.tipoGestion),
+      correo: texto(row, COL.correo),
+      idGestion,
+      evaluador: texto(row, COL.evaluador),
+      saludo: texto(row, COL.saludo),
+      empatia: texto(row, COL.empatia),
+      sonrisa: texto(row, COL.sonrisa),
+      claridad: texto(row, COL.claridad),
+      encuesta: texto(row, COL.encuesta),
+      informacion: texto(row, COL.informacion),
+      proceso: texto(row, COL.proceso),
+      cierre: texto(row, COL.cierre),
+      nota: texto(row, COL.nota),
+      tipoNota: texto(row, COL.tipoNota),
+      observacion: texto(row, COL.observacion),
+      hallazgos: texto(row, COL.hallazgos),
+      mejora: texto(row, COL.mejora),
+      tipoConsulta: texto(row, COL.tipoConsulta),
+      puntajeTuteo: texto(row, COL.puntajeTuteo),
+      tonoGeneral: texto(row, COL.tonoGeneral),
+    });
+  }
+
+  return {
+    auditorias: coincidencias,
+    asesores: Array.from(asesoresSet).sort((a, b) => a.localeCompare(b)),
+    meses: Array.from(mesesSet),
+    total,
+    limitado: total > coincidencias.length,
+  };
+}

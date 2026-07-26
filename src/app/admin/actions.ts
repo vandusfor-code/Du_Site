@@ -6,9 +6,11 @@ import {
   generarResumenCortes,
   obtenerEstadoAuditorias,
   cargarTranscripcionesCsv,
+  obtenerHistorialAuditorias,
   type ResultadoProcesamiento,
   type EstadoAuditorias,
   type ResultadoCargaCsv,
+  type HistorialAuditorias,
 } from "@/lib/auditorias-admin";
 
 async function requireAdminAction(): Promise<void> {
@@ -41,4 +43,12 @@ export async function cargarTranscripcionesAction(formData: FormData): Promise<R
   }
   const contenido = await archivo.text();
   return cargarTranscripcionesCsv(contenido);
+}
+
+export async function obtenerHistorialAuditoriasAction(filtros: {
+  asesor?: string;
+  mes?: string;
+}): Promise<HistorialAuditorias> {
+  await requireAdminAction();
+  return obtenerHistorialAuditorias(filtros);
 }

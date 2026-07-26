@@ -2,22 +2,30 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { ArrowLeft, Loader2, PlayCircle, RefreshCw, Sparkles, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, PlayCircle, RefreshCw, Sparkles, Upload, X, History } from "lucide-react";
 import {
   ejecutarAuditoriasAction,
   generarResumenCortesAction,
   obtenerEstadoAuditoriasAction,
   cargarTranscripcionesAction,
+  obtenerHistorialAuditoriasAction,
 } from "./actions";
-import type { EstadoAuditorias, ResultadoProcesamiento } from "@/lib/auditorias-admin";
+import type {
+  EstadoAuditorias,
+  ResultadoProcesamiento,
+  HistorialAuditorias,
+  AuditoriaHistorial,
+} from "@/lib/auditorias-admin";
 
 export default function AdminDashboard({
   nombre,
   estadoInicial,
+  historialInicial,
   errorInicial,
 }: {
   nombre: string;
   estadoInicial: EstadoAuditorias | null;
+  historialInicial: HistorialAuditorias | null;
   errorInicial: string | null;
 }) {
   const [estado, setEstado] = useState(estadoInicial);
@@ -33,6 +41,24 @@ export default function AdminDashboard({
   const [subiendoCsv, setSubiendoCsv] = useState(false);
   const [errorCsv, setErrorCsv] = useState<string | null>(null);
   const [mensajeCsv, setMensajeCsv] = useState<string | null>(null);
+
+  const [historial, setHistorial] = useState(historialInicial);
+  const [filtroAsesor, setFiltroAsesor] = useState("");
+  const [filtroMes, setFiltroMes] = useState("");
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
+  const [detalle, setDetalle] = useState<AuditoriaHistorial | null>(null);
+
+  async function aplicarFiltrosHistorial(asesor: string, mes: string) {
+    setCargandoHistorial(true);
+    try {
+      const nuevo = await obtenerHistorialAuditoriasAction({ asesor, mes });
+      setHistorial(nuevo);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar el historial");
+    } finally {
+      setCargandoHistorial(false);
+    }
+  }
 
   async function refrescarEstado() {
     setRefrescando(true);
@@ -120,7 +146,7 @@ export default function AdminDashboard({
         </Link>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="mx-auto max-w-5xl px-6 py-10">
         <section className="mb-6 rounded-2xl border border-border bg-surface p-8 shadow-card">
           <div className="flex items-center gap-3">
             <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-tint text-brand">
@@ -243,7 +269,246 @@ export default function AdminDashboard({
             <p className="mt-4 text-[13px] font-medium text-muted">{mensajeResumenes}</p>
           )}
         </section>
+
+        {/* ── Historial de auditorías (Consolidado) ── */}
+        <section className="mt-6 rounded-2xl border border-border bg-surface p-8 shadow-card">
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-tint text-brand">
+              <History size={20} />
+            </span>
+            <div>
+              <h2 className="text-[17px] font-bold text-foreground">Historial de auditorías</h2>
+              <p className="text-[13px] text-muted">
+                Consolidado completo. Haz clic en una fila para ver el detalle con todos los criterios.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <select
+              value={filtroAsesor}
+              onChange={(e) => {
+                setFiltroAsesor(e.target.value);
+                aplicarFiltrosHistorial(e.target.value, filtroMes);
+              }}
+              className="h-11 flex-1 rounded-lg border border-border-strong bg-surface px-3 text-[14px] font-medium text-foreground outline-none transition-colors focus:border-brand"
+            >
+              <option value="">Todos los asesores</option>
+              {historial?.asesores.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filtroMes}
+              onChange={(e) => {
+                setFiltroMes(e.target.value);
+                aplicarFiltrosHistorial(filtroAsesor, e.target.value);
+              }}
+              className="h-11 flex-1 rounded-lg border border-border-strong bg-surface px-3 text-[14px] font-medium text-foreground outline-none transition-colors focus:border-brand"
+            >
+              <option value="">Todos los meses</option>
+              {historial?.meses.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            {(filtroAsesor || filtroMes) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltroAsesor("");
+                  setFiltroMes("");
+                  aplicarFiltrosHistorial("", "");
+                }}
+                className="flex h-11 items-center justify-center gap-2 rounded-lg border border-border-strong px-4 text-[13px] font-semibold text-foreground transition-colors hover:border-brand"
+              >
+                <X size={14} />
+                Limpiar
+              </button>
+            )}
+          </div>
+
+          <div className="mt-4 flex items-center justify-between text-[12px] text-muted">
+            <span>
+              {historial ? (
+                <>
+                  {historial.total} auditoría{historial.total === 1 ? "" : "s"}
+                  {historial.limitado && ` · mostrando las ${historial.auditorias.length} más recientes`}
+                </>
+              ) : (
+                "—"
+              )}
+            </span>
+            {cargandoHistorial && <Loader2 size={14} className="animate-spin" />}
+          </div>
+
+          <div className="mt-3 overflow-x-auto rounded-xl border border-border">
+            <table className="w-full min-w-[640px] text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-border bg-surface-inset text-[11px] font-bold uppercase tracking-wide text-muted">
+                  <th className="px-4 py-3">Fecha</th>
+                  <th className="px-4 py-3">Asesor</th>
+                  <th className="px-4 py-3">Canal</th>
+                  <th className="px-4 py-3">ID Gestión</th>
+                  <th className="px-4 py-3">Nota</th>
+                  <th className="px-4 py-3">Tipo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historial && historial.auditorias.length > 0 ? (
+                  historial.auditorias.map((a, i) => (
+                    <tr
+                      key={`${a.idGestion}-${i}`}
+                      onClick={() => setDetalle(a)}
+                      className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-surface-inset"
+                    >
+                      <td className="px-4 py-3 text-muted">{a.fecha}</td>
+                      <td className="px-4 py-3 font-semibold text-foreground">{a.asesor}</td>
+                      <td className="px-4 py-3 text-muted">{a.canal}</td>
+                      <td className="px-4 py-3 font-mono text-[11px] text-muted">{a.idGestion.slice(0, 12)}…</td>
+                      <td className="px-4 py-3 font-bold text-foreground">{a.nota}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                            a.tipoNota.toUpperCase() === "PENC"
+                              ? "bg-error-bg text-error"
+                              : "bg-success-bg text-success"
+                          }`}
+                        >
+                          {a.tipoNota}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-muted">
+                      {cargandoHistorial ? "Cargando…" : "No hay auditorías para estos filtros."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </main>
+
+      {detalle && <DetalleModal a={detalle} onClose={() => setDetalle(null)} />}
+    </div>
+  );
+}
+
+function DetalleModal({ a, onClose }: { a: AuditoriaHistorial; onClose: () => void }) {
+  const criterios: { label: string; valor: string }[] = [
+    { label: "Saludo", valor: a.saludo },
+    { label: "Empatía", valor: a.empatia },
+    { label: "Sonrisa", valor: a.sonrisa },
+    { label: "Claridad", valor: a.claridad },
+    { label: "Encuesta", valor: a.encuesta },
+    { label: "Información", valor: a.informacion },
+    { label: "Proceso", valor: a.proceso },
+    { label: "Cierre", valor: a.cierre },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm sm:p-8"
+      onClick={onClose}
+    >
+      <div
+        className="my-4 w-full max-w-2xl rounded-2xl border border-border bg-surface shadow-hover"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between border-b border-border p-6">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-muted">Auditoría</p>
+            <h3 className="mt-1 text-lg font-extrabold text-foreground">{a.asesor}</h3>
+            <p className="mt-0.5 font-mono text-[12px] text-muted">{a.idGestion}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-2xl font-extrabold text-foreground">{a.nota}</p>
+              <span
+                className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                  a.tipoNota.toUpperCase() === "PENC" ? "bg-error-bg text-error" : "bg-success-bg text-success"
+                }`}
+              >
+                {a.tipoNota}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="grid size-9 place-items-center rounded-lg border border-border-strong text-muted transition-colors hover:border-brand hover:text-foreground"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-5 p-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetaItem label="Fecha" value={a.fecha} />
+            <MetaItem label="Canal" value={a.canal} />
+            <MetaItem label="Tipo consulta" value={a.tipoConsulta} />
+            <MetaItem label="Correo" value={a.correo} />
+            <MetaItem label="Tuteo" value={a.puntajeTuteo} />
+            <MetaItem label="Tono" value={a.tonoGeneral} />
+            <MetaItem label="Evaluador" value={a.evaluador} />
+            <MetaItem label="Tipo gestión" value={a.tipoGestion} />
+          </div>
+
+          <div>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">Criterios</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {criterios.map((c) => (
+                <div key={c.label} className="rounded-lg border border-border bg-surface-inset px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted">{c.label}</p>
+                  <p
+                    className={`mt-0.5 text-[13px] font-semibold ${
+                      c.valor.toLowerCase().includes("no cumple")
+                        ? "text-error"
+                        : c.valor.toLowerCase().includes("no aplica")
+                          ? "text-muted"
+                          : "text-success"
+                    }`}
+                  >
+                    {c.valor || "—"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <TextoBloque titulo="Observación" texto={a.observacion} />
+          <TextoBloque titulo="Hallazgos" texto={a.hallazgos} />
+          <TextoBloque titulo="Puntos de mejora" texto={a.mejora} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-muted">{label}</p>
+      <p className="mt-0.5 break-words text-[13px] font-medium text-foreground">{value || "—"}</p>
+    </div>
+  );
+}
+
+function TextoBloque({ titulo, texto }: { titulo: string; texto: string }) {
+  return (
+    <div>
+      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted">{titulo}</p>
+      <p className="whitespace-pre-line rounded-lg border border-border bg-surface-inset p-4 text-[13px] leading-relaxed text-foreground">
+        {texto || "—"}
+      </p>
     </div>
   );
 }
