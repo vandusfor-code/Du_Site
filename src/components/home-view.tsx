@@ -58,6 +58,7 @@ const MODULO_TONE: Record<ModuloId, string> = {
   quiz: "pink",
   admin: "violet",
   desempeno: "violet",
+  documentacion: "violet",
 };
 
 const PENDIENTES_VISIBLES = 5;

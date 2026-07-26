@@ -5,6 +5,7 @@ import {
   Headphones,
   Search,
   ShieldCheck,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuloId } from "@/lib/modulos";
@@ -25,4 +26,5 @@ export const MODULO_VISUALS: Record<ModuloId, ModuloVisual> = {
   quiz: { icon: GraduationCap, accentBg: "#fecdd3", accentFg: "#be123c" },
   admin: { icon: ShieldCheck, accentBg: "#e0e7ff", accentFg: "#4f46e5" },
   desempeno: { icon: BarChart3, accentBg: "#ede9fe", accentFg: "#7044ed" },
+  documentacion: { icon: BookOpen, accentBg: "#e0e7ff", accentFg: "#4f46e5" },
 };

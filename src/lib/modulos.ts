@@ -1,4 +1,4 @@
-export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno";
+export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno" | "documentacion";
 
 export interface Modulo {
   id: ModuloId;
@@ -57,6 +57,13 @@ export const MODULOS: Modulo[] = [
     descripcion: "Rendimiento de funcionarios, productividad, adherencia, indicadores por área, ranking y bonificación.",
     href: "/modulos/desempeno",
     color: "#7044ed",
+  },
+  {
+    id: "documentacion",
+    nombre: "Documentación Operativa",
+    descripcion: "Centraliza, documenta y valida el conocimiento operativo de los aplicativos.",
+    href: "/modulos/documentacion",
+    color: "#4f46e5",
   },
 ];
 
