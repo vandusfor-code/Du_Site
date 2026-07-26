@@ -10,112 +10,43 @@ import { resolverAsesoraId } from "@/lib/documentacion-identidad";
 import { obtenerPendientesDocumentacion } from "@/lib/documentacion-editor";
 
 const TRACKABLE = ["metricas", "quiz", "radicaciones", "linea-amiga"] as const;
+const RANGO_PRIORIDAD = { Alta: 0, Media: 1, Baja: 2 } as const;
 
-async function obtenerTareasPendientes(
-  nombre: string,
-  usuario: string,
-  moduloIds: string[]
-): Promise<TareaPendiente[]> {
-  const tareas: TareaPendiente[] = [];
-
-  const [auditoriasR, duacademyR, radicacionesR, lineaAmigaR, documentacionR] = await Promise.allSettled([
-    moduloIds.includes("metricas") ? obtenerAuditoriasConEstado(usuario) : Promise.resolve([]),
-    moduloIds.includes("quiz") ? obtenerDatosCompletos(nombre) : Promise.resolve(null),
-    moduloIds.includes("radicaciones") ? obtenerNotificacionesRadicaciones(nombre) : Promise.resolve([]),
-    moduloIds.includes("linea-amiga") ? obtenerNotificacionesLineaAmiga(nombre) : Promise.resolve([]),
-    moduloIds.includes("documentacion")
-      ? resolverAsesoraId(usuario).then((asesoraId) => obtenerPendientesDocumentacion(asesoraId))
-      : Promise.resolve([]),
-  ]);
-
-  if (auditoriasR.status === "fulfilled") {
-    auditoriasR.value
-      .filter((a) => !a.comprometido)
-      .forEach((a) => {
-        tareas.push({
-          id: `metricas-${a.idGestion}`,
-          titulo: `Firmar compromiso: ${a.tipoGestion}`,
-          moduloId: "metricas",
-          moduloNombre: "Métricas",
-          moduloHref: "/modulos/metricas",
-          fecha: a.fecha,
-          prioridad: "Media",
-        });
-      });
+// Convierte los strings de fecha heterogéneos de cada fuente a epoch ms para
+// ORDENAR por urgencia (nunca se usa para mostrar). Devuelve undefined si no hay
+// fecha comparable real (no se inventa una).
+function parseFechaRelevante(s: string | undefined | null): number | undefined {
+  if (!s) return undefined;
+  const t = s.trim();
+  let m: RegExpMatchArray | null;
+  if ((m = t.match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/))) {
+    return new Date(+m[3], +m[2] - 1, +m[1], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0).getTime();
   }
-
-  if (duacademyR.status === "fulfilled" && duacademyR.value) {
-    const datos = duacademyR.value;
-    const hechos = new Set(datos.historial.map((h) => h.idItem));
-    const cursosPendientes = datos.todosLosCursos.filter(
-      (c) => datos.asignadosCursos.includes(c.ID_MODULO) && !hechos.has(c.ID_MODULO)
-    );
-    const simsPendientes = datos.todasLasSims.filter(
-      (s) => datos.asignadosSims.includes(s.ID_SIMULACION) && !hechos.has(s.ID_SIMULACION)
-    );
-    [...cursosPendientes, ...simsPendientes].forEach((item, i) => {
-      tareas.push({
-        id: `duacademy-${item.ID_MODULO || item.ID_SIMULACION || i}`,
-        titulo: `Completar: ${item.TITULO || "Formación asignada"}`,
-        moduloId: "quiz",
-        moduloNombre: "DuAcademy",
-        moduloHref: "/modulos/quiz",
-        fecha: "",
-        prioridad: "Baja",
-      });
-    });
+  if ((m = t.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/))) {
+    return new Date(+m[3], +m[2] - 1, +m[1], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0).getTime();
   }
-
-  if (radicacionesR.status === "fulfilled") {
-    radicacionesR.value
-      .filter((n) => n.radicado !== "HORARIO")
-      .forEach((n) => {
-        tareas.push({
-          id: `radicaciones-${n.id}`,
-          titulo: n.mensaje || `Radicado ${n.radicado}`,
-          moduloId: "radicaciones",
-          moduloNombre: "Radicaciones",
-          moduloHref: "/modulos/radicaciones",
-          fecha: n.fecha,
-          prioridad: "Alta",
-        });
-      });
+  if ((m = t.match(/^(\d{2})\/(\d{2})(?:\s+(\d{2}):(\d{2}))?$/))) {
+    const y = new Date().getFullYear();
+    return new Date(y, +m[2] - 1, +m[1], m[3] ? +m[3] : 0, m[4] ? +m[4] : 0).getTime();
   }
+  const d = Date.parse(t);
+  return isNaN(d) ? undefined : d;
+}
 
-  if (lineaAmigaR.status === "fulfilled") {
-    lineaAmigaR.value
-      .filter((n) => n.radicado !== "HORARIO")
-      .forEach((n) => {
-        tareas.push({
-          id: `linea-amiga-${n.id}`,
-          titulo: n.mensaje || `Radicado ${n.radicado}`,
-          moduloId: "linea-amiga",
-          moduloNombre: "Línea Amiga",
-          moduloHref: "/modulos/linea-amiga",
-          fecha: n.fecha,
-          prioridad: "Alta",
-        });
-      });
-  }
-
-  if (documentacionR.status === "fulfilled") {
-    documentacionR.value.forEach((p) => {
-      tareas.push({
-        id: `documentacion-${p.asignacionId}`,
-        titulo: `Documentar procedimiento: ${p.titulo}`,
-        moduloId: "documentacion",
-        moduloNombre: p.aplicativo,
-        moduloHref: `/modulos/documentacion/${p.procedimientoId}`,
-        fecha: p.fechaLimite ? `Vence ${p.fechaLimite}` : "",
-        prioridad: "Media",
-        accion: p.accion,
-      });
-    });
-  }
-
-  const rango = { Alta: 0, Media: 1, Baja: 2 } as const;
-  tareas.sort((a, b) => rango[a.prioridad] - rango[b.prioridad]);
-  return tareas;
+// Orden por urgencia real: primero lo que tiene fecha (ascendente → vencidas y
+// próximas primero), luego lo que no tiene fecha; prioridad como desempate.
+function ordenarPorUrgencia(tareas: TareaPendiente[]): void {
+  tareas.sort((a, b) => {
+    const ah = a.ordenTs !== undefined;
+    const bh = b.ordenTs !== undefined;
+    if (ah && bh) {
+      if (a.ordenTs !== b.ordenTs) return (a.ordenTs as number) - (b.ordenTs as number);
+      return RANGO_PRIORIDAD[a.prioridad] - RANGO_PRIORIDAD[b.prioridad];
+    }
+    if (ah) return -1;
+    if (bh) return 1;
+    return RANGO_PRIORIDAD[a.prioridad] - RANGO_PRIORIDAD[b.prioridad];
+  });
 }
 
 function diasDesde(fechaTexto: string): number {
@@ -132,28 +63,124 @@ export default async function Home() {
   const nombre = session?.user?.nombre ?? "";
   const usuario = session?.user?.usuario ?? "";
   const moduloIds = session?.user?.modulos ?? [];
-  const esAdmin = (session?.user?.rol ?? "").trim().toLowerCase() === "admin";
-  // La tarjeta "Documentación Operativa" es consciente del rol: una asesora no va
-  // al dashboard administrativo (que la rechazaría) sino a su lista de Pendientes.
-  const modulos = modulosPermitidos(moduloIds).map((m) =>
-    m.id === "documentacion" && !esAdmin ? { ...m, href: "/#pendientes" } : m
-  );
+  // El href de Documentación es el mismo para todos: /modulos/documentacion decide
+  // server-side (dashboard Admin vs. "Mis procedimientos" de la asesora).
+  const modulos = modulosPermitidos(moduloIds);
 
   if (!usuario) {
-    return <HomeView nombre={nombre} modulos={modulos} logoutAction={logoutAction} tareas={[]} data={null} />;
+    return <HomeView nombre={nombre} usuario="" modulos={modulos} logoutAction={logoutAction} tareas={[]} data={null} />;
   }
 
-  const tieneMetricas = moduloIds.includes("metricas");
+  const has = (id: string) => moduloIds.includes(id);
+  const tieneMetricas = has("metricas");
 
-  const [tareas, auditoriasR, mesAnteriorR, gestionesMesR, cronogramaR] = await Promise.allSettled([
-    obtenerTareasPendientes(nombre, usuario, moduloIds),
-    tieneMetricas ? obtenerAuditoriasConEstado(usuario) : Promise.resolve([]),
-    tieneMetricas ? obtenerConteoMesAnterior(usuario) : Promise.resolve(0),
-    obtenerGestionesMes(),
-    tieneMetricas ? obtenerCronograma(nombre) : Promise.resolve([]),
-  ]);
+  // TODAS las lecturas externas del Home en un solo batch paralelo, cada una
+  // gateada por el módulo real del usuario. obtenerAuditoriasConEstado se llama
+  // UNA sola vez y su resultado alimenta tanto Pendientes como el resumen.
+  const [auditoriasR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, conteoMesAnteriorR, gestionesMesR, cronogramaR] =
+    await Promise.allSettled([
+      tieneMetricas ? obtenerAuditoriasConEstado(usuario) : Promise.resolve([]),
+      has("quiz") ? obtenerDatosCompletos(nombre) : Promise.resolve(null),
+      has("radicaciones") ? obtenerNotificacionesRadicaciones(nombre) : Promise.resolve([]),
+      has("linea-amiga") ? obtenerNotificacionesLineaAmiga(nombre) : Promise.resolve([]),
+      has("documentacion") ? resolverAsesoraId(usuario).then((id) => obtenerPendientesDocumentacion(id)) : Promise.resolve([]),
+      tieneMetricas ? obtenerConteoMesAnterior(usuario) : Promise.resolve(0),
+      has("linea-amiga") ? obtenerGestionesMes() : Promise.resolve(null),
+      tieneMetricas ? obtenerCronograma(nombre) : Promise.resolve([]),
+    ]);
 
-  const listaTareas = tareas.status === "fulfilled" ? tareas.value : [];
+  const auditorias = auditoriasR.status === "fulfilled" ? auditoriasR.value : [];
+
+  // ── Construcción de Pendientes desde los datos ya cargados ──
+  const listaTareas: TareaPendiente[] = [];
+
+  auditorias
+    .filter((a) => !a.comprometido)
+    .forEach((a) => {
+      listaTareas.push({
+        id: `metricas-${a.idGestion}`,
+        titulo: `Firmar compromiso: ${a.tipoGestion}`,
+        moduloId: "metricas",
+        moduloNombre: "Métricas",
+        moduloHref: "/modulos/metricas",
+        fecha: a.fecha,
+        prioridad: "Media",
+        ordenTs: parseFechaRelevante(a.fecha),
+      });
+    });
+
+  if (duacademyR.status === "fulfilled" && duacademyR.value) {
+    const datos = duacademyR.value;
+    const hechos = new Set(datos.historial.map((h) => h.idItem));
+    const cursosPendientes = datos.todosLosCursos.filter(
+      (c) => datos.asignadosCursos.includes(c.ID_MODULO) && !hechos.has(c.ID_MODULO)
+    );
+    const simsPendientes = datos.todasLasSims.filter(
+      (s) => datos.asignadosSims.includes(s.ID_SIMULACION) && !hechos.has(s.ID_SIMULACION)
+    );
+    [...cursosPendientes, ...simsPendientes].forEach((item, i) => {
+      listaTareas.push({
+        id: `duacademy-${item.ID_MODULO || item.ID_SIMULACION || i}`,
+        titulo: `Completar: ${item.TITULO || "Formación asignada"}`,
+        moduloId: "quiz",
+        moduloNombre: "DuAcademy",
+        moduloHref: "/modulos/quiz",
+        fecha: "",
+        prioridad: "Baja",
+      });
+    });
+  }
+
+  if (radicacionesR.status === "fulfilled") {
+    radicacionesR.value
+      .filter((n) => n.radicado !== "HORARIO")
+      .forEach((n) => {
+        listaTareas.push({
+          id: `radicaciones-${n.id}`,
+          titulo: n.mensaje || `Radicado ${n.radicado}`,
+          moduloId: "radicaciones",
+          moduloNombre: "Radicaciones",
+          moduloHref: "/modulos/radicaciones",
+          fecha: n.fecha,
+          prioridad: "Alta",
+          ordenTs: parseFechaRelevante(n.fecha),
+        });
+      });
+  }
+
+  if (lineaAmigaR.status === "fulfilled") {
+    lineaAmigaR.value
+      .filter((n) => n.radicado !== "HORARIO")
+      .forEach((n) => {
+        listaTareas.push({
+          id: `linea-amiga-${n.id}`,
+          titulo: n.mensaje || `Radicado ${n.radicado}`,
+          moduloId: "linea-amiga",
+          moduloNombre: "Línea Amiga",
+          moduloHref: "/modulos/linea-amiga",
+          fecha: n.fecha,
+          prioridad: "Alta",
+          ordenTs: parseFechaRelevante(n.fecha),
+        });
+      });
+  }
+
+  if (documentacionR.status === "fulfilled") {
+    documentacionR.value.forEach((p) => {
+      listaTareas.push({
+        id: `documentacion-${p.asignacionId}`,
+        titulo: `Documentar procedimiento: ${p.titulo}`,
+        moduloId: "documentacion",
+        moduloNombre: p.aplicativo,
+        moduloHref: `/modulos/documentacion/${p.procedimientoId}`,
+        fecha: p.fechaLimite ? `Vence ${p.fechaLimite}` : "",
+        prioridad: "Media",
+        accion: p.accion,
+        ordenTs: p.fechaLimiteTs,
+      });
+    });
+  }
+
   const sesiones = cronogramaR.status === "fulfilled" ? cronogramaR.value : [];
 
   const DIAS_SEMANA = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
@@ -164,6 +191,8 @@ export default async function Home() {
     .forEach((s) => {
       const fechaSesion = new Date(s.anio, s.mes, s.dia);
       const fechaTexto = `${DIAS_SEMANA[fechaSesion.getDay()]} ${String(s.dia).padStart(2, "0")}/${String(s.mes + 1).padStart(2, "0")} · ${s.horario}`;
+      const hm = s.horario.match(/(\d{1,2}):(\d{2})/);
+      const ts = new Date(s.anio, s.mes, s.dia, hm ? +hm[1] : 0, hm ? +hm[2] : 0).getTime();
       listaTareas.push({
         id: `cronograma-${s.anio}-${s.mes}-${s.dia}-${s.horario}`,
         titulo: `${s.actividad} con ${s.companero}`,
@@ -172,12 +201,11 @@ export default async function Home() {
         moduloHref: "/modulos/metricas",
         fecha: fechaTexto,
         prioridad: "Media",
+        ordenTs: ts,
       });
     });
-  {
-    const rango = { Alta: 0, Media: 1, Baja: 2 } as const;
-    listaTareas.sort((a, b) => rango[a.prioridad] - rango[b.prioridad]);
-  }
+
+  ordenarPorUrgencia(listaTareas);
 
   const diasMarcados = new Map<string, { anio: number; mes: number; dia: number; detalles: string[] }>();
   sesiones.forEach((s) => {
@@ -194,23 +222,22 @@ export default async function Home() {
     detalle: v.detalles.join(" · "),
   }));
 
-  // "Tu progreso": módulos con seguimiento real (Métricas, DuAcademy, Radicaciones, Línea Amiga)
-  // que el asesor tiene asignados y que hoy no tienen ningún pendiente.
+  // "Tu progreso": módulos con seguimiento real que el usuario tiene y que hoy no
+  // tienen ningún pendiente.
   const trackables = TRACKABLE.filter((id) => moduloIds.includes(id));
   const conPendientes = new Set(listaTareas.map((t) => t.moduloId));
   const alDia = trackables.filter((id) => !conPendientes.has(id)).length;
   const progresoPct = trackables.length > 0 ? Math.round((alDia / trackables.length) * 100) : 100;
   const progresoLabel = progresoPct >= 80 ? "Excelente 🔥" : progresoPct >= 50 ? "En progreso" : "Ponte al día";
 
-  // Resumen de compromisos: solo datos reales de Métricas. La tendencia compara contra el
-  // conteo real del mes anterior (null si no hay mes anterior con qué comparar).
+  // Resumen de compromisos: mismo dataset de auditorías ya cargado (sin releer).
   let resumen: HomeData["resumen"] = null;
   if (tieneMetricas && auditoriasR.status === "fulfilled") {
-    const items = auditoriasR.value;
+    const items = auditorias;
     const firmados = items.filter((a) => a.comprometido).length;
     const pendientes = items.filter((a) => !a.comprometido);
     const vencidos = pendientes.filter((a) => diasDesde(a.fecha) > 5).length;
-    const mesAnterior = mesAnteriorR.status === "fulfilled" ? mesAnteriorR.value : 0;
+    const mesAnterior = conteoMesAnteriorR.status === "fulfilled" ? conteoMesAnteriorR.value : 0;
     const tendenciaPct = mesAnterior > 0 ? Math.round(((items.length - mesAnterior) / mesAnterior) * 100) : null;
 
     resumen = {
@@ -226,5 +253,5 @@ export default async function Home() {
 
   const data: HomeData = { progresoPct, progresoLabel, resumen, gestionesMes, calendario };
 
-  return <HomeView nombre={nombre} modulos={modulos} logoutAction={logoutAction} tareas={listaTareas} data={data} />;
+  return <HomeView nombre={nombre} usuario={usuario} modulos={modulos} logoutAction={logoutAction} tareas={listaTareas} data={data} />;
 }

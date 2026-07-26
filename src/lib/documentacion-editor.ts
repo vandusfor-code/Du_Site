@@ -3,6 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   formatearFecha,
+  calcularProgreso,
   type DetalleProcedimiento,
   type PasoProcedimiento,
   type ValidacionProcedimiento,
@@ -10,6 +11,8 @@ import {
   type RelacionProcedimiento,
   type ProcedimientoBuscable,
   type PendienteDocumentacion,
+  type MisProcedimientosData,
+  type MiProcedimientoFila,
 } from "@/lib/documentacion-tipos";
 
 // ============================================================
@@ -689,8 +692,161 @@ export async function obtenerPendientesDocumentacion(asesoraId: string | null): 
         titulo: proc.titulo ?? "—",
         aplicativo: proc.aplicativo_id ? apNombres.get(proc.aplicativo_id) ?? "—" : "—",
         fechaLimite: formatearFecha(a.fecha_limite),
+        fechaLimiteTs: a.fecha_limite ? Date.parse(String(a.fecha_limite)) || undefined : undefined,
         estado: a.estado ?? "pendiente",
-        accion: a.estado === "pendiente" ? ("Comenzar" as const) : ("Continuar" as const),
+        accion:
+          a.estado === "pendiente"
+            ? ("Comenzar" as const)
+            : a.estado === "correccion_requerida"
+              ? ("Corregir" as const)
+              : ("Continuar" as const),
       };
     });
+}
+
+// ── "Mis procedimientos" (pantalla de la asesora) ──
+// Carga TODAS las asignaciones de la asesora + calcula progreso en bloque
+// (sin N+1) reutilizando la MISMA lógica calcularProgreso del editor.
+
+export async function obtenerMisProcedimientos(asesoraId: string | null): Promise<MisProcedimientosData> {
+  const vacio: MisProcedimientosData = {
+    kpi: { pendientes: 0, enElaboracion: 0, porRevisar: 0, correccionRequerida: 0, aprobados: 0 },
+    procedimientos: [],
+    aplicativos: [],
+    estados: [],
+  };
+  if (!asesoraId) return vacio;
+  const sb = getSupabase();
+
+  const { data: asignaciones, error: eAsig } = await sb
+    .from("asignaciones_documentacion")
+    .select("procedimiento_id, fecha_limite, fecha_asignacion, estado")
+    .eq("asesora_id", asesoraId)
+    .neq("estado", "cancelada");
+  if (eAsig) throw new Error(`Supabase: ${eAsig.message}`);
+  if (!asignaciones || asignaciones.length === 0) return vacio;
+
+  // Asignación relevante por procedimiento: la más reciente no cancelada.
+  const asigPorProc = new Map<string, { fecha_limite: string | null; fecha_asignacion: string | null }>();
+  for (const a of asignaciones) {
+    if (!a.procedimiento_id) continue;
+    const prev = asigPorProc.get(a.procedimiento_id);
+    if (!prev || (a.fecha_asignacion ?? "") > (prev.fecha_asignacion ?? "")) {
+      asigPorProc.set(a.procedimiento_id, { fecha_limite: a.fecha_limite, fecha_asignacion: a.fecha_asignacion });
+    }
+  }
+  const procIds = Array.from(asigPorProc.keys());
+  if (procIds.length === 0) return vacio;
+
+  // Una consulta por tabla — número constante, no N+1.
+  const [procR, apR, pasosR, valsR, errsR, relsR] = await Promise.all([
+    sb
+      .from("procedimientos")
+      .select(
+        "id, aplicativo_id, titulo, para_que_sirve, cuando_se_utiliza, resultado_esperado, resultado_no_aplica, validaciones_no_aplica, relaciones_no_aplica, errores_no_aplica, observaciones, observaciones_no_aplica, estado"
+      )
+      .in("id", procIds),
+    sb.from("aplicativos").select("id, nombre"),
+    sb.from("pasos_procedimiento").select("procedimiento_id, instruccion").in("procedimiento_id", procIds),
+    sb.from("validaciones_procedimiento").select("procedimiento_id, descripcion").in("procedimiento_id", procIds),
+    sb.from("errores_procedimiento").select("procedimiento_id, descripcion").in("procedimiento_id", procIds),
+    sb
+      .from("relaciones_procedimientos")
+      .select("procedimiento_origen_id, condicion, procedimiento_destino_id, procedimiento_propuesto, estado")
+      .in("procedimiento_origen_id", procIds)
+      .neq("estado", "descartado"),
+  ]);
+  for (const r of [procR, apR, pasosR, valsR, errsR, relsR]) {
+    if (r.error) throw new Error(`Supabase: ${r.error.message}`);
+  }
+
+  const apNombres = new Map((apR.data ?? []).map((a) => [a.id, a.nombre ?? "—"]));
+  const group = <T extends { procedimiento_id: string | null }>(rows: T[] | null) => {
+    const m = new Map<string, T[]>();
+    (rows ?? []).forEach((row) => {
+      if (!row.procedimiento_id) return;
+      const arr = m.get(row.procedimiento_id) ?? [];
+      arr.push(row);
+      m.set(row.procedimiento_id, arr);
+    });
+    return m;
+  };
+  const pasosPorProc = group(pasosR.data as { procedimiento_id: string | null; instruccion: string | null }[]);
+  const valsPorProc = group(valsR.data as { procedimiento_id: string | null; descripcion: string | null }[]);
+  const errsPorProc = group(errsR.data as { procedimiento_id: string | null; descripcion: string | null }[]);
+  const relsPorProc = new Map<string, { condicion: string | null; procedimiento_destino_id: string | null; procedimiento_propuesto: string | null; estado: string | null }[]>();
+  (relsR.data ?? []).forEach((r) => {
+    if (!r.procedimiento_origen_id) return;
+    const arr = relsPorProc.get(r.procedimiento_origen_id) ?? [];
+    arr.push(r);
+    relsPorProc.set(r.procedimiento_origen_id, arr);
+  });
+
+  const kpi = { pendientes: 0, enElaboracion: 0, porRevisar: 0, correccionRequerida: 0, aprobados: 0 };
+  const filas: MiProcedimientoFila[] = [];
+
+  for (const p of procR.data ?? []) {
+    const estado = p.estado ?? "pendiente";
+    if (estado === "pendiente") kpi.pendientes++;
+    else if (estado === "en_elaboracion") kpi.enElaboracion++;
+    else if (estado === "en_revision") kpi.porRevisar++;
+    else if (estado === "correccion_requerida") kpi.correccionRequerida++;
+    else if (estado === "aprobado") kpi.aprobados++;
+
+    // Construye el shape que calcularProgreso necesita (única fuente de verdad).
+    const detalle: DetalleProcedimiento = {
+      id: p.id,
+      titulo: p.titulo ?? "—",
+      aplicativo: p.aplicativo_id ? apNombres.get(p.aplicativo_id) ?? "—" : "—",
+      estado,
+      paraQueSirve: p.para_que_sirve ?? "",
+      cuandoSeUtiliza: p.cuando_se_utiliza ?? "",
+      pasos: (pasosPorProc.get(p.id) ?? []).map((x, i) => ({
+        id: `${p.id}-${i}`,
+        orden: i + 1,
+        instruccion: x.instruccion ?? "",
+        imagenPath: null,
+        imagenNoAplica: false,
+        imagenUrl: null,
+      })),
+      resultadoEsperado: p.resultado_esperado ?? "",
+      resultadoNoAplica: !!p.resultado_no_aplica,
+      validaciones: (valsPorProc.get(p.id) ?? []).map((x, i) => ({ id: `${p.id}-v${i}`, orden: i + 1, descripcion: x.descripcion ?? "" })),
+      validacionesNoAplica: !!p.validaciones_no_aplica,
+      relaciones: (relsPorProc.get(p.id) ?? []).map((x, i) => ({
+        id: `${p.id}-r${i}`,
+        condicion: x.condicion ?? "",
+        destinoId: x.procedimiento_destino_id,
+        destinoTitulo: null,
+        destinoAplicativo: null,
+        propuesto: x.procedimiento_propuesto,
+        estado: (x.estado ?? "vinculado") as RelacionProcedimiento["estado"],
+      })),
+      relacionesNoAplica: !!p.relaciones_no_aplica,
+      errores: (errsPorProc.get(p.id) ?? []).map((x, i) => ({ id: `${p.id}-e${i}`, orden: i + 1, descripcion: x.descripcion ?? "" })),
+      erroresNoAplica: !!p.errores_no_aplica,
+      observaciones: p.observaciones ?? "",
+      observacionesNoAplica: !!p.observaciones_no_aplica,
+    };
+    const progreso = calcularProgreso(detalle);
+    const asig = asigPorProc.get(p.id);
+
+    filas.push({
+      id: p.id,
+      titulo: p.titulo ?? "—",
+      descripcion: p.para_que_sirve ?? "",
+      aplicativo: detalle.aplicativo,
+      estado,
+      progresoCompletadas: progreso.completadas,
+      progresoPct: progreso.pct,
+      fechaLimite: formatearFecha(asig?.fecha_limite),
+      fechaLimiteTs: asig?.fecha_limite ? Date.parse(String(asig.fecha_limite)) || undefined : undefined,
+      fechaAsignacionTs: asig?.fecha_asignacion ? Date.parse(String(asig.fecha_asignacion)) || undefined : undefined,
+    });
+  }
+
+  const aplicativos = Array.from(new Set(filas.map((f) => f.aplicativo).filter((x) => x && x !== "—"))).sort((a, b) => a.localeCompare(b));
+  const estados = Array.from(new Set(filas.map((f) => f.estado)));
+
+  return { kpi, procedimientos: filas, aplicativos, estados };
 }

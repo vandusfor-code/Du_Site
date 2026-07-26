@@ -178,6 +178,62 @@ export interface PendienteDocumentacion {
   titulo: string;
   aplicativo: string;
   fechaLimite: string; // "" si no hay
+  fechaLimiteTs?: number; // epoch ms para ordenar por urgencia (no para mostrar)
   estado: string;
-  accion: "Comenzar" | "Continuar";
+  accion: "Comenzar" | "Continuar" | "Corregir";
+}
+
+// Etiqueta de estado tal como la ve la ASESORA (mockup): "Por revisar"/"Aprobado"
+// en vez de "En revisión"/"Publicado". No cambia los estados reales de la BD.
+export const ESTADO_ASESORA_LABEL: Record<string, string> = {
+  pendiente: "Pendiente",
+  en_elaboracion: "En elaboración",
+  en_revision: "Por revisar",
+  correccion_requerida: "Corrección requerida",
+  aprobado: "Aprobado",
+  archivado: "Archivado",
+};
+
+// Acción según el estado real del procedimiento. Todas navegan al editor [id].
+export function accionPorEstado(estado: string): string {
+  switch (estado) {
+    case "pendiente":
+      return "Comenzar";
+    case "en_elaboracion":
+      return "Continuar";
+    case "correccion_requerida":
+      return "Corregir";
+    case "en_revision":
+      return "Ver";
+    case "aprobado":
+      return "Ver procedimiento";
+    default:
+      return "Ver";
+  }
+}
+
+export interface MiProcedimientoFila {
+  id: string;
+  titulo: string;
+  descripcion: string; // para_que_sirve o "" (nunca texto ficticio)
+  aplicativo: string;
+  estado: string; // estado real de la BD
+  progresoCompletadas: number;
+  progresoPct: number;
+  fechaLimite: string; // formateada o ""
+  fechaLimiteTs?: number;
+  fechaAsignacionTs?: number; // para orden "Más recientes"
+}
+
+export interface MisProcedimientosData {
+  kpi: {
+    pendientes: number;
+    enElaboracion: number;
+    porRevisar: number;
+    correccionRequerida: number;
+    aprobados: number;
+  };
+  procedimientos: MiProcedimientoFila[];
+  aplicativos: string[];
+  estados: string[];
 }

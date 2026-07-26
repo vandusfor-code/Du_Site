@@ -129,3 +129,37 @@
 .btnGhost { height: 44px; border-radius: 12px; border: 1px solid #e1e4eb; background: #fff; color: #3c4257; padding: 0 20px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; }
 .btnGhost:hover { border-color: #c3c8d6; }
 .btnGhost:disabled { opacity: .6; cursor: not-allowed; }
+
+/* ── Vista de asesora: "Mis procedimientos" ── */
+.misPill { display: inline-flex; align-items: center; gap: 6px; margin: 12px 0 0 39px; padding: 4px 11px; border-radius: 20px; background: #ede9fe; color: #6d28d9; font-size: 12px; font-weight: 700; }
+.kpis5 { grid-template-columns: repeat(5, 1fr); }
+.slateBg { background: #eef0f6; color: #5b6478; }
+.slateBar { background: #94a0b8; }
+.violetBadge { background: #ede9fe; color: #6d28d9; }
+.searchRow4 { display: grid; grid-template-columns: 1fr auto auto auto; gap: 12px; margin-bottom: 16px; }
+
+.procRow { display: flex; align-items: center; gap: 12px; }
+.procAvatar { width: 34px; height: 34px; border-radius: 10px; background: #eef0f6; color: #5b6478; display: grid; place-items: center; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+
+.prog { min-width: 150px; }
+.progText { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; color: #5b6478; margin-bottom: 6px; }
+.progText b { color: #1c2031; font-weight: 700; }
+.progBar { height: 6px; border-radius: 4px; background: #eef0f6; overflow: hidden; }
+.progBarFill { height: 100%; border-radius: 4px; transition: width .3s ease; }
+
+.accionBtn { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 16px; border-radius: 9px; font-size: 12.5px; font-weight: 700; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.accionPrimary { background: #4f46e5; color: #fff; }
+.accionPrimary:hover { background: #4338ca; }
+.accionGhost { background: #fff; color: #4f46e5; border: 1px solid #d6d9ff; }
+.accionGhost:hover { background: #f5f5ff; }
+.accionDanger { background: #fff; color: #e0526b; border: 1px solid #f5c6ce; }
+.accionDanger:hover { background: #fdf2f4; }
+
+@media (max-width: 1100px) {
+  .kpis5 { grid-template-columns: repeat(3, 1fr); }
+  .searchRow4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .kpis5 { grid-template-columns: 1fr 1fr; }
+  .searchRow4 { grid-template-columns: 1fr; }
+}

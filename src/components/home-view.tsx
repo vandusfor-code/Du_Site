@@ -5,8 +5,11 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
   BarChart3,
   Bell,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -14,9 +17,11 @@ import {
   ClipboardCheck,
   Clock3,
   FolderOpen,
+  LayoutGrid,
   LogOut,
   MessageSquareText,
   SlidersHorizontal,
+  X,
 } from "lucide-react";
 import type { Modulo, ModuloId } from "@/lib/modulos";
 import type { GestionesMes } from "@/lib/lineaAmiga";
@@ -34,6 +39,8 @@ export interface TareaPendiente {
   prioridad: "Alta" | "Media" | "Baja";
   /** Etiqueta de acción opcional (ej. "Comenzar" / "Continuar") mostrada como pill. */
   accion?: string;
+  /** Timestamp (epoch ms) de la fecha relevante para ORDENAR por urgencia. No se muestra. */
+  ordenTs?: number;
 }
 
 export interface HomeData {
@@ -167,14 +174,37 @@ function UserMenu({ nombre, logoutAction }: { nombre: string; logoutAction: () =
   );
 }
 
+const MAX_MODULOS_HOME = 5;
+
+function claveModulos(usuario: string): string {
+  return `dusite:home-modulos:${usuario || "anon"}`;
+}
+
+// Intersecta la preferencia local (orden guardado) con los módulos realmente
+// permitidos: nunca muestra un módulo no autorizado y añade al final los nuevos
+// permitidos que aún no estén en la preferencia. Sin preferencia → primeros N.
+function resolverVisibles(modulos: Modulo[], pref: string[] | null): Modulo[] {
+  const permitidos = new Map(modulos.map((m) => [m.id, m]));
+  if (!pref || pref.length === 0) return modulos.slice(0, MAX_MODULOS_HOME);
+  const ordenados: Modulo[] = [];
+  for (const id of pref) {
+    const m = permitidos.get(id as ModuloId);
+    if (m && !ordenados.includes(m)) ordenados.push(m);
+  }
+  for (const m of modulos) if (!ordenados.includes(m)) ordenados.push(m);
+  return ordenados.slice(0, MAX_MODULOS_HOME);
+}
+
 export function HomeView({
   nombre,
+  usuario,
   modulos,
   logoutAction,
   tareas,
   data,
 }: {
   nombre: string;
+  usuario: string;
   modulos: Modulo[];
   logoutAction: () => void;
   tareas: TareaPendiente[];
@@ -184,6 +214,37 @@ export function HomeView({
   const primerNombre = nombre.split(" ")[0] || nombre;
   const { playClick } = useModuleSound();
   const [mostrarTodasTareas, setMostrarTodasTareas] = useState(false);
+  const [prefModulos, setPrefModulos] = useState<string[] | null>(null);
+  const [personalizarAbierto, setPersonalizarAbierto] = useState(false);
+
+  useEffect(() => {
+    // Se difiere con setTimeout(0) para no llamar setState en el cuerpo síncrono
+    // del effect (regla react-hooks/set-state-in-effect) y evitar mismatch de hidratación.
+    const id = setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(claveModulos(usuario));
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) setPrefModulos(arr.filter((x) => typeof x === "string"));
+        }
+      } catch {
+        /* localStorage no disponible: se usa el orden por defecto */
+      }
+    }, 0);
+    return () => clearTimeout(id);
+  }, [usuario]);
+
+  const modulosVisibles = resolverVisibles(modulos, prefModulos);
+
+  function guardarPreferencia(ids: string[]) {
+    setPrefModulos(ids);
+    try {
+      localStorage.setItem(claveModulos(usuario), JSON.stringify(ids));
+    } catch {
+      /* si falla el guardado, la preferencia queda solo en memoria de la sesión */
+    }
+    setPersonalizarAbierto(false);
+  }
   const alertas = tareas.filter((t) => t.prioridad === "Alta").length;
   const [offsetMeses, setOffsetMeses] = useState(0);
   const [resaltarCalendario, setResaltarCalendario] = useState(false);
@@ -353,12 +414,17 @@ export function HomeView({
 
           <div className="sectionTitle">
             <span>Tus módulos</span>
-            <button type="button">
-              <SlidersHorizontal size={15} /> Personalizar
-            </button>
+            <div className="sectionActions">
+              <Link href="/modulos" className="sectionLink" onClick={playClick}>
+                <LayoutGrid size={15} /> Ver todos
+              </Link>
+              <button type="button" onClick={() => setPersonalizarAbierto(true)}>
+                <SlidersHorizontal size={15} /> Personalizar
+              </button>
+            </div>
           </div>
           <section className="modules">
-            {modulos.map((modulo) => {
+            {modulosVisibles.map((modulo) => {
               const visual = MODULO_VISUALS[modulo.id];
               const Icon = visual.icon;
               const tone = MODULO_TONE[modulo.id];
@@ -451,15 +517,17 @@ export function HomeView({
                     <div className={`taskIcon ${tone}`}>
                       <Icon size={22} />
                     </div>
-                    <div>
+                    <div className="taskBody">
                       <b>{t.titulo}</b>
-                      <span>
-                        {t.moduloNombre}
-                        {t.fecha ? ` · ${t.fecha}` : ""}
+                      <span className="taskMeta">
+                        <span className="taskMetaText">
+                          {t.moduloNombre}
+                          {t.fecha ? ` · ${t.fecha}` : ""}
+                        </span>
                         {t.accion ? <span className="taskAction">{t.accion}</span> : null}
                       </span>
                     </div>
-                    <ChevronRight size={17} />
+                    <ChevronRight size={17} className="taskArrow" />
                   </Link>
                 );
               })
@@ -487,6 +555,126 @@ export function HomeView({
           </article>
         </div>
       )}
+
+      {personalizarAbierto && (
+        <PersonalizarModulos
+          modulos={modulos}
+          seleccionInicial={modulosVisibles.map((m) => m.id)}
+          onGuardar={guardarPreferencia}
+          onCerrar={() => setPersonalizarAbierto(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function PersonalizarModulos({
+  modulos,
+  seleccionInicial,
+  onGuardar,
+  onCerrar,
+}: {
+  modulos: Modulo[];
+  seleccionInicial: string[];
+  onGuardar: (ids: string[]) => void;
+  onCerrar: () => void;
+}) {
+  // `seleccion` mantiene el ORDEN elegido; los no seleccionados se muestran aparte.
+  const [seleccion, setSeleccion] = useState<string[]>(seleccionInicial.slice(0, MAX_MODULOS_HOME));
+  const porId = new Map(modulos.map((m) => [m.id, m]));
+  const noSeleccionados = modulos.filter((m) => !seleccion.includes(m.id));
+
+  function alternar(id: string) {
+    setSeleccion((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_MODULOS_HOME) return prev; // tope de 5
+      return [...prev, id];
+    });
+  }
+  function mover(i: number, dir: -1 | 1) {
+    setSeleccion((prev) => {
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const copia = [...prev];
+      [copia[i], copia[j]] = [copia[j], copia[i]];
+      return copia;
+    });
+  }
+
+  return (
+    <div className="persoOverlay" onClick={onCerrar}>
+      <div className="persoDrawer" onClick={(e) => e.stopPropagation()}>
+        <div className="persoHead">
+          <div>
+            <h3>Personalizar módulos</h3>
+            <p>Elige hasta {MAX_MODULOS_HOME} módulos para tu inicio y ordénalos. No cambia tus permisos.</p>
+          </div>
+          <button type="button" className="persoClose" onClick={onCerrar} aria-label="Cerrar">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="persoBody">
+          <div className="persoGroupTitle">En tu inicio ({seleccion.length}/{MAX_MODULOS_HOME})</div>
+          {seleccion.length === 0 && <div className="persoEmpty">Aún no has elegido módulos.</div>}
+          {seleccion.map((id, i) => {
+            const m = porId.get(id as ModuloId);
+            if (!m) return null;
+            const visual = MODULO_VISUALS[m.id];
+            const Icon = visual.icon;
+            return (
+              <div className="persoItem" key={id}>
+                <span className="persoIcon" style={{ background: visual.accentBg, color: visual.accentFg }}>
+                  <Icon size={16} />
+                </span>
+                <span className="persoName">{m.nombre}</span>
+                <button type="button" className="persoMove" onClick={() => mover(i, -1)} disabled={i === 0} aria-label="Subir">
+                  <ArrowUp size={14} />
+                </button>
+                <button type="button" className="persoMove" onClick={() => mover(i, 1)} disabled={i === seleccion.length - 1} aria-label="Bajar">
+                  <ArrowDown size={14} />
+                </button>
+                <button type="button" className="persoToggle persoActivo" onClick={() => alternar(id)} aria-label="Quitar">
+                  <Check size={14} />
+                </button>
+              </div>
+            );
+          })}
+
+          {noSeleccionados.length > 0 && (
+            <>
+              <div className="persoGroupTitle">Disponibles</div>
+              {noSeleccionados.map((m) => {
+                const visual = MODULO_VISUALS[m.id];
+                const Icon = visual.icon;
+                const lleno = seleccion.length >= MAX_MODULOS_HOME;
+                return (
+                  <div className="persoItem" key={m.id}>
+                    <span className="persoIcon" style={{ background: visual.accentBg, color: visual.accentFg }}>
+                      <Icon size={16} />
+                    </span>
+                    <span className="persoName">{m.nombre}</span>
+                    <button
+                      type="button"
+                      className="persoToggle"
+                      onClick={() => alternar(m.id)}
+                      disabled={lleno}
+                      title={lleno ? `Máximo ${MAX_MODULOS_HOME}` : "Agregar"}
+                    >
+                      Agregar
+                    </button>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+
+        <div className="persoFoot">
+          <button type="button" className="persoBtnGhost" onClick={onCerrar}>Cancelar</button>
+          <button type="button" className="persoBtnPrimary" onClick={() => onGuardar(seleccion)}>Guardar</button>
+        </div>
+      </div>
     </div>
   );
 }
