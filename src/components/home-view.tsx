@@ -32,6 +32,8 @@ export interface TareaPendiente {
   moduloHref: string;
   fecha: string;
   prioridad: "Alta" | "Media" | "Baja";
+  /** Etiqueta de acción opcional (ej. "Comenzar" / "Continuar") mostrada como pill. */
+  accion?: string;
 }
 
 export interface HomeData {
@@ -454,6 +456,7 @@ export function HomeView({
                       <span>
                         {t.moduloNombre}
                         {t.fecha ? ` · ${t.fecha}` : ""}
+                        {t.accion ? <span className="taskAction">{t.accion}</span> : null}
                       </span>
                     </div>
                     <ChevronRight size={17} />

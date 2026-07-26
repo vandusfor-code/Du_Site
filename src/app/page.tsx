@@ -6,6 +6,8 @@ import { obtenerAuditoriasConEstado, obtenerConteoMesAnterior, obtenerCronograma
 import { obtenerDatosCompletos } from "@/lib/duacademy";
 import { obtenerNotificaciones as obtenerNotificacionesRadicaciones } from "@/lib/radicaciones";
 import { getNotificaciones as obtenerNotificacionesLineaAmiga, obtenerGestionesMes } from "@/lib/lineaAmiga";
+import { resolverAsesoraId } from "@/lib/documentacion-identidad";
+import { obtenerPendientesDocumentacion } from "@/lib/documentacion-editor";
 
 const TRACKABLE = ["metricas", "quiz", "radicaciones", "linea-amiga"] as const;
 
@@ -16,11 +18,14 @@ async function obtenerTareasPendientes(
 ): Promise<TareaPendiente[]> {
   const tareas: TareaPendiente[] = [];
 
-  const [auditoriasR, duacademyR, radicacionesR, lineaAmigaR] = await Promise.allSettled([
+  const [auditoriasR, duacademyR, radicacionesR, lineaAmigaR, documentacionR] = await Promise.allSettled([
     moduloIds.includes("metricas") ? obtenerAuditoriasConEstado(usuario) : Promise.resolve([]),
     moduloIds.includes("quiz") ? obtenerDatosCompletos(nombre) : Promise.resolve(null),
     moduloIds.includes("radicaciones") ? obtenerNotificacionesRadicaciones(nombre) : Promise.resolve([]),
     moduloIds.includes("linea-amiga") ? obtenerNotificacionesLineaAmiga(nombre) : Promise.resolve([]),
+    moduloIds.includes("documentacion")
+      ? resolverAsesoraId(usuario).then((asesoraId) => obtenerPendientesDocumentacion(asesoraId))
+      : Promise.resolve([]),
   ]);
 
   if (auditoriasR.status === "fulfilled") {
@@ -91,6 +96,21 @@ async function obtenerTareasPendientes(
           prioridad: "Alta",
         });
       });
+  }
+
+  if (documentacionR.status === "fulfilled") {
+    documentacionR.value.forEach((p) => {
+      tareas.push({
+        id: `documentacion-${p.asignacionId}`,
+        titulo: `Documentar procedimiento: ${p.titulo}`,
+        moduloId: "documentacion",
+        moduloNombre: p.aplicativo,
+        moduloHref: `/modulos/documentacion/${p.procedimientoId}`,
+        fecha: p.fechaLimite ? `Vence ${p.fechaLimite}` : "",
+        prioridad: "Media",
+        accion: p.accion,
+      });
+    });
   }
 
   const rango = { Alta: 0, Media: 1, Baja: 2 } as const;

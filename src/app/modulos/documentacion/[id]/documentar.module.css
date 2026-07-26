@@ -1,0 +1,125 @@
+.page { min-height: 100vh; background: #f7f8fc; color: #15162b; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 22px clamp(18px, 4vw, 48px) 60px; }
+.page * { box-sizing: border-box; }
+.shell { max-width: 1000px; margin: 0 auto; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.back { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #68738c; text-decoration: none; background: none; border: 0; cursor: pointer; font-family: inherit; padding: 0; }
+.back:hover { color: #4f46e5; }
+.guardado { display: flex; flex-direction: column; align-items: flex-end; font-size: 11.5px; }
+.spin { animation: docspin 0.9s linear infinite; }
+@keyframes docspin { to { transform: rotate(360deg); } }
+.guardadoLinea { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.guardadoOk { color: #16a34a; }
+.guardadoBusy { color: #b45309; }
+.guardadoError { color: #dc2626; }
+.guardadoSub { color: #98a0b3; margin-top: 2px; }
+
+.card { background: #fff; border: 1px solid #e5e7ef; border-radius: 16px; box-shadow: 0 2px 8px rgba(24, 30, 55, .045); padding: 22px; margin-bottom: 18px; }
+
+.header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
+.headerLeft { display: flex; gap: 14px; }
+.headerIcon { width: 46px; height: 46px; border-radius: 13px; background: #e0e7ff; color: #4f46e5; display: grid; place-items: center; flex-shrink: 0; }
+.eyebrow { font-size: 12px; color: #68738c; font-weight: 600; margin: 2px 0 2px; }
+.titulo { font-size: 22px; font-weight: 800; margin: 0; letter-spacing: -.3px; color: #16172a; }
+.meta { display: flex; gap: 20px; margin-top: 12px; flex-wrap: wrap; }
+.metaItem span { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: #98a0b3; margin-bottom: 3px; }
+.metaItem b { font-size: 13px; color: #2b3145; }
+.metaFecha { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #2b3145; font-weight: 700; }
+.progresoBox { text-align: right; min-width: 200px; }
+.progresoTop { font-size: 15px; font-weight: 800; color: #16172a; }
+.progresoPct { font-size: 12px; color: #68738c; margin-top: 2px; }
+.progresoBar { height: 6px; border-radius: 4px; background: #eef0f6; margin-top: 10px; overflow: hidden; }
+.progresoBarFill { height: 100%; background: #4f46e5; border-radius: 4px; transition: width .3s ease; }
+
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 8px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.neutral { background: #f1f3f7; color: #667189; }
+.amber { background: #fef6e0; color: #b7791f; }
+.red { background: #fdecef; color: #e0526b; }
+.redStrong { background: #fde4e4; color: #d64545; }
+.green { background: #e6f7ee; color: #1f9d59; }
+
+.stepper { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; padding: 22px; }
+.step { display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; text-align: center; }
+.step::before { content: ""; position: absolute; top: 17px; right: 50%; width: 100%; height: 2px; background: #e5e7ef; z-index: 0; }
+.step:first-child::before { display: none; }
+.stepDone::before, .stepDone ~ .step::before { background: #22c55e; }
+.stepCircle { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 800; background: #eef0f6; color: #9aa2b8; border: 2px solid #eef0f6; position: relative; z-index: 1; }
+.stepDone .stepCircle { background: #e6f7ee; color: #16a34a; border-color: #bbf0d3; }
+.stepActual .stepCircle { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+.stepLabel { font-size: 10.5px; color: #98a0b3; font-weight: 600; max-width: 90px; line-height: 1.25; }
+.stepActual .stepLabel { color: #4f46e5; font-weight: 800; }
+.stepDone .stepLabel { color: #16172a; }
+
+.seccionTitulo { font-size: 16px; font-weight: 800; margin: 0 0 4px; color: #16172a; }
+.seccionSub { font-size: 12.5px; color: #68738c; margin: 0 0 18px; }
+.seccionHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+
+.textarea { width: 100%; min-height: 140px; border: 1px solid #e1e4eb; border-radius: 12px; padding: 14px 16px; font-size: 13.5px; font-family: inherit; color: #202238; resize: vertical; }
+.textarea:focus { outline: 0; border-color: #4f46e5; }
+
+.opcionesRadio { display: flex; gap: 12px; margin-bottom: 18px; }
+.radioCard { flex: 1; display: flex; align-items: center; gap: 10px; border: 1.5px solid #e1e4eb; border-radius: 12px; padding: 14px 16px; cursor: pointer; font-size: 13.5px; font-weight: 700; color: #4b5468; background: #fff; }
+.radioCard input { accent-color: #4f46e5; width: 16px; height: 16px; }
+.radioCardActiva { border-color: #4f46e5; background: #f5f5ff; color: #4f46e5; }
+
+.btnPrimario { height: 40px; border-radius: 10px; border: 0; background: #4f46e5; color: #fff; padding: 0 16px; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.btnPrimario:hover { background: #4338ca; }
+.btnPrimario:disabled { opacity: .6; cursor: not-allowed; }
+.btnFantasma { height: 40px; border-radius: 10px; border: 1px solid #e1e4eb; background: #fff; color: #3c4257; padding: 0 16px; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font-family: inherit; }
+.btnFantasma:hover { border-color: #c3c8d6; }
+.btnFantasma:disabled { opacity: .6; cursor: not-allowed; }
+.btnIcono { width: 34px; height: 34px; border-radius: 9px; border: 1px solid #e6e8ef; background: #fff; color: #98a0b3; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; }
+.btnIcono:hover { border-color: #f3b4bd; color: #e0526b; }
+
+.listaVacia { text-align: center; padding: 30px 10px; color: #98a0b3; font-size: 13px; border: 1.5px dashed #e5e7ef; border-radius: 12px; }
+
+/* Paso a paso */
+.pasoFila { display: grid; grid-template-columns: 22px 34px 1fr 200px 90px 34px; gap: 14px; align-items: start; border: 1px solid #edeff4; border-radius: 12px; padding: 16px; margin-bottom: 12px; background: #fff; }
+.pasoFilaArrastrando { opacity: .5; }
+.arrastre { color: #c3c8d6; cursor: grab; padding-top: 8px; }
+.pasoNumero { width: 30px; height: 30px; border-radius: 9px; background: #e0e7ff; color: #4f46e5; display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+.campoLabel { display: block; font-size: 10.5px; font-weight: 700; color: #8a93a8; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 6px; }
+.inputInstruccion { width: 100%; border: 1px solid #e1e4eb; border-radius: 9px; padding: 9px 12px; font-size: 13px; font-family: inherit; color: #202238; }
+.inputInstruccion:focus { outline: 0; border-color: #4f46e5; }
+
+.dropzone { border: 1.5px dashed #d8dbe6; border-radius: 10px; padding: 14px 10px; text-align: center; cursor: pointer; color: #9aa2b8; }
+.dropzone:hover { border-color: #b6bce0; color: #4f46e5; }
+.dropzone span { display: block; font-size: 11.5px; font-weight: 700; margin-top: 4px; }
+.dropzone small { display: block; font-size: 9.5px; margin-top: 2px; color: #b4bbca; }
+.capturaPreview { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid #e1e4eb; height: 74px; }
+.capturaPreview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.capturaQuitar { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; background: rgba(20, 20, 35, .75); color: #fff; border: 0; display: grid; place-items: center; cursor: pointer; }
+.noAplicaCheck { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #68738c; font-weight: 600; padding-top: 8px; white-space: nowrap; }
+.noAplicaCheck input { accent-color: #4f46e5; width: 15px; height: 15px; }
+
+/* Relaciones */
+.relacionCard { border: 1px solid #edeff4; border-radius: 12px; padding: 16px; margin-bottom: 12px; display: grid; grid-template-columns: 34px 1fr 1fr 60px; gap: 14px; align-items: start; background: #fff; }
+.destinoBox { border: 1px solid #e1e4eb; border-radius: 9px; padding: 10px 12px; }
+.destinoSearch { width: 100%; border: 1px solid #e1e4eb; border-radius: 9px; padding: 9px 12px; font-size: 13px; font-family: inherit; margin-bottom: 6px; }
+.destinoSearch:focus { outline: 0; border-color: #4f46e5; }
+.destinoResultados { border: 1px solid #e1e4eb; border-radius: 9px; max-height: 150px; overflow-y: auto; }
+.destinoResultado { padding: 8px 12px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #f1f3f7; }
+.destinoResultado:last-child { border-bottom: 0; }
+.destinoResultado:hover { background: #f5f5ff; }
+.destinoResultado b { display: block; color: #202238; }
+.destinoResultado span { color: #98a0b3; font-size: 11px; }
+.destinoElegido { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.destinoElegidoIcon { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; }
+.destinoElegidoIconExistente { background: #e6f7ee; color: #16a34a; }
+.destinoElegidoIconPropuesto { background: #fef6e0; color: #b7791f; }
+.destinoElegidoBody b { display: block; font-size: 12.5px; }
+.destinoElegidoBody span { font-size: 11px; color: #98a0b3; }
+.pillExistente { background: #e6f7ee; color: #1f9d59; padding: 2px 8px; border-radius: 7px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.pillPropuesto { background: #fef6e0; color: #b7791f; padding: 2px 8px; border-radius: 7px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.info { display: flex; gap: 10px; align-items: flex-start; background: #f0edff; color: #4f46e5; border-radius: 10px; padding: 12px 14px; font-size: 12px; margin-top: 4px; }
+
+.footer { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+
+.error { border-radius: 10px; padding: 10px 14px; font-size: 12.5px; font-weight: 600; margin-bottom: 14px; background: #fff0f1; color: #d93142; border: 1px solid #ffd4d2; }
+
+@media (max-width: 760px) {
+  .stepper { grid-template-columns: repeat(4, 1fr); row-gap: 18px; }
+  .pasoFila { grid-template-columns: 1fr; }
+  .relacionCard { grid-template-columns: 1fr; }
+  .meta { gap: 12px; }
+}

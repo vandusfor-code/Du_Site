@@ -68,3 +68,116 @@ export interface NuevaAsignacionInput {
 export type ResultadoAsignacion =
   | { ok: true }
   | { ok: false; error: string };
+
+// ============================================================
+// Editor de documentación (experiencia de la asesora) — tipos puros.
+// ============================================================
+
+export function formatearFecha(v: unknown): string {
+  if (!v) return "";
+  const d = new Date(String(v));
+  if (isNaN(d.getTime())) return "";
+  const MESES3 = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  return `${String(d.getUTCDate()).padStart(2, "0")} ${MESES3[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+export interface PasoProcedimiento {
+  id: string;
+  orden: number;
+  instruccion: string;
+  imagenPath: string | null;
+  imagenNoAplica: boolean;
+  imagenUrl: string | null;
+}
+
+export interface ValidacionProcedimiento {
+  id: string;
+  orden: number;
+  descripcion: string;
+}
+
+export interface ErrorProcedimiento {
+  id: string;
+  orden: number;
+  descripcion: string;
+}
+
+export interface RelacionProcedimiento {
+  id: string;
+  condicion: string;
+  destinoId: string | null;
+  destinoTitulo: string | null;
+  destinoAplicativo: string | null;
+  propuesto: string | null;
+  estado: "vinculado" | "propuesto" | "descartado";
+}
+
+export interface ProcedimientoBuscable {
+  id: string;
+  titulo: string;
+  aplicativo: string;
+}
+
+export interface DetalleProcedimiento {
+  id: string;
+  titulo: string;
+  aplicativo: string;
+  estado: string;
+  paraQueSirve: string;
+  cuandoSeUtiliza: string;
+  pasos: PasoProcedimiento[];
+  resultadoEsperado: string;
+  resultadoNoAplica: boolean;
+  validaciones: ValidacionProcedimiento[];
+  validacionesNoAplica: boolean;
+  relaciones: RelacionProcedimiento[];
+  relacionesNoAplica: boolean;
+  errores: ErrorProcedimiento[];
+  erroresNoAplica: boolean;
+  observaciones: string;
+  observacionesNoAplica: boolean;
+}
+
+export const SECCIONES_DOC: { n: number; label: string }[] = [
+  { n: 1, label: "Propósito" },
+  { n: 2, label: "Cuándo se utiliza" },
+  { n: 3, label: "Paso a paso" },
+  { n: 4, label: "Resultado" },
+  { n: 5, label: "Validaciones" },
+  { n: 6, label: "Procedimientos relacionados" },
+  { n: 7, label: "Errores frecuentes" },
+  { n: 8, label: "Observaciones" },
+];
+
+export interface ProgresoDoc {
+  completadas: number;
+  total: number;
+  pct: number;
+  porSeccion: boolean[]; // índice 0 = sección 1 ... índice 7 = sección 8
+}
+
+export function calcularProgreso(d: DetalleProcedimiento): ProgresoDoc {
+  const porSeccion = [
+    d.paraQueSirve.trim().length > 0,
+    d.cuandoSeUtiliza.trim().length > 0,
+    d.pasos.some((p) => p.instruccion.trim().length > 0),
+    d.resultadoNoAplica || d.resultadoEsperado.trim().length > 0,
+    d.validacionesNoAplica || d.validaciones.some((v) => v.descripcion.trim().length > 0),
+    d.relacionesNoAplica ||
+      d.relaciones.some((r) => r.condicion.trim().length > 0 && (!!r.destinoId || !!(r.propuesto && r.propuesto.trim()))),
+    d.erroresNoAplica || d.errores.some((e) => e.descripcion.trim().length > 0),
+    d.observacionesNoAplica || d.observaciones.trim().length > 0,
+  ];
+  const completadas = porSeccion.filter(Boolean).length;
+  return { completadas, total: 8, pct: Math.round((completadas / 8) * 100), porSeccion };
+}
+
+export interface PendienteDocumentacion {
+  asignacionId: string;
+  procedimientoId: string;
+  titulo: string;
+  aplicativo: string;
+  fechaLimite: string; // "" si no hay
+  estado: string;
+  accion: "Comenzar" | "Continuar";
+}

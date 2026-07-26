@@ -181,6 +181,7 @@
 .dusite-home .task:hover { background: var(--bg-subtle); }
 .dusite-home .task b { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .dusite-home .task span { display: block; font-size: 11px; color: var(--text-tertiary); margin-top: 4px; font-weight: 400; }
+.dusite-home .task .taskAction { display: inline-block; margin: 4px 0 0 8px; font-size: 10px; font-weight: 700; background: var(--pqrsf-soft); color: var(--pqrsf); padding: 2px 7px; border-radius: 10px; }
 
 /* ── Gestiones del mes (franja inferior) ── */
 .dusite-home .gestionesStripWrap { max-width: 1780px; margin: 0 auto; padding: 0 clamp(24px, 3vw, 56px) 36px; }
