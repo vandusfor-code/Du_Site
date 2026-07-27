@@ -347,7 +347,7 @@ export function HomeView({
             <article className="focus">
               {esAdmin && (
                 <button type="button" className="focusEdit" onClick={() => setEditarBanner(true)} title="Editar enfoque del día">
-                  <Pencil size={15} />
+                  <Pencil size={14} /> <span>Editar</span>
                 </button>
               )}
               <div className="focusCopy">
