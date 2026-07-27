@@ -4,8 +4,8 @@ import { HomeView, type TareaPendiente, type HomeData } from "@/components/home-
 import { logoutAction } from "./logout/actions";
 import { obtenerAuditoriasConEstado, obtenerConteoMesAnterior, obtenerCronograma } from "@/lib/metricas";
 import { obtenerDatosCompletos } from "@/lib/duacademy";
-import { obtenerNotificaciones as obtenerNotificacionesRadicaciones, obtenerRadicacionesUltimosDias, type RadicacionDia } from "@/lib/radicaciones";
-import { getNotificaciones as obtenerNotificacionesLineaAmiga, obtenerGestionesMes, obtenerPqrsfUltimosDias, type PqrsfDia } from "@/lib/lineaAmiga";
+import { obtenerNotificaciones as obtenerNotificacionesRadicaciones, obtenerRadicacionesSerie, type RadicacionDia } from "@/lib/radicaciones";
+import { getNotificaciones as obtenerNotificacionesLineaAmiga, obtenerGestionesMes, obtenerPqrsfSerie, type PqrsfDia } from "@/lib/lineaAmiga";
 import { resolverAsesoraId } from "@/lib/documentacion-identidad";
 import { obtenerPendientesDocumentacion } from "@/lib/documentacion-editor";
 import { obtenerBannerHome, type BannerHome } from "@/lib/home-config";
@@ -81,7 +81,7 @@ export default async function Home() {
   // TODAS las lecturas externas del Home en un solo batch paralelo, cada una
   // gateada por el módulo real del usuario. obtenerAuditoriasConEstado se llama
   // UNA sola vez y su resultado alimenta tanto Pendientes como el resumen.
-  const [auditoriasR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, conteoMesAnteriorR, gestionesMesR, cronogramaR, bannerR, radicacionesDiasR, pqrsfDiasR] =
+  const [auditoriasR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, conteoMesAnteriorR, gestionesMesR, cronogramaR, bannerR, serieRadR, seriePqrsfR] =
     await Promise.allSettled([
       tieneMetricas ? obtenerAuditoriasConEstado(usuario) : Promise.resolve([]),
       has("quiz") ? obtenerDatosCompletos(nombre) : Promise.resolve(null),
@@ -92,8 +92,8 @@ export default async function Home() {
       has("linea-amiga") || esAdmin ? obtenerGestionesMes() : Promise.resolve(null),
       tieneMetricas ? obtenerCronograma(nombre) : Promise.resolve([]),
       obtenerBannerHome(),
-      esAdmin ? obtenerRadicacionesUltimosDias(5) : Promise.resolve(null),
-      esAdmin ? obtenerPqrsfUltimosDias(5) : Promise.resolve(null),
+      esAdmin ? obtenerRadicacionesSerie() : Promise.resolve(null),
+      esAdmin ? obtenerPqrsfSerie() : Promise.resolve(null),
     ]);
 
   const banner: BannerHome | null = bannerR.status === "fulfilled" ? bannerR.value : null;
@@ -262,10 +262,14 @@ export default async function Home() {
   }
 
   const gestionesMes = gestionesMesR.status === "fulfilled" ? gestionesMesR.value : null;
-  const radicacionesDias: RadicacionDia[] | null = radicacionesDiasR.status === "fulfilled" ? radicacionesDiasR.value : null;
-  const pqrsfDias: PqrsfDia[] | null = pqrsfDiasR.status === "fulfilled" ? pqrsfDiasR.value : null;
+  const serieRad = serieRadR.status === "fulfilled" ? serieRadR.value : null;
+  const seriePqrsf = seriePqrsfR.status === "fulfilled" ? seriePqrsfR.value : null;
+  const radicacionesDias: RadicacionDia[] | null = serieRad?.dias ?? null;
+  const radicacionesMeses: RadicacionDia[] | null = serieRad?.meses ?? null;
+  const pqrsfDias: PqrsfDia[] | null = seriePqrsf?.dias ?? null;
+  const pqrsfMeses: PqrsfDia[] | null = seriePqrsf?.meses ?? null;
 
-  const data: HomeData = { progresoPct, progresoLabel, resumen, gestionesMes, radicacionesDias, pqrsfDias, calendario };
+  const data: HomeData = { progresoPct, progresoLabel, resumen, gestionesMes, radicacionesDias, radicacionesMeses, pqrsfDias, pqrsfMeses, calendario };
 
   return <HomeView nombre={nombre} usuario={usuario} esAdmin={esAdmin} modulos={modulos} logoutAction={logoutAction} tareas={listaTareas} data={data} banner={banner} />;
 }

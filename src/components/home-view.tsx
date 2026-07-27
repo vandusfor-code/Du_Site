@@ -65,8 +65,12 @@ export interface HomeData {
   gestionesMes: GestionesMes | null;
   /** Radicaciones reales por día (últimos N), para la tarjeta del Home Admin. */
   radicacionesDias: RadicacionDia[] | null;
+  /** Radicaciones reales por mes (últimos N). */
+  radicacionesMeses: RadicacionDia[] | null;
   /** PQRSF creados reales por día (últimos N), para la tarjeta del Home Admin. */
   pqrsfDias: PqrsfDia[] | null;
+  /** PQRSF creados reales por mes (últimos N). */
+  pqrsfMeses: PqrsfDia[] | null;
   /** Días con sesiones de Cronograma (Role Play / Escuchas) asignadas, de cualquier mes. */
   calendario: { anio: number; mes: number; dia: number; detalle: string }[];
 }
@@ -387,7 +391,13 @@ export function HomeView({
           </div>
 
           {esAdmin ? (
-            <MetricasAdmin gestiones={data?.gestionesMes ?? null} radicacionesDias={data?.radicacionesDias ?? null} pqrsfDias={data?.pqrsfDias ?? null} />
+            <MetricasAdmin
+              gestiones={data?.gestionesMes ?? null}
+              radicacionesDias={data?.radicacionesDias ?? null}
+              radicacionesMeses={data?.radicacionesMeses ?? null}
+              pqrsfDias={data?.pqrsfDias ?? null}
+              pqrsfMeses={data?.pqrsfMeses ?? null}
+            />
           ) : (
             <div className="middleRow">
               <ProgresoSemanal pct={progresoPct} label={data?.progresoLabel ?? "—"} mensaje={progresoMensaje} />
@@ -931,7 +941,7 @@ function MetricBarrasDias({ Icon, label, dias }: { Icon: typeof Clock3; label: s
             <div className="barraTrack">
               <div className={`barra ${d.esHoy ? "barraViolet" : "barraGrisViolet"}`} style={{ height: alto(d.valor) }} />
             </div>
-            <span>{d.esHoy ? "Hoy" : d.fecha}</span>
+            <span>{d.fecha}</span>
           </div>
         ))}
       </div>
@@ -944,11 +954,15 @@ function MetricBarrasDias({ Icon, label, dias }: { Icon: typeof Clock3; label: s
 function MetricasAdmin({
   gestiones,
   radicacionesDias,
+  radicacionesMeses,
   pqrsfDias,
+  pqrsfMeses,
 }: {
   gestiones: GestionesMes | null;
   radicacionesDias: RadicacionDia[] | null;
+  radicacionesMeses: RadicacionDia[] | null;
   pqrsfDias: PqrsfDia[] | null;
+  pqrsfMeses: PqrsfDia[] | null;
 }) {
   if (!gestiones) return null;
   return (
@@ -972,8 +986,16 @@ function MetricasAdmin({
         </div>
         <BarrasVerticales comunicados={gestiones.pqrsfComunicados} faltantes={gestiones.pqrsfPorComunicar} />
       </article>
-      <MetricCard Icon={MessageSquareText} label="PQRSF registrados (Mes)" valor={gestiones.pqrsfMes} />
-      <MetricCard Icon={FolderOpen} label="Radicaciones registradas (Mes)" valor={gestiones.radicadosMes} />
+      {pqrsfMeses && pqrsfMeses.length > 0 ? (
+        <MetricBarrasDias Icon={MessageSquareText} label="PQRSF registrados (por mes)" dias={pqrsfMeses} />
+      ) : (
+        <MetricCard Icon={MessageSquareText} label="PQRSF registrados (Mes)" valor={gestiones.pqrsfMes} />
+      )}
+      {radicacionesMeses && radicacionesMeses.length > 0 ? (
+        <MetricBarrasDias Icon={FolderOpen} label="Radicaciones registradas (por mes)" dias={radicacionesMeses} />
+      ) : (
+        <MetricCard Icon={FolderOpen} label="Radicaciones registradas (Mes)" valor={gestiones.radicadosMes} />
+      )}
     </section>
   );
 }

@@ -221,6 +221,64 @@ export function hoyEnBogota(): { dia: number; mes: number; anio: number } {
   };
 }
 
+// Serie de conteos por período (para las tarjetas de métricas del Home Admin).
+// A partir de una lista de fechas (una por fila/evento) construye a la vez el
+// conteo de los últimos N días y los últimos N meses. Fechas como hora de pared.
+export interface SerieItem {
+  fecha: string; // etiqueta ("Hoy", "26/7", "Este mes", "jul"…)
+  valor: number;
+  esHoy: boolean; // período actual (hoy / mes en curso) → se resalta
+}
+
+const MESES_ABR = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+export function serieDesdeFechas(
+  fechas: (Date | null)[],
+  dias = 5,
+  meses = 5
+): { dias: SerieItem[]; meses: SerieItem[] } {
+  const hoy = hoyEnBogota(); // { dia, mes (0-based), anio }
+  const claveDia = (y: number, m0: number, d: number) => `${y}-${m0}-${d}`;
+  const claveMes = (y: number, m0: number) => `${y}-${m0}`;
+
+  const contDia = new Map<string, number>();
+  const contMes = new Map<string, number>();
+  for (const dt of fechas) {
+    if (!dt) continue;
+    const y = dt.getUTCFullYear();
+    const m0 = dt.getUTCMonth();
+    const d = dt.getUTCDate();
+    contDia.set(claveDia(y, m0, d), (contDia.get(claveDia(y, m0, d)) ?? 0) + 1);
+    contMes.set(claveMes(y, m0), (contMes.get(claveMes(y, m0)) ?? 0) + 1);
+  }
+
+  const baseDia = Date.UTC(hoy.anio, hoy.mes, hoy.dia);
+  const diasArr: SerieItem[] = [];
+  for (let i = dias - 1; i >= 0; i--) {
+    const dt = new Date(baseDia - i * 86400000);
+    const esHoy = i === 0;
+    diasArr.push({
+      fecha: esHoy ? "Hoy" : `${dt.getUTCDate()}/${dt.getUTCMonth() + 1}`,
+      valor: contDia.get(claveDia(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate())) ?? 0,
+      esHoy,
+    });
+  }
+
+  const mesesArr: SerieItem[] = [];
+  for (let i = meses - 1; i >= 0; i--) {
+    let y = hoy.anio;
+    let m = hoy.mes - i;
+    while (m < 0) {
+      m += 12;
+      y--;
+    }
+    const esActual = i === 0;
+    mesesArr.push({ fecha: esActual ? "Este mes" : MESES_ABR[m], valor: contMes.get(claveMes(y, m)) ?? 0, esHoy: esActual });
+  }
+
+  return { dias: diasArr, meses: mesesArr };
+}
+
 // Convierte una celda de duración (fracción de día u "HH:mm:ss") al formato
 // "minutos:segundos" usado en el dashboard de métricas.
 export function formatDuration(value: unknown): string {

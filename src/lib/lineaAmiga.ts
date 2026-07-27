@@ -6,6 +6,8 @@ import {
   parseSheetDate,
   formatSheetDate,
   hoyEnBogota,
+  serieDesdeFechas,
+  type SerieItem,
 } from "@/lib/sheets";
 
 function sheetId(): string {
@@ -532,40 +534,14 @@ export async function obtenerResumenGestion(_agente: string): Promise<ResumenGes
   return { devueltos: 0, campana: 0, respondidos: 0, porResponder: 0 };
 }
 
-// ── PQRSF creados por día (para la tarjeta del Home Admin) ──
-// Cuenta filas de la pestaña "PQRSF Creados" por día (columna A "Marca temporal"),
-// para los últimos N días. Una sola lectura de esa columna, sin N+1.
-export interface PqrsfDia {
-  fecha: string;
-  valor: number;
-  esHoy: boolean;
-}
+// ── PQRSF creados por día y por mes (tarjetas del Home Admin) ──
+// UNA lectura de la columna A "Marca temporal" de "PQRSF Creados"; de ahí salen
+// los últimos N días y los últimos N meses. Sin N+1, hora de pared.
+export type PqrsfDia = SerieItem;
 
-export async function obtenerPqrsfUltimosDias(dias = 5): Promise<PqrsfDia[]> {
+export async function obtenerPqrsfSerie(): Promise<{ dias: PqrsfDia[]; meses: PqrsfDia[] }> {
   const id = sheetId();
   const data = await readRange(id, `${SHEETS.PQRSF}!A2:A`, { unformatted: true });
-
-  const hoy = hoyEnBogota(); // { dia, mes (0-based), anio }
-  const base = Date.UTC(hoy.anio, hoy.mes, hoy.dia);
-  const clave = (y: number, m0: number, d: number) => `${y}-${m0}-${d}`;
-
-  const dividir: { key: string; label: string; esHoy: boolean }[] = [];
-  for (let i = dias - 1; i >= 0; i--) {
-    const dt = new Date(base - i * 86400000);
-    dividir.push({
-      key: clave(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()),
-      label: `${dt.getUTCDate()}/${dt.getUTCMonth() + 1}`,
-      esHoy: i === 0,
-    });
-  }
-
-  const conteo = new Map<string, number>();
-  for (const row of data) {
-    const dt = parseSheetDate(row[0]);
-    if (!dt) continue;
-    const k = clave(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
-    conteo.set(k, (conteo.get(k) ?? 0) + 1);
-  }
-
-  return dividir.map((c) => ({ fecha: c.label, valor: conteo.get(c.key) ?? 0, esHoy: c.esHoy }));
+  const fechas = data.map((row) => parseSheetDate(row[0]));
+  return serieDesdeFechas(fechas, 5, 5);
 }
