@@ -65,12 +65,13 @@ export default async function Home() {
   const nombre = session?.user?.nombre ?? "";
   const usuario = session?.user?.usuario ?? "";
   const moduloIds = session?.user?.modulos ?? [];
+  const esAdmin = (session?.user?.rol ?? "").trim().toLowerCase() === "admin";
   // El href de Documentación es el mismo para todos: /modulos/documentacion decide
   // server-side (dashboard Admin vs. "Mis procedimientos" de la asesora).
   const modulos = modulosPermitidos(moduloIds);
 
   if (!usuario) {
-    return <HomeView nombre={nombre} usuario="" modulos={modulos} logoutAction={logoutAction} tareas={[]} data={null} />;
+    return <HomeView nombre={nombre} usuario="" esAdmin={false} modulos={modulos} logoutAction={logoutAction} tareas={[]} data={null} />;
   }
 
   const has = (id: string) => moduloIds.includes(id);
@@ -87,7 +88,7 @@ export default async function Home() {
       has("linea-amiga") ? obtenerNotificacionesLineaAmiga(nombre) : Promise.resolve([]),
       has("documentacion") ? resolverAsesoraId(usuario).then((id) => obtenerPendientesDocumentacion(id)) : Promise.resolve([]),
       tieneMetricas ? obtenerConteoMesAnterior(usuario) : Promise.resolve(0),
-      has("linea-amiga") ? obtenerGestionesMes() : Promise.resolve(null),
+      has("linea-amiga") || esAdmin ? obtenerGestionesMes() : Promise.resolve(null),
       tieneMetricas ? obtenerCronograma(nombre) : Promise.resolve([]),
     ]);
 
@@ -258,5 +259,5 @@ export default async function Home() {
 
   const data: HomeData = { progresoPct, progresoLabel, resumen, gestionesMes, calendario };
 
-  return <HomeView nombre={nombre} usuario={usuario} modulos={modulos} logoutAction={logoutAction} tareas={listaTareas} data={data} />;
+  return <HomeView nombre={nombre} usuario={usuario} esAdmin={esAdmin} modulos={modulos} logoutAction={logoutAction} tareas={listaTareas} data={data} />;
 }

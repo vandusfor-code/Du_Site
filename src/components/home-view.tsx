@@ -9,6 +9,7 @@ import {
   ArrowDown,
   BarChart3,
   Bell,
+  BookOpen,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -200,6 +201,7 @@ function resolverVisibles(modulos: Modulo[], pref: string[] | null): Modulo[] {
 export function HomeView({
   nombre,
   usuario,
+  esAdmin,
   modulos,
   logoutAction,
   tareas,
@@ -207,6 +209,7 @@ export function HomeView({
 }: {
   nombre: string;
   usuario: string;
+  esAdmin: boolean;
   modulos: Modulo[];
   logoutAction: () => void;
   tareas: TareaPendiente[];
@@ -362,57 +365,52 @@ export function HomeView({
             </article>
           </div>
 
-          <div className="middleRow">
-            <article className="progressCard">
-              <span>Tu progreso semanal</span>
-              <b>
-                {progresoPct}% · {data?.progresoLabel ?? "—"} <i />
-              </b>
-              <div className="progress">
-                <i style={{ width: `${progresoPct}%` }} />
-              </div>
-              <small>{progresoMensaje}</small>
-            </article>
+          {esAdmin ? (
+            <MetricasAdmin gestiones={data?.gestionesMes ?? null} />
+          ) : (
+            <div className="middleRow">
+              <ProgresoSemanal pct={progresoPct} label={data?.progresoLabel ?? "—"} mensaje={progresoMensaje} />
 
-            {data?.resumen && (
-              <article className="summary">
-                <div className="summaryHead">
-                  <b>Resumen de compromisos</b>
-                  <button type="button">Este mes⌄</button>
-                </div>
-                <div className="stats">
-                  <Stat
-                    Icon={Clock3}
-                    tone="violet"
-                    n={String(data.resumen.compromisos)}
-                    title="Total compromisos"
-                    sub={data.resumen.tendenciaPct !== null ? `${data.resumen.tendenciaPct >= 0 ? "↑" : "↓"} ${Math.abs(data.resumen.tendenciaPct)}% vs mes anterior` : "Este mes"}
-                  />
-                  <Stat
-                    Icon={CheckCircle2}
-                    tone="lime"
-                    n={String(data.resumen.firmados)}
-                    title="Firmados"
-                    sub={data.resumen.compromisos > 0 ? `${Math.round((data.resumen.firmados / data.resumen.compromisos) * 100)}% del total` : "Sin datos"}
-                  />
-                  <Stat
-                    Icon={Clock3}
-                    tone="orange"
-                    n={String(data.resumen.pendientes)}
-                    title="Pendientes"
-                    sub={data.resumen.compromisos > 0 ? `${Math.round((data.resumen.pendientes / data.resumen.compromisos) * 100)}% del total` : "Sin datos"}
-                  />
-                  <Stat
-                    Icon={ClipboardCheck}
-                    tone="violet"
-                    n={String(data.resumen.vencidos)}
-                    title="Vencidos (+5 días)"
-                    sub={data.resumen.compromisos > 0 ? `${Math.round((data.resumen.vencidos / data.resumen.compromisos) * 100)}% del total` : "Sin datos"}
-                  />
-                </div>
-              </article>
-            )}
-          </div>
+              {data?.resumen && (
+                <article className="summary">
+                  <div className="summaryHead">
+                    <b>Resumen de compromisos</b>
+                    <button type="button">Este mes⌄</button>
+                  </div>
+                  <div className="stats">
+                    <Stat
+                      Icon={Clock3}
+                      tone="violet"
+                      n={String(data.resumen.compromisos)}
+                      title="Total compromisos"
+                      sub={data.resumen.tendenciaPct !== null ? `${data.resumen.tendenciaPct >= 0 ? "↑" : "↓"} ${Math.abs(data.resumen.tendenciaPct)}% vs mes anterior` : "Este mes"}
+                    />
+                    <Stat
+                      Icon={CheckCircle2}
+                      tone="lime"
+                      n={String(data.resumen.firmados)}
+                      title="Firmados"
+                      sub={data.resumen.compromisos > 0 ? `${Math.round((data.resumen.firmados / data.resumen.compromisos) * 100)}% del total` : "Sin datos"}
+                    />
+                    <Stat
+                      Icon={Clock3}
+                      tone="orange"
+                      n={String(data.resumen.pendientes)}
+                      title="Pendientes"
+                      sub={data.resumen.compromisos > 0 ? `${Math.round((data.resumen.pendientes / data.resumen.compromisos) * 100)}% del total` : "Sin datos"}
+                    />
+                    <Stat
+                      Icon={ClipboardCheck}
+                      tone="violet"
+                      n={String(data.resumen.vencidos)}
+                      title="Vencidos (+5 días)"
+                      sub={data.resumen.compromisos > 0 ? `${Math.round((data.resumen.vencidos / data.resumen.compromisos) * 100)}% del total` : "Sin datos"}
+                    />
+                  </div>
+                </article>
+              )}
+            </div>
+          )}
 
           <div className="sectionTitle">
             <span>Tus módulos</span>
@@ -535,10 +533,12 @@ export function HomeView({
               })
             )}
           </article>
+
+          {esAdmin && <ProgresoSemanal pct={progresoPct} label={data?.progresoLabel ?? "—"} mensaje={progresoMensaje} />}
         </aside>
       </div>
 
-      {data?.gestionesMes && (
+      {!esAdmin && data?.gestionesMes && (
         <div className="gestionesStripWrap">
           <article className="gestionesStrip">
             <div className="gestionesStripLabel">
@@ -678,6 +678,82 @@ function PersonalizarModulos({
         </div>
       </div>
     </div>
+  );
+}
+
+function ProgresoSemanal({ pct, label, mensaje }: { pct: number; label: string; mensaje: string }) {
+  return (
+    <article className="progressCard">
+      <span>Tu progreso semanal</span>
+      <b>
+        {pct}% · {label} <i />
+      </b>
+      <div className="progress">
+        <i style={{ width: `${pct}%` }} />
+      </div>
+      <small>{mensaje}</small>
+    </article>
+  );
+}
+
+function MetricCard({ Icon, label, valor }: { Icon: typeof Clock3; label: string; valor: number }) {
+  return (
+    <article className="metricCard">
+      <div className="metricHead">
+        <div className="statIcon violet">
+          <Icon size={20} />
+        </div>
+        <span className="metricLabel">{label}</span>
+      </div>
+      <div className="metricValor">{valor}</div>
+    </article>
+  );
+}
+
+// Barras VERTICALES (no dona/pie): verde = comunicados, ámbar = faltantes.
+function BarrasVerticales({ comunicados, faltantes }: { comunicados: number; faltantes: number }) {
+  const max = Math.max(comunicados, faltantes, 1);
+  const alto = (v: number) => `${Math.max(3, Math.round((v / max) * 100))}%`;
+  return (
+    <div className="barras">
+      <div className="barraCol">
+        <b>{comunicados}</b>
+        <div className="barraTrack">
+          <div className="barra barraGreen" style={{ height: alto(comunicados) }} />
+        </div>
+        <span>Comunicados</span>
+      </div>
+      <div className="barraCol">
+        <b>{faltantes}</b>
+        <div className="barraTrack">
+          <div className="barra barraOrange" style={{ height: alto(faltantes) }} />
+        </div>
+        <span>Faltantes</span>
+      </div>
+    </div>
+  );
+}
+
+// Fila de 5 tarjetas de métricas (solo Admin). Datos reales de GestionesMes; sin
+// tendencias ni sparklines porque aún no existe histórico real que las alimente.
+function MetricasAdmin({ gestiones }: { gestiones: GestionesMes | null }) {
+  if (!gestiones) return null;
+  return (
+    <section className="metricasRow">
+      <MetricCard Icon={FolderOpen} label="Radicaciones registradas (Hoy)" valor={gestiones.radicadosHoy} />
+      <MetricCard Icon={MessageSquareText} label="PQRSF registrados (Hoy)" valor={gestiones.pqrsfHoy} />
+      <article className="metricCard">
+        <div className="metricHead">
+          <div className="statIcon violet">
+            <BookOpen size={20} />
+          </div>
+          <span className="metricLabel">PQRSF por comunicar vs faltantes (Hoy)</span>
+        </div>
+        <BarrasVerticales comunicados={gestiones.pqrsfComunicados} faltantes={gestiones.pqrsfPorComunicar} />
+      </article>
+      <MetricCard Icon={MessageSquareText} label="PQRSF registrados (Mes)" valor={gestiones.pqrsfMes} />
+      <MetricCard Icon={FolderOpen} label="Radicaciones registradas (Mes)" valor={gestiones.radicadosMes} />
+    </section>
   );
 }
 
