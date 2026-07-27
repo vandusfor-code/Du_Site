@@ -8,6 +8,7 @@ import { obtenerNotificaciones as obtenerNotificacionesRadicaciones } from "@/li
 import { getNotificaciones as obtenerNotificacionesLineaAmiga, obtenerGestionesMes } from "@/lib/lineaAmiga";
 import { resolverAsesoraId } from "@/lib/documentacion-identidad";
 import { obtenerPendientesDocumentacion } from "@/lib/documentacion-editor";
+import { obtenerBannerHome, type BannerHome } from "@/lib/home-config";
 
 const TRACKABLE = ["metricas", "quiz", "radicaciones", "linea-amiga"] as const;
 const RANGO_PRIORIDAD = { Alta: 0, Media: 1, Baja: 2 } as const;
@@ -71,7 +72,7 @@ export default async function Home() {
   const modulos = modulosPermitidos(moduloIds);
 
   if (!usuario) {
-    return <HomeView nombre={nombre} usuario="" esAdmin={false} modulos={modulos} logoutAction={logoutAction} tareas={[]} data={null} />;
+    return <HomeView nombre={nombre} usuario="" esAdmin={false} modulos={modulos} logoutAction={logoutAction} tareas={[]} data={null} banner={null} />;
   }
 
   const has = (id: string) => moduloIds.includes(id);
@@ -80,7 +81,7 @@ export default async function Home() {
   // TODAS las lecturas externas del Home en un solo batch paralelo, cada una
   // gateada por el módulo real del usuario. obtenerAuditoriasConEstado se llama
   // UNA sola vez y su resultado alimenta tanto Pendientes como el resumen.
-  const [auditoriasR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, conteoMesAnteriorR, gestionesMesR, cronogramaR] =
+  const [auditoriasR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, conteoMesAnteriorR, gestionesMesR, cronogramaR, bannerR] =
     await Promise.allSettled([
       tieneMetricas ? obtenerAuditoriasConEstado(usuario) : Promise.resolve([]),
       has("quiz") ? obtenerDatosCompletos(nombre) : Promise.resolve(null),
@@ -90,7 +91,10 @@ export default async function Home() {
       tieneMetricas ? obtenerConteoMesAnterior(usuario) : Promise.resolve(0),
       has("linea-amiga") || esAdmin ? obtenerGestionesMes() : Promise.resolve(null),
       tieneMetricas ? obtenerCronograma(nombre) : Promise.resolve([]),
+      obtenerBannerHome(),
     ]);
+
+  const banner: BannerHome | null = bannerR.status === "fulfilled" ? bannerR.value : null;
 
   const auditorias = auditoriasR.status === "fulfilled" ? auditoriasR.value : [];
 
@@ -259,5 +263,5 @@ export default async function Home() {
 
   const data: HomeData = { progresoPct, progresoLabel, resumen, gestionesMes, calendario };
 
-  return <HomeView nombre={nombre} usuario={usuario} esAdmin={esAdmin} modulos={modulos} logoutAction={logoutAction} tareas={listaTareas} data={data} />;
+  return <HomeView nombre={nombre} usuario={usuario} esAdmin={esAdmin} modulos={modulos} logoutAction={logoutAction} tareas={listaTareas} data={data} banner={banner} />;
 }

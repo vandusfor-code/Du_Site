@@ -21,9 +21,13 @@ import {
   LayoutGrid,
   LogOut,
   MessageSquareText,
+  Pencil,
   SlidersHorizontal,
+  Upload,
   X,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { guardarBannerTextoAction, subirBannerImagenAction } from "@/app/banner-actions";
 import type { Modulo, ModuloId } from "@/lib/modulos";
 import type { GestionesMes } from "@/lib/lineaAmiga";
 import { MODULO_VISUALS } from "@/components/module-icons";
@@ -206,6 +210,7 @@ export function HomeView({
   logoutAction,
   tareas,
   data,
+  banner,
 }: {
   nombre: string;
   usuario: string;
@@ -214,7 +219,11 @@ export function HomeView({
   logoutAction: () => void;
   tareas: TareaPendiente[];
   data: HomeData | null;
+  banner: { titulo: string; imagenUrl: string | null } | null;
 }) {
+  const router = useRouter();
+  const [bannerActual, setBannerActual] = useState(banner);
+  const [editarBanner, setEditarBanner] = useState(false);
   const now = useNow();
   const primerNombre = nombre.split(" ")[0] || nombre;
   const { playClick } = useModuleSound();
@@ -336,16 +345,17 @@ export function HomeView({
             </div>
 
             <article className="focus">
+              {esAdmin && (
+                <button type="button" className="focusEdit" onClick={() => setEditarBanner(true)} title="Editar enfoque del día">
+                  <Pencil size={15} />
+                </button>
+              )}
               <div className="focusCopy">
                 <label>
                   <i />
                   ENFOQUE DEL DÍA
                 </label>
-                <h2>
-                  Concentra tu energía
-                  <br />
-                  en lo importante
-                </h2>
+                <h2>{bannerActual?.titulo ?? "Concentra tu energía en lo importante"}</h2>
                 <p>
                   {tareas.length > 0
                     ? `Tienes ${tareas.length} pendiente${tareas.length === 1 ? "" : "s"} por resolver esta semana.`
@@ -361,7 +371,12 @@ export function HomeView({
                   Ver mi jornada <ArrowRight size={17} />
                 </button>
               </div>
-              <Image src="/du-site-focus.webp" alt="Espacio de trabajo Du Site" width={640} height={510} priority />
+              {bannerActual?.imagenUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="focusImg" src={bannerActual.imagenUrl} alt="Enfoque del día" />
+              ) : (
+                <Image src="/du-site-focus.webp" alt="Espacio de trabajo Du Site" width={640} height={510} priority />
+              )}
             </article>
           </div>
 
@@ -566,6 +581,145 @@ export function HomeView({
           onCerrar={() => setPersonalizarAbierto(false)}
         />
       )}
+
+      {editarBanner && (
+        <EditarBanner
+          bannerActual={bannerActual}
+          onGuardado={(b) => {
+            setBannerActual(b);
+            router.refresh(); // refleja el cambio para las asesoras en su próxima carga
+          }}
+          onCerrar={() => setEditarBanner(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditarBanner({
+  bannerActual,
+  onGuardado,
+  onCerrar,
+}: {
+  bannerActual: { titulo: string; imagenUrl: string | null } | null;
+  onGuardado: (b: { titulo: string; imagenUrl: string | null }) => void;
+  onCerrar: () => void;
+}) {
+  const [titulo, setTitulo] = useState(bannerActual?.titulo ?? "");
+  const [imagenUrl, setImagenUrl] = useState<string | null>(bannerActual?.imagenUrl ?? null);
+  const [guardando, setGuardando] = useState(false);
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function subirImagen(archivo: File) {
+    if (!["image/png", "image/jpeg", "image/webp"].includes(archivo.type)) {
+      setError("Formato no permitido. Usa PNG, JPG o WebP.");
+      return;
+    }
+    if (archivo.size > 5 * 1024 * 1024) {
+      setError("La imagen supera el tamaño máximo de 5 MB.");
+      return;
+    }
+    setSubiendo(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("archivo", archivo);
+      const r = await subirBannerImagenAction(fd);
+      if (r.ok) setImagenUrl(r.url ?? null);
+      else setError(r.error ?? "No se pudo subir la imagen.");
+    } catch {
+      setError("No se pudo subir la imagen.");
+    } finally {
+      setSubiendo(false);
+    }
+  }
+
+  async function guardar() {
+    if (guardando) return;
+    if (!titulo.trim()) {
+      setError("El texto no puede quedar vacío.");
+      return;
+    }
+    setGuardando(true);
+    setError(null);
+    try {
+      const r = await guardarBannerTextoAction(titulo.trim());
+      if (r.ok) {
+        onGuardado({ titulo: titulo.trim(), imagenUrl });
+        onCerrar();
+      } else {
+        setError(r.error ?? "No se pudo guardar.");
+      }
+    } catch {
+      setError("No se pudo guardar.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  const ocupado = guardando || subiendo;
+
+  return (
+    <div className="persoOverlay" onClick={ocupado ? undefined : onCerrar}>
+      <div className="bannerModal" onClick={(e) => e.stopPropagation()}>
+        <div className="persoHead">
+          <div>
+            <h3>Editar enfoque del día</h3>
+            <p>Lo que guardes aquí lo verán todas las asesoras en su inicio.</p>
+          </div>
+          <button type="button" className="persoClose" onClick={onCerrar} aria-label="Cerrar" disabled={ocupado}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="bannerBody">
+          <label className="bannerLabel">Frase</label>
+          <textarea
+            className="bannerTextarea"
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            placeholder="Concentra tu energía en lo importante"
+            maxLength={160}
+            disabled={ocupado}
+          />
+
+          <label className="bannerLabel" style={{ marginTop: 16 }}>Imagen</label>
+          <div className="bannerImgBox">
+            {imagenUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imagenUrl} alt="Vista previa" />
+            ) : (
+              <span className="bannerImgVacia">Imagen actual por defecto</span>
+            )}
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) subirImagen(f);
+            }}
+          />
+          <button type="button" className="persoBtnGhost" onClick={() => fileRef.current?.click()} disabled={ocupado} style={{ marginTop: 10 }}>
+            {subiendo ? "Subiendo…" : (<><Upload size={15} /> Subir imagen</>)}
+          </button>
+          <p className="bannerHint">PNG, JPG o WebP · máx. 5 MB</p>
+
+          {error && <div className="bannerError">{error}</div>}
+        </div>
+
+        <div className="persoFoot">
+          <button type="button" className="persoBtnGhost" onClick={onCerrar} disabled={ocupado}>Cancelar</button>
+          <button type="button" className="persoBtnPrimary" onClick={guardar} disabled={ocupado}>
+            {guardando ? "Guardando…" : "Guardar"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
