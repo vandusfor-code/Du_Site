@@ -483,3 +483,42 @@ export async function verificarHorarios(usuario: string): Promise<void> {
     // silencioso, igual que el original
   }
 }
+
+// ── Radicaciones por día (para la tarjeta del Home Admin) ──
+// Cuenta cuántas filas (radicaciones) hay en GESTIONES por cada uno de los
+// últimos N días, usando la columna A "Marca temporal". Una sola lectura de esa
+// columna (sin N+1). Fechas tratadas como hora de pared (sin desfase de zona).
+export interface RadicacionDia {
+  fecha: string; // etiqueta d/M
+  valor: number;
+  esHoy: boolean;
+}
+
+export async function obtenerRadicacionesUltimosDias(dias = 5): Promise<RadicacionDia[]> {
+  const id = sheetId();
+  const data = await readRange(id, "GESTIONES!A2:A", { unformatted: true });
+
+  const hoy = hoyEnBogota(); // { dia, mes (0-based), anio }
+  const base = Date.UTC(hoy.anio, hoy.mes, hoy.dia);
+  const clave = (y: number, m0: number, d: number) => `${y}-${m0}-${d}`;
+
+  const dividir: { key: string; label: string; esHoy: boolean }[] = [];
+  for (let i = dias - 1; i >= 0; i--) {
+    const dt = new Date(base - i * 86400000);
+    dividir.push({
+      key: clave(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()),
+      label: `${dt.getUTCDate()}/${dt.getUTCMonth() + 1}`,
+      esHoy: i === 0,
+    });
+  }
+
+  const conteo = new Map<string, number>();
+  for (const row of data) {
+    const dt = parseSheetDate(row[0]);
+    if (!dt) continue;
+    const k = clave(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
+    conteo.set(k, (conteo.get(k) ?? 0) + 1);
+  }
+
+  return dividir.map((c) => ({ fecha: c.label, valor: conteo.get(c.key) ?? 0, esHoy: c.esHoy }));
+}

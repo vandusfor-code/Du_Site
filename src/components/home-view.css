@@ -224,7 +224,19 @@
 .dusite-home .barra { width: 100%; border-radius: 6px 6px 0 0; transition: height 240ms ease; }
 .dusite-home .barraGreen { background: #22c55e; }
 .dusite-home .barraOrange { background: #f59e0b; }
+.dusite-home .barraViolet { background: var(--brand-purple); }
+.dusite-home .barraGrisViolet { background: #c7c2f0; }
 .dusite-home .barraCol span { font-size: 10px; color: var(--text-tertiary); font-weight: 600; text-align: center; }
+
+/* Barras de últimos días (radicaciones reales) */
+.dusite-home .barrasDias { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: auto; height: 104px; }
+.dusite-home .barraColDia { display: flex; flex-direction: column; align-items: center; gap: 5px; height: 100%; justify-content: flex-end; flex: 1; min-width: 0; }
+.dusite-home .barraColDia b { font-size: 12px; font-weight: 800; color: var(--text-secondary); }
+.dusite-home .barraColHoy b { color: var(--text-primary); }
+.dusite-home .barraColDia .barraTrack { width: 100%; max-width: 30px; height: 62px; display: flex; align-items: flex-end; }
+.dusite-home .barraColDia .barra { width: 100%; }
+.dusite-home .barraColDia span { font-size: 9.5px; color: var(--text-tertiary); font-weight: 600; white-space: nowrap; }
+.dusite-home .barraColHoy span { color: var(--brand-purple); font-weight: 700; }
 
 @media (max-width: 1100px) {
   .dusite-home .shell { grid-template-columns: 1fr; }

@@ -30,6 +30,7 @@ import { useRouter } from "next/navigation";
 import { guardarBannerTextoAction, subirBannerImagenAction } from "@/app/banner-actions";
 import type { Modulo, ModuloId } from "@/lib/modulos";
 import type { GestionesMes } from "@/lib/lineaAmiga";
+import type { RadicacionDia } from "@/lib/radicaciones";
 import { MODULO_VISUALS } from "@/components/module-icons";
 import { useModuleSound } from "@/lib/use-module-sound";
 import "./home-view.css";
@@ -62,6 +63,8 @@ export interface HomeData {
     tendenciaPct: number | null;
   } | null;
   gestionesMes: GestionesMes | null;
+  /** Radicaciones reales por día (últimos N), para la tarjeta del Home Admin. */
+  radicacionesDias: RadicacionDia[] | null;
   /** Días con sesiones de Cronograma (Role Play / Escuchas) asignadas, de cualquier mes. */
   calendario: { anio: number; mes: number; dia: number; detalle: string }[];
 }
@@ -382,7 +385,7 @@ export function HomeView({
           </div>
 
           {esAdmin ? (
-            <MetricasAdmin gestiones={data?.gestionesMes ?? null} />
+            <MetricasAdmin gestiones={data?.gestionesMes ?? null} radicacionesDias={data?.radicacionesDias ?? null} />
           ) : (
             <div className="middleRow">
               <ProgresoSemanal pct={progresoPct} label={data?.progresoLabel ?? "—"} mensaje={progresoMensaje} />
@@ -907,13 +910,44 @@ function BarrasVerticales({ comunicados, faltantes }: { comunicados: number; fal
   );
 }
 
-// Fila de 5 tarjetas de métricas (solo Admin). Datos reales de GestionesMes; sin
-// tendencias ni sparklines porque aún no existe histórico real que las alimente.
-function MetricasAdmin({ gestiones }: { gestiones: GestionesMes | null }) {
+// Barras verticales de los últimos días (datos REALES): la de hoy resaltada.
+function MetricBarrasDias({ Icon, label, dias }: { Icon: typeof Clock3; label: string; dias: RadicacionDia[] }) {
+  const max = Math.max(...dias.map((d) => d.valor), 1);
+  const alto = (v: number) => `${Math.max(4, Math.round((v / max) * 100))}%`;
+  return (
+    <article className="metricCard">
+      <div className="metricHead">
+        <div className="statIcon violet">
+          <Icon size={20} />
+        </div>
+        <span className="metricLabel">{label}</span>
+      </div>
+      <div className="barrasDias">
+        {dias.map((d, i) => (
+          <div className={`barraColDia ${d.esHoy ? "barraColHoy" : ""}`} key={i}>
+            <b>{d.valor}</b>
+            <div className="barraTrack">
+              <div className={`barra ${d.esHoy ? "barraViolet" : "barraGrisViolet"}`} style={{ height: alto(d.valor) }} />
+            </div>
+            <span>{d.esHoy ? "Hoy" : d.fecha}</span>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+// Fila de 5 tarjetas de métricas (solo Admin). Números y barras REALES. La tarjeta
+// "Radicaciones registradas (Hoy)" muestra barras de los últimos días desde GESTIONES.
+function MetricasAdmin({ gestiones, radicacionesDias }: { gestiones: GestionesMes | null; radicacionesDias: RadicacionDia[] | null }) {
   if (!gestiones) return null;
   return (
     <section className="metricasRow">
-      <MetricCard Icon={FolderOpen} label="Radicaciones registradas (Hoy)" valor={gestiones.radicadosHoy} />
+      {radicacionesDias && radicacionesDias.length > 0 ? (
+        <MetricBarrasDias Icon={FolderOpen} label="Radicaciones registradas (últimos días)" dias={radicacionesDias} />
+      ) : (
+        <MetricCard Icon={FolderOpen} label="Radicaciones registradas (Hoy)" valor={gestiones.radicadosHoy} />
+      )}
       <MetricCard Icon={MessageSquareText} label="PQRSF registrados (Hoy)" valor={gestiones.pqrsfHoy} />
       <article className="metricCard">
         <div className="metricHead">
