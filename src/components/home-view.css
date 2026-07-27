@@ -206,7 +206,8 @@
 .dusite-home .metricCard { background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: var(--radius-large); box-shadow: var(--shadow-surface); padding: 16px 18px; min-height: 168px; display: flex; flex-direction: column; }
 .dusite-home .metricHead { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
 .dusite-home .metricLabel { font-size: 12px; font-weight: 600; color: var(--text-secondary); line-height: 1.35; }
-.dusite-home .metricValor { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); margin-top: auto; line-height: 1; }
+.dusite-home .metricValor { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); line-height: 1; }
+.dusite-home .sparkline { width: 100%; height: 30px; margin-top: auto; display: block; opacity: 0.9; }
 
 /* Barras verticales (verde=comunicados, ámbar=faltantes) */
 .dusite-home .barras { display: flex; align-items: flex-end; justify-content: center; gap: 26px; margin-top: auto; height: 104px; }

@@ -696,6 +696,23 @@ function ProgresoSemanal({ pct, label, mensaje }: { pct: number; label: string; 
   );
 }
 
+// Mini-gráfica DECORATIVA (símbólica): no representa histórico real todavía,
+// solo aporta el remate visual de la referencia. Sin cifras/tendencias falsas.
+function SparklineDeco() {
+  return (
+    <svg className="sparkline" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true">
+      <polyline
+        points="0,20 12,16 24,18 36,11 48,14 60,7 72,12 84,5 100,9"
+        fill="none"
+        stroke="#22c55e"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function MetricCard({ Icon, label, valor }: { Icon: typeof Clock3; label: string; valor: number }) {
   return (
     <article className="metricCard">
@@ -706,6 +723,7 @@ function MetricCard({ Icon, label, valor }: { Icon: typeof Clock3; label: string
         <span className="metricLabel">{label}</span>
       </div>
       <div className="metricValor">{valor}</div>
+      <SparklineDeco />
     </article>
   );
 }
