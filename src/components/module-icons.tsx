@@ -6,6 +6,7 @@ import {
   Search,
   ShieldCheck,
   BookOpen,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuloId } from "@/lib/modulos";
@@ -27,4 +28,5 @@ export const MODULO_VISUALS: Record<ModuloId, ModuloVisual> = {
   admin: { icon: ShieldCheck, accentBg: "#e0e7ff", accentFg: "#4f46e5" },
   desempeno: { icon: BarChart3, accentBg: "#ede9fe", accentFg: "#7044ed" },
   documentacion: { icon: BookOpen, accentBg: "#e0e7ff", accentFg: "#4f46e5" },
+  "pqrsf-comunicar": { icon: Upload, accentBg: "#e0d7ff", accentFg: "#6d28d9" },
 };

@@ -75,6 +75,7 @@ const MODULO_TONE: Record<ModuloId, string> = {
   admin: "violet",
   desempeno: "violet",
   documentacion: "violet",
+  "pqrsf-comunicar": "violet",
 };
 
 const PENDIENTES_VISIBLES = 5;
