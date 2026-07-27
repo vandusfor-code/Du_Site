@@ -29,7 +29,7 @@ import {
 import { useRouter } from "next/navigation";
 import { guardarBannerTextoAction, subirBannerImagenAction } from "@/app/banner-actions";
 import type { Modulo, ModuloId } from "@/lib/modulos";
-import type { GestionesMes } from "@/lib/lineaAmiga";
+import type { GestionesMes, PqrsfDia } from "@/lib/lineaAmiga";
 import type { RadicacionDia } from "@/lib/radicaciones";
 import { MODULO_VISUALS } from "@/components/module-icons";
 import { useModuleSound } from "@/lib/use-module-sound";
@@ -65,6 +65,8 @@ export interface HomeData {
   gestionesMes: GestionesMes | null;
   /** Radicaciones reales por día (últimos N), para la tarjeta del Home Admin. */
   radicacionesDias: RadicacionDia[] | null;
+  /** PQRSF creados reales por día (últimos N), para la tarjeta del Home Admin. */
+  pqrsfDias: PqrsfDia[] | null;
   /** Días con sesiones de Cronograma (Role Play / Escuchas) asignadas, de cualquier mes. */
   calendario: { anio: number; mes: number; dia: number; detalle: string }[];
 }
@@ -385,7 +387,7 @@ export function HomeView({
           </div>
 
           {esAdmin ? (
-            <MetricasAdmin gestiones={data?.gestionesMes ?? null} radicacionesDias={data?.radicacionesDias ?? null} />
+            <MetricasAdmin gestiones={data?.gestionesMes ?? null} radicacionesDias={data?.radicacionesDias ?? null} pqrsfDias={data?.pqrsfDias ?? null} />
           ) : (
             <div className="middleRow">
               <ProgresoSemanal pct={progresoPct} label={data?.progresoLabel ?? "—"} mensaje={progresoMensaje} />
@@ -939,7 +941,15 @@ function MetricBarrasDias({ Icon, label, dias }: { Icon: typeof Clock3; label: s
 
 // Fila de 5 tarjetas de métricas (solo Admin). Números y barras REALES. La tarjeta
 // "Radicaciones registradas (Hoy)" muestra barras de los últimos días desde GESTIONES.
-function MetricasAdmin({ gestiones, radicacionesDias }: { gestiones: GestionesMes | null; radicacionesDias: RadicacionDia[] | null }) {
+function MetricasAdmin({
+  gestiones,
+  radicacionesDias,
+  pqrsfDias,
+}: {
+  gestiones: GestionesMes | null;
+  radicacionesDias: RadicacionDia[] | null;
+  pqrsfDias: PqrsfDia[] | null;
+}) {
   if (!gestiones) return null;
   return (
     <section className="metricasRow">
@@ -948,7 +958,11 @@ function MetricasAdmin({ gestiones, radicacionesDias }: { gestiones: GestionesMe
       ) : (
         <MetricCard Icon={FolderOpen} label="Radicaciones registradas (Hoy)" valor={gestiones.radicadosHoy} />
       )}
-      <MetricCard Icon={MessageSquareText} label="PQRSF registrados (Hoy)" valor={gestiones.pqrsfHoy} />
+      {pqrsfDias && pqrsfDias.length > 0 ? (
+        <MetricBarrasDias Icon={MessageSquareText} label="PQRSF registrados (últimos días)" dias={pqrsfDias} />
+      ) : (
+        <MetricCard Icon={MessageSquareText} label="PQRSF registrados (Hoy)" valor={gestiones.pqrsfHoy} />
+      )}
       <article className="metricCard">
         <div className="metricHead">
           <div className="statIcon violet">
