@@ -30,12 +30,10 @@ function StatCard({
   icon: Icon,
   label,
   value,
-  trend,
 }: {
   icon: typeof Phone;
   label: string;
-  value: number | null;
-  trend?: string;
+  value: number;
 }) {
   return (
     <article className={s.stat}>
@@ -45,31 +43,19 @@ function StatCard({
       <div>
         <span>{label}</span>
         <div className={s.statLine}>
-          <strong>{value === null ? "—" : value}</strong>
-          {value !== null && trend ? (
-            <small>
-              <b>{trend}</b>
-              <em>vs mes anterior</em>
-            </small>
-          ) : value === null ? (
-            <small>
-              <em className={s.pendiente}>Pendiente de conectar</em>
-            </small>
-          ) : null}
+          <strong>{value}</strong>
         </div>
       </div>
     </article>
   );
 }
 
-function EstadoBadge({ estado }: { estado?: "activa" | "inactiva" }) {
-  if (!estado) return <span className={`${s.badge} ${s.sinDato}`}>Sin dato</span>;
+function EstadoBadge({ estado }: { estado: "activa" | "inactiva" }) {
   if (estado === "activa") return <span className={`${s.badge} ${s.activa}`}><i />Activa</span>;
   return <span className={`${s.badge} ${s.inactiva}`}><i />Inactiva</span>;
 }
 
-function UsoBadge({ uso }: { uso?: "en_uso" | "disponible" }) {
-  if (!uso) return <span className={`${s.badge} ${s.sinDato}`}>Sin dato</span>;
+function UsoBadge({ uso }: { uso: "en_uso" | "disponible" }) {
   if (uso === "en_uso") return <span className={`${s.badge} ${s.usada}`}>En uso</span>;
   return <span className={`${s.badge} ${s.disponible}`}>Disponible</span>;
 }
@@ -199,7 +185,7 @@ export default function ExtensionesDashboard({
         )}
 
         <section className={s.stats}>
-          <StatCard icon={Phone} label="Extensiones activas" value={kpis.activas ?? kpis.total} />
+          <StatCard icon={Phone} label="Extensiones activas" value={kpis.activas} />
           <StatCard icon={Users} label="En uso" value={kpis.enUso} />
           <StatCard icon={UserRound} label="Disponibles" value={kpis.disponibles} />
           <StatCard icon={Clock3} label="Sin uso (inactivas)" value={kpis.inactivas} />
