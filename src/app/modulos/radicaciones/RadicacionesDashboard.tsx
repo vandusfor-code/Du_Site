@@ -4,7 +4,7 @@ import "./radicaciones.css";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Search, X, ChevronLeft, ChevronRight, MoreHorizontal, CalendarDays, FileText, CheckCircle2, RotateCcw, TrendingUp } from "lucide-react";
+import { Search, X, ChevronLeft, ChevronRight, MoreHorizontal, CalendarDays, FileText, CheckCircle2, RotateCcw, TrendingUp, Send } from "lucide-react";
 import {
   obtenerAsesoresAction,
   guardarRadicacionAction,
@@ -84,7 +84,6 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
   const [resumen, setResumen] = useState<ResumenHoy>({ efectivos: 0, devueltos: 0, total: 0 });
   const [historial, setHistorial] = useState<HistorialItem[]>([]);
 
-  const [regPanelOpen, setRegPanelOpen] = useState(true);
   const [regRadicado, setRegRadicado] = useState("");
   const [regFecha, setRegFecha] = useState("");
   const [regDevuelto, setRegDevuelto] = useState(false);
@@ -254,6 +253,14 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
     if (id) marcarRecibidoAction(id).then(refreshNotifs);
   }
 
+  function limpiarFormulario() {
+    setRegRadicado("");
+    setRegFecha("");
+    setRegDevuelto(false);
+    setRegSnc(false);
+    setRegObs("");
+  }
+
   async function submitRegistration() {
     if (!regRadicado.trim()) return mostrarToast("El radicado es obligatorio", true);
     if (regSnc && !regFecha) return mostrarToast("Se requiere fecha para reporte SNC", true);
@@ -270,11 +277,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
 
     if (res.success) {
       mostrarToast("Radicado registrado con éxito");
-      setRegRadicado("");
-      setRegFecha("");
-      setRegDevuelto(false);
-      setRegSnc(false);
-      setRegObs("");
+      limpiarFormulario();
       refreshDashboard();
     } else {
       mostrarToast(res.error ?? "Error al guardar", true);
@@ -399,75 +402,68 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
           {vista === "radicacion" && (
             <section className="radic-view">
               <div className="radicacion-head">
-                <div>
-                  <p>Registra, consulta y da seguimiento a las radicaciones gestionadas.</p>
-                </div>
-                <div className="radicacion-actions">
-                  <button className="btn-primary" onClick={() => setRegPanelOpen(true)}>
-                    <Plus size={18} /> Nueva radicación
-                  </button>
-                </div>
+                <p>Registra, consulta y da seguimiento a las radicaciones gestionadas.</p>
               </div>
 
               <div className="kpi-grid">
                 <div className="kpi-card turno">
-                  <span className="kpi-icon lime"><CalendarDays size={21} /></span>
-                  <div className="kpi-body">
+                  <div className="kpi-top">
+                    <span className="kpi-icon lime"><CalendarDays size={20} /></span>
                     <span className="kpi-label">Turno del día</span>
-                    <div className="kpi-turno-status">
-                      <span className={`status-dot ${wfm.colorClass}`} />
-                      <span>{wfm.status}</span>
-                    </div>
-                    <p className="kpi-turno-line">Jornada: <b>{wfm.jornadaTexto}</b></p>
-                    <p className="kpi-turno-line">Próximo: <b>{wfm.nextLabel}</b></p>
-                    <div className="kpi-turno-timer">{wfm.countdown}</div>
                   </div>
+                  <div className="kpi-turno-status">
+                    <span className={`status-dot ${wfm.colorClass}`} />
+                    <span>{wfm.status}</span>
+                  </div>
+                  <p className="kpi-turno-line">Jornada: <b>{wfm.jornadaTexto}</b></p>
+                  <p className="kpi-turno-line">Próximo: <b>{wfm.nextLabel}</b></p>
+                  <div className="kpi-turno-timer">{wfm.countdown}</div>
                 </div>
 
                 <div className="kpi-card">
-                  <span className="kpi-icon violet"><FileText size={21} /></span>
-                  <div className="kpi-body">
+                  <div className="kpi-top">
+                    <span className="kpi-icon violet"><FileText size={20} /></span>
                     <span className="kpi-label">Radicaciones de hoy</span>
-                    <div className="kpi-value">{resumen.total}</div>
-                    <p className="kpi-sub">Gestiones de hoy</p>
                   </div>
+                  <div className="kpi-value">{resumen.total}</div>
+                  <p className="kpi-sub">Gestiones de hoy</p>
                 </div>
 
                 <div className="kpi-card">
-                  <span className="kpi-icon green"><CheckCircle2 size={21} /></span>
-                  <div className="kpi-body">
+                  <div className="kpi-top">
+                    <span className="kpi-icon green"><CheckCircle2 size={20} /></span>
                     <span className="kpi-label">Exitosas</span>
-                    <div className="kpi-value">{resumen.efectivos}</div>
-                    <p className="kpi-sub green">
-                      {resumen.total > 0 ? Math.round((resumen.efectivos / resumen.total) * 100) : 0}% del total
-                    </p>
                   </div>
+                  <div className="kpi-value">{resumen.efectivos}</div>
+                  <p className="kpi-sub green">
+                    {resumen.total > 0 ? Math.round((resumen.efectivos / resumen.total) * 100) : 0}% del total
+                  </p>
                 </div>
 
                 <div className="kpi-card">
-                  <span className="kpi-icon red"><RotateCcw size={21} /></span>
-                  <div className="kpi-body">
+                  <div className="kpi-top">
+                    <span className="kpi-icon red"><RotateCcw size={20} /></span>
                     <span className="kpi-label">Devueltas</span>
-                    <div className="kpi-value">{resumen.devueltos}</div>
-                    <p className="kpi-sub red">
-                      {resumen.total > 0 ? Math.round((resumen.devueltos / resumen.total) * 100) : 0}% del total
-                    </p>
                   </div>
+                  <div className="kpi-value">{resumen.devueltos}</div>
+                  <p className="kpi-sub red">
+                    {resumen.total > 0 ? Math.round((resumen.devueltos / resumen.total) * 100) : 0}% del total
+                  </p>
                 </div>
 
                 <div className="kpi-card">
-                  <span className="kpi-icon violet"><TrendingUp size={21} /></span>
-                  <div className="kpi-body">
+                  <div className="kpi-top">
+                    <span className="kpi-icon violet"><TrendingUp size={20} /></span>
                     <span className="kpi-label">Eficiencia</span>
-                    <div className="kpi-value">
-                      {resumen.total > 0 ? Math.round((resumen.efectivos / resumen.total) * 100) : 0}%
-                    </div>
-                    <p className="kpi-sub">Rendimiento global</p>
                   </div>
+                  <div className="kpi-value">
+                    {resumen.total > 0 ? Math.round((resumen.efectivos / resumen.total) * 100) : 0}%
+                  </div>
+                  <p className="kpi-sub">Rendimiento global</p>
                 </div>
               </div>
 
-              <div className={`radicacion-body ${!regPanelOpen ? "full" : ""}`}>
+              <div className="radicacion-body">
                 <div className="section-card">
                   <div className="section-header">
                     <h3>Historial de radicaciones</h3>
@@ -568,64 +564,63 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                   </div>
                 </div>
 
-                {regPanelOpen && (
-                  <aside className="side-panel">
-                    <div className="side-panel-head">
-                      <div>
-                        <h2>Nueva radicación</h2>
-                        <p>Completa los datos para registrar el radicado</p>
-                      </div>
-                      <button type="button" onClick={() => setRegPanelOpen(false)} aria-label="Cerrar">
-                        <X size={20} />
-                      </button>
+                <aside className="side-panel">
+                  <div className="side-panel-head">
+                    <div>
+                      <h2>Nueva radicación</h2>
+                      <p>Completa los datos para registrar el radicado</p>
                     </div>
-                    <div className="input-group">
-                      <label>Código de Radicado</label>
-                      <input
-                        type="text"
-                        className="input-field"
-                        placeholder="PQ-XXXXXXX"
-                        value={regRadicado}
-                        onChange={(e) => setRegRadicado(e.target.value)}
-                      />
-                    </div>
-                    <div className="input-group">
-                      <label>Fecha del Caso</label>
-                      <input
-                        type="date"
-                        className="input-field"
-                        value={regFecha}
-                        onChange={(e) => setRegFecha(e.target.value)}
-                      />
-                    </div>
-                    <div className="checkbox-item" onClick={() => setRegDevuelto((v) => !v)}>
-                      <input type="checkbox" checked={regDevuelto} onChange={() => setRegDevuelto((v) => !v)} />
-                      <span>¿Devuelto por errores?</span>
-                    </div>
-                    <div className="checkbox-item" onClick={() => setRegSnc((v) => !v)}>
-                      <input type="checkbox" checked={regSnc} onChange={() => setRegSnc((v) => !v)} />
-                      <span>Requiere seguimiento de calidad (SNC)</span>
-                    </div>
-                    <div className="input-group">
-                      <label>Observaciones</label>
-                      <textarea
-                        className="input-field"
-                        style={{ minHeight: 110, resize: "none" }}
-                        placeholder="Escribe detalles adicionales..."
-                        value={regObs}
-                        onChange={(e) => setRegObs(e.target.value)}
-                      />
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 10 }}>
-                      <button type="button" className="btn-cancel" onClick={() => setRegPanelOpen(false)}>
-                        Cancelar
-                      </button>
-                      <button className="btn-primary" disabled={guardandoReg} onClick={submitRegistration}>
-                        <span>{guardandoReg ? "Guardando..." : "Registrar radicado"}</span>
-                      </button>
-                    </div>
-                  </aside>
-                )}
+                    <button type="button" onClick={limpiarFormulario} aria-label="Limpiar">
+                      <X size={20} />
+                    </button>
+                  </div>
+                  <div className="input-group">
+                    <label>Código de radicado</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="PQ-XXXXXXX"
+                      value={regRadicado}
+                      onChange={(e) => setRegRadicado(e.target.value)}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label>Fecha del caso</label>
+                    <input
+                      type="date"
+                      className="input-field"
+                      value={regFecha}
+                      onChange={(e) => setRegFecha(e.target.value)}
+                    />
+                  </div>
+                  <div className="checkbox-item" onClick={() => setRegDevuelto((v) => !v)}>
+                    <input type="checkbox" checked={regDevuelto} onChange={() => setRegDevuelto((v) => !v)} />
+                    <span>¿Devuelto por errores?</span>
+                  </div>
+                  <div className="checkbox-item" onClick={() => setRegSnc((v) => !v)}>
+                    <input type="checkbox" checked={regSnc} onChange={() => setRegSnc((v) => !v)} />
+                    <span>Requiere seguimiento de calidad (SNC)</span>
+                  </div>
+                  <div className="input-group">
+                    <label>Observaciones</label>
+                    <textarea
+                      className="input-field"
+                      style={{ minHeight: 70, resize: "none" }}
+                      placeholder="Escribe detalles adicionales..."
+                      value={regObs}
+                      onChange={(e) => setRegObs(e.target.value)}
+                    />
+                  </div>
+                  <div className="side-panel-actions">
+                    <button type="button" className="btn-cancel" onClick={limpiarFormulario}>
+                      Cancelar
+                    </button>
+                    <button className="btn-primary" disabled={guardandoReg} onClick={submitRegistration}>
+                      <Send size={16} />
+                      <span>{guardandoReg ? "Guardando..." : "Registrar radicado"}</span>
+                    </button>
+                  </div>
+                </aside>
               </div>
             </section>
           )}
