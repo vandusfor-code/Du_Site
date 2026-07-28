@@ -1,4 +1,4 @@
-export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno" | "documentacion" | "pqrsf-comunicar";
+export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno" | "documentacion" | "pqrsf-comunicar" | "extensiones";
 
 export interface Modulo {
   id: ModuloId;
@@ -71,6 +71,13 @@ export const MODULOS: Modulo[] = [
     descripcion: "Registro e importación de PQRSF pendientes por comunicar.",
     href: "/modulos/pqrsf-comunicar",
     color: "#6952e8",
+  },
+  {
+    id: "extensiones",
+    nombre: "Extensiones",
+    descripcion: "Consulta las extensiones telefónicas disponibles en la organización.",
+    href: "/modulos/extensiones",
+    color: "#2f1b72",
   },
 ];
 

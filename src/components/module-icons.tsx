@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   BookOpen,
   Upload,
+  Phone,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuloId } from "@/lib/modulos";
@@ -29,4 +30,5 @@ export const MODULO_VISUALS: Record<ModuloId, ModuloVisual> = {
   desempeno: { icon: BarChart3, accentBg: "#ede9fe", accentFg: "#7044ed" },
   documentacion: { icon: BookOpen, accentBg: "#e0e7ff", accentFg: "#4f46e5" },
   "pqrsf-comunicar": { icon: Upload, accentBg: "#e0d7ff", accentFg: "#6d28d9" },
+  extensiones: { icon: Phone, accentBg: "#efeaff", accentFg: "#2f1b72" },
 };
