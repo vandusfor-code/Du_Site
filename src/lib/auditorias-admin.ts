@@ -14,8 +14,8 @@ const MAX_INTENTOS = 2;
 const TOPE_MAXIMO_POR_CORRIDA = 50;
 const LIMITE_MS = 5 * 60 * 1000;
 
-const MODELO_CRITERIOS = "claude-haiku-4-5";
-const MODELO_TEXTOS = "claude-opus-4-8";
+const MODELO_CRITERIOS = "claude-sonnet-5";
+const MODELO_TEXTOS = "claude-opus-5";
 
 function sheetId(): string {
   const id = process.env.SHEET_ID_METRICAS;
@@ -47,6 +47,18 @@ function esFechaDeHoyBogota(valor: unknown): boolean {
 
 function fechaCorta(fecha: Date): string {
   return fecha.toLocaleDateString("sv-SE", { timeZone: "America/Bogota" });
+}
+
+const LIMITE_TRANSCRIPCION = 24000;
+const MARCADOR_RECORTE = "\n[...tramo intermedio omitido por longitud...]\n";
+
+// El saludo está al inicio y el cierre/encuesta al final: si hay que recortar,
+// conservamos ambos extremos en vez de cortar por el final (que borraba el cierre).
+function prepararTranscripcion(completa: string): string {
+  if (completa.length <= LIMITE_TRANSCRIPCION) return completa;
+  const inicio = Math.floor(LIMITE_TRANSCRIPCION * 0.4);
+  const final = LIMITE_TRANSCRIPCION - inicio;
+  return completa.slice(0, inicio) + MARCADOR_RECORTE + completa.slice(completa.length - final);
 }
 
 /* ===================== */
@@ -197,13 +209,16 @@ async function auditarLlamada(
   esChat: boolean,
   registrarError: (idGestion: string, motivo: string, respuestaCruda?: string) => Promise<void>
 ): Promise<ResultadoAuditoria | null> {
-  const transcripcion = transcripcionCompleta.slice(0, 12000);
+  const transcripcion = prepararTranscripcion(transcripcionCompleta);
   const tipoInteraccion = esChat ? "chat" : "llamada";
   const contexto = contextoPrompt(esChat);
 
   const promptCriterios = `${contexto}
 
 Eres un analista de calidad de Cofrem. Evalúa esta transcripción de ${tipoInteraccion}.
+
+REGLA DE EVIDENCIA (aplica a cada criterio): marca "Cumple" SOLO si hay evidencia textual explícita y clara de que el AGENTE lo hizo. Ante la duda, evidencia ambigua o ausencia de evidencia, marca "No cumple". No asumas ni completes con lo que el agente "probablemente" dijo o haría en un caso típico — evalúa únicamente lo que está escrito en la transcripción.
+Si la transcripción está incompleta o cortada, evalúa solo con lo disponible; no penalices criterios cuya parte relevante de la interacción no aparece en el texto.
 
 CRITERIOS:
 SALUDO — Cumple si AGENTE: (1) saludo temporal + empresa + su nombre, (2) pregunta nombre del usuario, lo saluda y se ofrece.
@@ -328,6 +343,7 @@ Habla en SEGUNDA persona ("Manejaste...", "Mostraste...").`
 }
 
 REGLAS ABSOLUTAS para los TRES campos:
+- Básate ÚNICAMENTE en lo que ocurrió en la transcripción. No inventes detalles ni cites frases que no aparecen literalmente en el texto.
 - Nunca uses "cliente", siempre "usuario"
 - Nunca menciones distorsiones fonéticas del nombre Cofrem como error
 - Nunca menciones "su merced" como algo a corregir
