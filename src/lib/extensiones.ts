@@ -16,7 +16,7 @@ import type { ExtensionRegistro, ExtensionesData } from "@/lib/extensiones-tipos
 // set de ejemplo entregado en el mockup, para validar la UI.
 // ============================================================
 
-const TAB = "Extensiones";
+const TAB = "EXTENSIONES";
 
 function texto(row: unknown[], idx: number): string {
   return (row[idx] ?? "").toString().trim();
