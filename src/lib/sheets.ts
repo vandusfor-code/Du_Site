@@ -1,4 +1,16 @@
-import { google } from "googleapis";
+import { JWT } from "google-auth-library";
+
+// ============================================================
+// Acceso a Google Sheets vía REST + fetch (SIN la librería `googleapis`).
+//
+// `googleapis` pesa ~200 MB y tiene un import carísimo (arma un índice enorme
+// de APIs al evaluarse), lo que inflaba el bundle y ralentizaba el arranque en
+// frío de CADA función serverless. Aquí solo usamos `google-auth-library`
+// (~800 KB) para firmar el token de la cuenta de servicio, y hablamos con la
+// API REST de Sheets con `fetch`. La API pública de este módulo es idéntica a
+// la anterior (readRange/appendRow/updateRange/appendRows/asegurarHoja), así
+// que ningún otro archivo cambia su comportamiento.
+// ============================================================
 
 function getCredentials() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -17,21 +29,61 @@ function getCredentials() {
   };
 }
 
-// Cliente reutilizado durante toda la vida de la instancia (lambda "caliente").
-// Antes se creaba un GoogleAuth NUEVO en cada llamada, lo que obligaba a Google
-// a re-emitir el token OAuth una y otra vez (un round-trip extra por lectura).
-// Con el singleton, el token se emite una vez y GoogleAuth lo reutiliza/renueva
-// internamente, así una página con varias lecturas paga UN solo intercambio.
-let sheetsClient: ReturnType<typeof google.sheets> | null = null;
+// Cliente JWT reutilizado durante toda la vida de la instancia ("caliente").
+// google-auth-library cachea el access token internamente y lo renueva solo
+// cuando está por expirar, así una página con varias lecturas paga UN solo
+// intercambio de token (antes se re-emitía en cada llamada).
+let jwtClient: JWT | null = null;
 
-export function getSheetsClient() {
-  if (sheetsClient) return sheetsClient;
-  const auth = new google.auth.GoogleAuth({
-    credentials: getCredentials(),
+function getJwtClient(): JWT {
+  if (jwtClient) return jwtClient;
+  const { client_email, private_key } = getCredentials();
+  jwtClient = new JWT({
+    email: client_email,
+    key: private_key,
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
-  sheetsClient = google.sheets({ version: "v4", auth });
-  return sheetsClient;
+  return jwtClient;
+}
+
+async function getAccessToken(): Promise<string> {
+  const res = await getJwtClient().getAccessToken();
+  const token = typeof res === "string" ? res : res?.token;
+  if (!token) throw new Error("No se pudo obtener el token de acceso de Google");
+  return token;
+}
+
+const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+
+interface HttpError extends Error {
+  status?: number;
+}
+
+async function sheetsFetch<T = Record<string, unknown>>(path: string, init?: RequestInit): Promise<T> {
+  const token = await getAccessToken();
+  const res = await fetch(`${SHEETS_API}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (!res.ok) {
+    let detalle = "";
+    try {
+      detalle = await res.text();
+    } catch {
+      /* sin cuerpo */
+    }
+    const err: HttpError = new Error(`Sheets API ${res.status}: ${detalle.slice(0, 300)}`);
+    err.status = res.status;
+    throw err;
+  }
+
+  if (res.status === 204) return {} as T;
+  return (await res.json()) as T;
 }
 
 // La API de Sheets aplica una cuota de 60 lecturas/min por usuario. En ráfagas
@@ -67,15 +119,28 @@ export async function readRange(
   range: string,
   opts?: { unformatted?: boolean }
 ): Promise<unknown[][]> {
-  const sheets = getSheetsClient();
-  const res = await conReintentosDeLectura(() =>
-    sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range,
-      valueRenderOption: opts?.unformatted ? "UNFORMATTED_VALUE" : "FORMATTED_VALUE",
-    })
-  );
-  return res.data.values ?? [];
+  const render = opts?.unformatted ? "UNFORMATTED_VALUE" : "FORMATTED_VALUE";
+  const path = `/${spreadsheetId}/values/${encodeURIComponent(range)}?valueRenderOption=${render}`;
+  const data = await conReintentosDeLectura(() => sheetsFetch<{ values?: unknown[][] }>(path));
+  return data.values ?? [];
+}
+
+// Append de bajo nivel; devuelve el rango donde quedaron las filas nuevas
+// (necesario para replicar formato en pqrsf-comunicar).
+export async function valuesAppend(
+  spreadsheetId: string,
+  range: string,
+  values: (string | number)[][],
+  opts?: { valueInputOption?: "USER_ENTERED" | "RAW"; insertDataOption?: "INSERT_ROWS" | "OVERWRITE" }
+): Promise<{ updatedRange?: string }> {
+  const vio = opts?.valueInputOption ?? "USER_ENTERED";
+  const ido = opts?.insertDataOption ?? "INSERT_ROWS";
+  const path = `/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=${vio}&insertDataOption=${ido}`;
+  const data = await sheetsFetch<{ updates?: { updatedRange?: string } }>(path, {
+    method: "POST",
+    body: JSON.stringify({ values }),
+  });
+  return { updatedRange: data.updates?.updatedRange };
 }
 
 export async function appendRow(
@@ -83,14 +148,7 @@ export async function appendRow(
   range: string,
   row: (string | number)[]
 ) {
-  const sheets = getSheetsClient();
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range,
-    valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [row] },
-  });
+  await valuesAppend(spreadsheetId, range, [row]);
 }
 
 export async function updateRange(
@@ -98,13 +156,8 @@ export async function updateRange(
   range: string,
   values: (string | number)[][]
 ) {
-  const sheets = getSheetsClient();
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values },
-  });
+  const path = `/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+  await sheetsFetch(path, { method: "PUT", body: JSON.stringify({ values }) });
 }
 
 export async function appendRows(
@@ -113,14 +166,23 @@ export async function appendRows(
   rows: (string | number)[][]
 ) {
   if (rows.length === 0) return;
-  const sheets = getSheetsClient();
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range,
-    valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: { values: rows },
-  });
+  await valuesAppend(spreadsheetId, range, rows);
+}
+
+// Metadatos del libro (equivalente a spreadsheets.get). `fields` restringe la
+// respuesta (p. ej. "sheets.properties(sheetId,title)").
+export async function getSpreadsheetMeta<T = { sheets?: { properties?: { sheetId?: number; title?: string } }[] }>(
+  spreadsheetId: string,
+  fields?: string
+): Promise<T> {
+  const path = `/${spreadsheetId}${fields ? `?fields=${encodeURIComponent(fields)}` : ""}`;
+  return sheetsFetch<T>(path);
+}
+
+// batchUpdate genérico (addSheet, copyPaste, etc.).
+export async function batchUpdate(spreadsheetId: string, requests: unknown[]): Promise<unknown> {
+  const path = `/${spreadsheetId}:batchUpdate`;
+  return sheetsFetch(path, { method: "POST", body: JSON.stringify({ requests }) });
 }
 
 // Crea la pestaña si no existe (y le pone encabezados, si se dan). Usado por
@@ -130,23 +192,14 @@ export async function asegurarHoja(
   nombreHoja: string,
   headers?: (string | number)[]
 ) {
-  const sheets = getSheetsClient();
-  const meta = await sheets.spreadsheets.get({ spreadsheetId });
-  const existe = meta.data.sheets?.some((s) => s.properties?.title === nombreHoja);
+  const meta = await getSpreadsheetMeta(spreadsheetId, "sheets.properties(title)");
+  const existe = (meta.sheets ?? []).some((s) => s.properties?.title === nombreHoja);
   if (existe) return;
 
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId,
-    requestBody: { requests: [{ addSheet: { properties: { title: nombreHoja } } }] },
-  });
+  await batchUpdate(spreadsheetId, [{ addSheet: { properties: { title: nombreHoja } } }]);
 
   if (headers) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${nombreHoja}!A1`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [headers] },
-    });
+    await updateRange(spreadsheetId, `${nombreHoja}!A1`, [headers]);
   }
 }
 
