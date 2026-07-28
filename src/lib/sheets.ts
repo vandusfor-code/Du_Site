@@ -17,13 +17,21 @@ function getCredentials() {
   };
 }
 
+// Cliente reutilizado durante toda la vida de la instancia (lambda "caliente").
+// Antes se creaba un GoogleAuth NUEVO en cada llamada, lo que obligaba a Google
+// a re-emitir el token OAuth una y otra vez (un round-trip extra por lectura).
+// Con el singleton, el token se emite una vez y GoogleAuth lo reutiliza/renueva
+// internamente, así una página con varias lecturas paga UN solo intercambio.
+let sheetsClient: ReturnType<typeof google.sheets> | null = null;
+
 export function getSheetsClient() {
+  if (sheetsClient) return sheetsClient;
   const auth = new google.auth.GoogleAuth({
     credentials: getCredentials(),
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
-
-  return google.sheets({ version: "v4", auth });
+  sheetsClient = google.sheets({ version: "v4", auth });
+  return sheetsClient;
 }
 
 // La API de Sheets aplica una cuota de 60 lecturas/min por usuario. En ráfagas

@@ -1,4 +1,9 @@
-import { readRange } from "./sheets";
+// NOTA: NO importamos "./sheets" (y por lo tanto googleapis) de forma estática.
+// auth.ts importa este módulo, y la ruta /api/auth se usa también para CERRAR
+// sesión y para validar la sesión. googleapis tiene un import muy costoso (arma
+// un índice enorme de APIs al evaluarse); cargarlo estáticamente hacía que hasta
+// el logout pagara ese arranque. Con el import dinámico dentro de buscarUsuario,
+// googleapis solo se evalúa cuando alguien REALMENTE inicia sesión.
 
 // Rol oficial del usuario, leído de la columna F de la hoja "Usuarios".
 // "Admin" = coordinador/administrador; "Asesora" = usuaria estándar.
@@ -27,6 +32,7 @@ export async function buscarUsuario(usuario: string): Promise<Usuario | null> {
     throw new Error("Falta la variable SHEET_ID_USUARIOS");
   }
 
+  const { readRange } = await import("./sheets");
   const filas = await readRange(SHEET_ID, RANGE);
 
   const fila = filas.find(
