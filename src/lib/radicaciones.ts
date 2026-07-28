@@ -189,6 +189,8 @@ export interface HistorialItem {
   fecha: string;
   radicado: string;
   devuelto: string;
+  snc: string;
+  observacion: string;
 }
 
 export async function obtenerHistorial(usuario: string): Promise<HistorialItem[]> {
@@ -204,8 +206,9 @@ export async function obtenerHistorial(usuario: string): Promise<HistorialItem[]
         fecha: formatSheetDate(data[i][0], "dd/MM/yyyy"),
         radicado: texto(data[i], 3),
         devuelto: texto(data[i], 4),
+        snc: texto(data[i], 6),
+        observacion: texto(data[i], 5),
       });
-      if (res.length >= 10) break;
     }
     return res;
   } catch {

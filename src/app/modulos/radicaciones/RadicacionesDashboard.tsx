@@ -3,7 +3,8 @@
 import "./radicaciones.css";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Search, X, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import {
   obtenerAsesoresAction,
   guardarRadicacionAction,
@@ -31,18 +32,34 @@ import type {
 } from "@/lib/radicaciones";
 import { SoundToggleButton } from "@/components/module-shell";
 
-type Vista = "dashboard" | "registry" | "snc" | "search" | "notifications" | "chat";
+type Vista = "radicacion" | "snc" | "search" | "notifications" | "chat";
 
 const NOMBRES_VISTA: Record<Vista, string> = {
-  dashboard: "Panel de Control",
-  registry: "Nueva Radicación",
+  radicacion: "Radicación",
   snc: "Gestión de Calidad (SNC)",
   search: "Búsqueda Global",
   notifications: "Centro de Notificaciones",
   chat: "Comunicación Interna",
 };
 
+const FILAS_POR_PAGINA_OPCIONES = [10, 20, 50];
+
 const ALERT_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
+
+// item.fecha viene formateada "dd/MM/yyyy" desde el servidor (formatSheetDate).
+function fechaDentroDeRango(fechaStr: string, filtro: "hoy" | "semana" | "mes", ahora: Date): boolean {
+  const m = fechaStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return true;
+  const fecha = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+
+  if (filtro === "hoy") return fecha.getTime() === hoy.getTime();
+  if (filtro === "mes") return fecha.getFullYear() === hoy.getFullYear() && fecha.getMonth() === hoy.getMonth();
+
+  const inicioSemana = new Date(hoy);
+  inicioSemana.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7)); // lunes
+  return fecha.getTime() >= inicioSemana.getTime() && fecha.getTime() <= hoy.getTime();
+}
 
 function parseTimeClient(str: string | undefined): Date | null {
   if (!str || str === "Sin break" || str === "-" || str === "DESCANSO") return null;
@@ -59,7 +76,7 @@ function parseTimeClient(str: string | undefined): Date | null {
 }
 
 export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
-  const [vista, setVista] = useState<Vista>("dashboard");
+  const [vista, setVista] = useState<Vista>("radicacion");
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
   const [soundOn, setSoundOn] = useState(true);
 
@@ -67,12 +84,20 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
   const [resumen, setResumen] = useState<ResumenHoy>({ efectivos: 0, devueltos: 0, total: 0 });
   const [historial, setHistorial] = useState<HistorialItem[]>([]);
 
+  const [regPanelOpen, setRegPanelOpen] = useState(false);
   const [regRadicado, setRegRadicado] = useState("");
   const [regFecha, setRegFecha] = useState("");
   const [regDevuelto, setRegDevuelto] = useState(false);
   const [regSnc, setRegSnc] = useState(false);
   const [regObs, setRegObs] = useState("");
   const [guardandoReg, setGuardandoReg] = useState(false);
+
+  const [histQuery, setHistQuery] = useState("");
+  const [histFecha, setHistFecha] = useState("todas");
+  const [histEstado, setHistEstado] = useState("todos");
+  const [histDevuelto, setHistDevuelto] = useState("todos");
+  const [histPagina, setHistPagina] = useState(1);
+  const [histFilasPorPagina, setHistFilasPorPagina] = useState(10);
 
   const [sncQuery, setSncQuery] = useState("");
   const [sncResult, setSncResult] = useState<SncResultado | null | undefined>(undefined);
@@ -196,7 +221,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
 
   function cambiarVista(v: Vista) {
     setVista(v);
-    if (v === "dashboard") refreshDashboard();
+    if (v === "radicacion") refreshDashboard();
     if (v === "notifications") {
       lastNotifSeen.current = notificaciones.length;
       setNotifBadge(0);
@@ -288,6 +313,33 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
 
   const wfm = computeWfm(shift, now);
 
+  const filasHistorialFiltradas = useMemo(() => {
+    const texto = histQuery.trim().toLowerCase();
+    return historial.filter((item) => {
+      const isDev = ["si", "sí"].includes(item.devuelto.toLowerCase());
+      const coincide = `${item.radicado} ${item.observacion}`.toLowerCase().includes(texto);
+      const fechaOk = histFecha === "todas" || fechaDentroDeRango(item.fecha, histFecha as "hoy" | "semana" | "mes", now);
+      const estadoOk = histEstado === "todos" || (histEstado === "devuelta") === isDev;
+      const devueltoOk = histDevuelto === "todos" || (histDevuelto === "si") === isDev;
+      return coincide && fechaOk && estadoOk && devueltoOk;
+    });
+  }, [historial, histQuery, histFecha, histEstado, histDevuelto, now]);
+
+  const histTotalPaginas = Math.max(1, Math.ceil(filasHistorialFiltradas.length / histFilasPorPagina));
+  const histPaginaActual = Math.min(histPagina, histTotalPaginas);
+  const histInicio = (histPaginaActual - 1) * histFilasPorPagina;
+  const filasHistorialPagina = filasHistorialFiltradas.slice(histInicio, histInicio + histFilasPorPagina);
+
+  const histPaginasVisibles = useMemo(() => {
+    const ventana = 5;
+    let desde = Math.max(1, histPaginaActual - Math.floor(ventana / 2));
+    const hasta = Math.min(histTotalPaginas, desde + ventana - 1);
+    desde = Math.max(1, hasta - ventana + 1);
+    const arr: number[] = [];
+    for (let i = desde; i <= hasta; i++) arr.push(i);
+    return arr;
+  }, [histPaginaActual, histTotalPaginas]);
+
   return (
     <div className="radic-scope">
       <audio ref={audioRef} src={ALERT_SOUND_URL} preload="auto" />
@@ -344,8 +396,19 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
         </header>
 
         <div className="scroll-area">
-          {vista === "dashboard" && (
-            <section className="view-container">
+          {vista === "radicacion" && (
+            <section className="view-container" style={{ maxWidth: 1400 }}>
+              <div className="radicacion-head">
+                <div>
+                  <p>Registra, consulta y da seguimiento a las radicaciones gestionadas.</p>
+                </div>
+                <div className="radicacion-actions">
+                  <button className="btn-primary" onClick={() => setRegPanelOpen(true)}>
+                    <Plus size={18} /> Nueva radicación
+                  </button>
+                </div>
+              </div>
+
               <div className="stats-grid">
                 <div className="stat-card wfm-card">
                   <span className="label">Turno del Día</span>
@@ -363,14 +426,23 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                 </div>
 
                 <div className="stat-card">
-                  <span className="label">Exitosos</span>
-                  <div className="value" style={{ color: "var(--secondary)" }}>{resumen.efectivos}</div>
-                  <div className="sub-text" style={{ color: "var(--secondary)" }}>Gestiones de hoy</div>
+                  <span className="label">Radicaciones de hoy</span>
+                  <div className="value">{resumen.total}</div>
+                  <div className="sub-text" style={{ color: "var(--primary-deep)" }}>Gestiones de hoy</div>
                 </div>
                 <div className="stat-card">
-                  <span className="label">Devueltos</span>
+                  <span className="label">Exitosas</span>
+                  <div className="value" style={{ color: "var(--secondary)" }}>{resumen.efectivos}</div>
+                  <div className="sub-text" style={{ color: "var(--secondary)" }}>
+                    {resumen.total > 0 ? Math.round((resumen.efectivos / resumen.total) * 100) : 0}% del total
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <span className="label">Devueltas</span>
                   <div className="value" style={{ color: "var(--error)" }}>{resumen.devueltos}</div>
-                  <div className="sub-text" style={{ color: "var(--error)" }}>Errores hoy</div>
+                  <div className="sub-text" style={{ color: "var(--error)" }}>
+                    {resumen.total > 0 ? Math.round((resumen.devueltos / resumen.total) * 100) : 0}% del total
+                  </div>
                 </div>
                 <div className="stat-card">
                   <span className="label">Eficiencia</span>
@@ -381,83 +453,165 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                 </div>
               </div>
 
-              <div className="section-card">
-                <div className="section-header">
-                  <h3>Historial Reciente</h3>
-                </div>
-                <div>
-                  {historial.length === 0 ? (
-                    <p style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>
-                      No hay registros recientes
-                    </p>
-                  ) : (
-                    historial.map((item, i) => {
-                      const isDev = ["si", "sí"].includes(item.devuelto.toLowerCase());
-                      return (
-                        <div key={i} className="history-row">
-                          <div className="row-main">
-                            <b>{item.radicado}</b>
-                            <span>{item.fecha}</span>
-                          </div>
-                          <span className={`status-pill ${isDev ? "error" : "success"}`}>
-                            {isDev ? "Devuelto" : "Exitoso"}
-                          </span>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </section>
-          )}
+              <div className={`radicacion-body ${!regPanelOpen ? "full" : ""}`}>
+                <div className="section-card">
+                  <div className="section-header">
+                    <h3>Historial de radicaciones</h3>
+                  </div>
 
-          {vista === "registry" && (
-            <section className="view-container">
-              <div className="form-box">
-                <div className="form-title">
-                  <h2>Nueva Radicación</h2>
-                  <p>Completa los datos del radicado procesado</p>
+                  <div className="hist-toolbar">
+                    <label className="hist-search">
+                      <Search size={16} />
+                      <input
+                        placeholder="Buscar por código u observaciones..."
+                        value={histQuery}
+                        onChange={(e) => { setHistQuery(e.target.value); setHistPagina(1); }}
+                      />
+                    </label>
+                    <select className="hist-select" value={histFecha} onChange={(e) => { setHistFecha(e.target.value); setHistPagina(1); }}>
+                      <option value="todas">Fecha · Todas</option>
+                      <option value="hoy">Fecha · Hoy</option>
+                      <option value="semana">Fecha · Esta semana</option>
+                      <option value="mes">Fecha · Este mes</option>
+                    </select>
+                    <select className="hist-select" value={histEstado} onChange={(e) => { setHistEstado(e.target.value); setHistPagina(1); }}>
+                      <option value="todos">Estado · Todos</option>
+                      <option value="exitosa">Estado · Exitosa</option>
+                      <option value="devuelta">Estado · Devuelta</option>
+                    </select>
+                    <select className="hist-select" value={histDevuelto} onChange={(e) => { setHistDevuelto(e.target.value); setHistPagina(1); }}>
+                      <option value="todos">¿Devuelto? · Todos</option>
+                      <option value="si">¿Devuelto? · Sí</option>
+                      <option value="no">¿Devuelto? · No</option>
+                    </select>
+                  </div>
+
+                  <div className="hist-table-wrap">
+                    <table className="hist-table">
+                      <thead>
+                        <tr>
+                          <th>CÓDIGO</th>
+                          <th>FECHA DEL CASO</th>
+                          <th>¿DEVUELTO?</th>
+                          <th>SNC</th>
+                          <th>ESTADO</th>
+                          <th>OBSERVACIONES</th>
+                          <th>ACCIONES</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filasHistorialPagina.length === 0 ? (
+                          <tr>
+                            <td className="empty" colSpan={7}>
+                              {historial.length === 0 ? "No hay registros recientes" : "No se encontraron radicaciones con estos filtros."}
+                            </td>
+                          </tr>
+                        ) : (
+                          filasHistorialPagina.map((item, i) => {
+                            const isDev = ["si", "sí"].includes(item.devuelto.toLowerCase());
+                            const isSnc = ["si", "sí"].includes(item.snc.toLowerCase());
+                            return (
+                              <tr key={i}>
+                                <td><b>{item.radicado}</b></td>
+                                <td>{item.fecha}</td>
+                                <td><span className={isDev ? "hist-badge-yes" : "hist-badge-no"}>{isDev ? "Sí" : "No"}</span></td>
+                                <td>{isSnc ? "Sí" : "No"}</td>
+                                <td><span className={`status-pill ${isDev ? "error" : "success"}`}>{isDev ? "Devuelta" : "Exitosa"}</span></td>
+                                <td>{item.observacion || "—"}</td>
+                                <td><MoreHorizontal size={16} style={{ color: "var(--text-muted)" }} /></td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="hist-pager">
+                    <span>
+                      Mostrando {filasHistorialFiltradas.length === 0 ? 0 : histInicio + 1} a{" "}
+                      {Math.min(histInicio + histFilasPorPagina, filasHistorialFiltradas.length)} de {filasHistorialFiltradas.length} radicaciones
+                    </span>
+                    <div className="hist-pages">
+                      <button type="button" disabled={histPaginaActual === 1} onClick={() => setHistPagina((p) => Math.max(1, p - 1))}>
+                        <ChevronLeft size={15} />
+                      </button>
+                      {histPaginasVisibles.map((p) => (
+                        <button key={p} type="button" className={p === histPaginaActual ? "current" : ""} onClick={() => setHistPagina(p)}>
+                          {p}
+                        </button>
+                      ))}
+                      <button type="button" disabled={histPaginaActual === histTotalPaginas} onClick={() => setHistPagina((p) => Math.min(histTotalPaginas, p + 1))}>
+                        <ChevronRight size={15} />
+                      </button>
+                    </div>
+                    <span className="hist-pager-rows">
+                      Filas por página:
+                      <select value={histFilasPorPagina} onChange={(e) => { setHistFilasPorPagina(Number(e.target.value)); setHistPagina(1); }}>
+                        {FILAS_POR_PAGINA_OPCIONES.map((n) => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </span>
+                  </div>
                 </div>
-                <div className="input-group">
-                  <label>Código de Radicado</label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    placeholder="PQ-XXXXXXX"
-                    value={regRadicado}
-                    onChange={(e) => setRegRadicado(e.target.value)}
-                  />
-                </div>
-                <div className="input-group">
-                  <label>Fecha del Caso</label>
-                  <input
-                    type="date"
-                    className="input-field"
-                    value={regFecha}
-                    onChange={(e) => setRegFecha(e.target.value)}
-                  />
-                </div>
-                <div className="checkbox-item" onClick={() => setRegDevuelto((v) => !v)}>
-                  <input type="checkbox" checked={regDevuelto} onChange={() => setRegDevuelto((v) => !v)} />
-                  <span>¿Devuelto por errores?</span>
-                </div>
-                <div className="checkbox-item" onClick={() => setRegSnc((v) => !v)}>
-                  <input type="checkbox" checked={regSnc} onChange={() => setRegSnc((v) => !v)} />
-                  <span>Requiere seguimiento de calidad (SNC)</span>
-                </div>
-                <div className="input-group">
-                  <label>Observaciones</label>
-                  <textarea
-                    className="input-field"
-                    style={{ minHeight: 120, resize: "none" }}
-                    placeholder="Escribe detalles adicionales..."
-                    value={regObs}
-                    onChange={(e) => setRegObs(e.target.value)}
-                  />
-                </div>
-                <button className="btn-primary" disabled={guardandoReg} onClick={submitRegistration}>
-                  <span>{guardandoReg ? "Guardando..." : "Registrar Radicado"}</span>
-                </button>
+
+                {regPanelOpen && (
+                  <aside className="side-panel">
+                    <div className="side-panel-head">
+                      <div>
+                        <h2>Nueva radicación</h2>
+                        <p>Completa los datos para registrar el radicado</p>
+                      </div>
+                      <button type="button" onClick={() => setRegPanelOpen(false)} aria-label="Cerrar">
+                        <X size={20} />
+                      </button>
+                    </div>
+                    <div className="input-group">
+                      <label>Código de Radicado</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="PQ-XXXXXXX"
+                        value={regRadicado}
+                        onChange={(e) => setRegRadicado(e.target.value)}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label>Fecha del Caso</label>
+                      <input
+                        type="date"
+                        className="input-field"
+                        value={regFecha}
+                        onChange={(e) => setRegFecha(e.target.value)}
+                      />
+                    </div>
+                    <div className="checkbox-item" onClick={() => setRegDevuelto((v) => !v)}>
+                      <input type="checkbox" checked={regDevuelto} onChange={() => setRegDevuelto((v) => !v)} />
+                      <span>¿Devuelto por errores?</span>
+                    </div>
+                    <div className="checkbox-item" onClick={() => setRegSnc((v) => !v)}>
+                      <input type="checkbox" checked={regSnc} onChange={() => setRegSnc((v) => !v)} />
+                      <span>Requiere seguimiento de calidad (SNC)</span>
+                    </div>
+                    <div className="input-group">
+                      <label>Observaciones</label>
+                      <textarea
+                        className="input-field"
+                        style={{ minHeight: 110, resize: "none" }}
+                        placeholder="Escribe detalles adicionales..."
+                        value={regObs}
+                        onChange={(e) => setRegObs(e.target.value)}
+                      />
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 10 }}>
+                      <button type="button" className="btn-cancel" onClick={() => setRegPanelOpen(false)}>
+                        Cancelar
+                      </button>
+                      <button className="btn-primary" disabled={guardandoReg} onClick={submitRegistration}>
+                        <span>{guardandoReg ? "Guardando..." : "Registrar radicado"}</span>
+                      </button>
+                    </div>
+                  </aside>
+                )}
               </div>
             </section>
           )}
