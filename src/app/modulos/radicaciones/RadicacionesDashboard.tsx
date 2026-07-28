@@ -4,7 +4,7 @@ import "./radicaciones.css";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Search, X, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { Plus, Search, X, ChevronLeft, ChevronRight, MoreHorizontal, CalendarDays, FileText, CheckCircle2, RotateCcw, TrendingUp } from "lucide-react";
 import {
   obtenerAsesoresAction,
   guardarRadicacionAction,
@@ -84,7 +84,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
   const [resumen, setResumen] = useState<ResumenHoy>({ efectivos: 0, devueltos: 0, total: 0 });
   const [historial, setHistorial] = useState<HistorialItem[]>([]);
 
-  const [regPanelOpen, setRegPanelOpen] = useState(false);
+  const [regPanelOpen, setRegPanelOpen] = useState(true);
   const [regRadicado, setRegRadicado] = useState("");
   const [regFecha, setRegFecha] = useState("");
   const [regDevuelto, setRegDevuelto] = useState(false);
@@ -397,7 +397,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
 
         <div className="scroll-area">
           {vista === "radicacion" && (
-            <section className="view-container" style={{ maxWidth: 1400 }}>
+            <section className="radic-view">
               <div className="radicacion-head">
                 <div>
                   <p>Registra, consulta y da seguimiento a las radicaciones gestionadas.</p>
@@ -409,47 +409,61 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                 </div>
               </div>
 
-              <div className="stats-grid">
-                <div className="stat-card wfm-card">
-                  <span className="label">Turno del Día</span>
-                  <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
-                    <span className={`status-dot ${wfm.colorClass}`} />
-                    <span style={{ fontWeight: 700, fontSize: 14 }}>{wfm.status}</span>
+              <div className="kpi-grid">
+                <div className="kpi-card turno">
+                  <span className="kpi-icon lime"><CalendarDays size={21} /></span>
+                  <div className="kpi-body">
+                    <span className="kpi-label">Turno del día</span>
+                    <div className="kpi-turno-status">
+                      <span className={`status-dot ${wfm.colorClass}`} />
+                      <span>{wfm.status}</span>
+                    </div>
+                    <p className="kpi-turno-line">Jornada: <b>{wfm.jornadaTexto}</b></p>
+                    <p className="kpi-turno-line">Próximo: <b>{wfm.nextLabel}</b></p>
+                    <div className="kpi-turno-timer">{wfm.countdown}</div>
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 15 }}>
-                    Jornada: <b style={{ color: "var(--text-main)" }}>{wfm.jornadaTexto}</b>
-                  </div>
-                  <span className="label" style={{ fontSize: 10 }}>
-                    Próximo: {wfm.nextLabel}
-                  </span>
-                  <div className="countdown-timer">{wfm.countdown}</div>
                 </div>
 
-                <div className="stat-card">
-                  <span className="label">Radicaciones de hoy</span>
-                  <div className="value">{resumen.total}</div>
-                  <div className="sub-text" style={{ color: "var(--primary-deep)" }}>Gestiones de hoy</div>
-                </div>
-                <div className="stat-card">
-                  <span className="label">Exitosas</span>
-                  <div className="value" style={{ color: "var(--secondary)" }}>{resumen.efectivos}</div>
-                  <div className="sub-text" style={{ color: "var(--secondary)" }}>
-                    {resumen.total > 0 ? Math.round((resumen.efectivos / resumen.total) * 100) : 0}% del total
+                <div className="kpi-card">
+                  <span className="kpi-icon violet"><FileText size={21} /></span>
+                  <div className="kpi-body">
+                    <span className="kpi-label">Radicaciones de hoy</span>
+                    <div className="kpi-value">{resumen.total}</div>
+                    <p className="kpi-sub">Gestiones de hoy</p>
                   </div>
                 </div>
-                <div className="stat-card">
-                  <span className="label">Devueltas</span>
-                  <div className="value" style={{ color: "var(--error)" }}>{resumen.devueltos}</div>
-                  <div className="sub-text" style={{ color: "var(--error)" }}>
-                    {resumen.total > 0 ? Math.round((resumen.devueltos / resumen.total) * 100) : 0}% del total
+
+                <div className="kpi-card">
+                  <span className="kpi-icon green"><CheckCircle2 size={21} /></span>
+                  <div className="kpi-body">
+                    <span className="kpi-label">Exitosas</span>
+                    <div className="kpi-value">{resumen.efectivos}</div>
+                    <p className="kpi-sub green">
+                      {resumen.total > 0 ? Math.round((resumen.efectivos / resumen.total) * 100) : 0}% del total
+                    </p>
                   </div>
                 </div>
-                <div className="stat-card">
-                  <span className="label">Eficiencia</span>
-                  <div className="value">
-                    {resumen.total > 0 ? Math.round((resumen.efectivos / resumen.total) * 100) : 0}%
+
+                <div className="kpi-card">
+                  <span className="kpi-icon red"><RotateCcw size={21} /></span>
+                  <div className="kpi-body">
+                    <span className="kpi-label">Devueltas</span>
+                    <div className="kpi-value">{resumen.devueltos}</div>
+                    <p className="kpi-sub red">
+                      {resumen.total > 0 ? Math.round((resumen.devueltos / resumen.total) * 100) : 0}% del total
+                    </p>
                   </div>
-                  <div className="sub-text" style={{ color: "var(--primary-deep)" }}>Rendimiento global</div>
+                </div>
+
+                <div className="kpi-card">
+                  <span className="kpi-icon violet"><TrendingUp size={21} /></span>
+                  <div className="kpi-body">
+                    <span className="kpi-label">Eficiencia</span>
+                    <div className="kpi-value">
+                      {resumen.total > 0 ? Math.round((resumen.efectivos / resumen.total) * 100) : 0}%
+                    </div>
+                    <p className="kpi-sub">Rendimiento global</p>
+                  </div>
                 </div>
               </div>
 

@@ -38,13 +38,14 @@
 
 /* --- SIDEBAR --- */
 .radic-scope .sidebar {
-  width: 300px;
+  width: 264px;
+  flex-shrink: 0;
   background: var(--sidebar);
   color: #fff;
   box-shadow: 10px 0 30px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  padding: 40px 24px;
+  padding: 34px 20px;
   transition: var(--transition);
 }
 
@@ -168,8 +169,8 @@
 .radic-scope .main-canvas { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 
 .radic-scope .top-bar {
-  height: 88px;
-  padding: 0 56px;
+  height: 76px;
+  padding: 0 34px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -179,7 +180,7 @@
 
 .radic-scope .page-title h2 { font-family: 'Poppins', sans-serif; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin: 0; }
 
-.radic-scope .scroll-area { flex: 1; overflow-y: auto; padding: 48px 56px; }
+.radic-scope .scroll-area { flex: 1; overflow-y: auto; padding: 26px 34px 37px; }
 
 .radic-scope .view-container { max-width: 1200px; margin: 0 auto; animation: radic-fadeIn 0.4s ease-out; }
 
@@ -415,13 +416,35 @@
 .radic-scope ::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.22); }
 
 /* --- RADICACIÓN UNIFICADA (historial + nueva radicación) --- */
-.radic-scope .radicacion-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 32px; flex-wrap: wrap; }
-.radic-scope .radicacion-head p { color: var(--text-muted); font-size: 14px; margin: 6px 0 0; max-width: 520px; }
-.radic-scope .radicacion-date { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 14px; justify-content: flex-end; }
-.radic-scope .radicacion-actions { display: flex; flex-direction: column; align-items: flex-end; }
+/* Ocupa todo el ancho tras el sidebar: sin max-width ni centrado. */
+.radic-scope .radic-view { width: 100%; max-width: none; margin: 0; animation: radic-fadeIn 0.4s ease-out; }
+
+.radic-scope .radicacion-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 22px; flex-wrap: wrap; }
+.radic-scope .radicacion-head p { color: var(--text-muted); font-size: 14px; margin: 0; max-width: 560px; }
 .radic-scope .radicacion-actions .btn-primary { width: auto; padding: 14px 24px; margin-top: 0; }
 
-.radic-scope .radicacion-body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+/* 5 KPIs en UNA sola fila */
+.radic-scope .kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; width: 100%; margin-bottom: 24px; }
+.radic-scope .kpi-card { min-width: 0; background: #fff; border: 1px solid #eceef3; border-radius: 15px; box-shadow: 0 5px 18px rgba(25, 31, 56, 0.045); padding: 22px 20px; display: flex; gap: 15px; }
+.radic-scope .kpi-card.turno { border-color: #d3ec5b; background: #fdfff5; }
+.radic-scope .kpi-icon { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; flex-shrink: 0; }
+.radic-scope .kpi-icon.violet { background: #f0edff; color: #5b45e0; }
+.radic-scope .kpi-icon.green { background: #eafaf0; color: var(--secondary); }
+.radic-scope .kpi-icon.red { background: #fff0f1; color: var(--error); }
+.radic-scope .kpi-icon.lime { background: #f2ffd2; color: #93bf00; }
+.radic-scope .kpi-body { min-width: 0; }
+.radic-scope .kpi-label { display: block; font-size: 13.5px; color: #52617f; font-weight: 500; margin-top: 2px; }
+.radic-scope .kpi-value { font-size: 30px; font-weight: 800; font-family: 'Poppins', sans-serif; line-height: 1.1; margin: 8px 0 6px; color: var(--text-main); }
+.radic-scope .kpi-sub { font-size: 12.5px; color: var(--text-muted); margin: 0; }
+.radic-scope .kpi-sub.green { color: var(--secondary); }
+.radic-scope .kpi-sub.red { color: var(--error); }
+.radic-scope .kpi-turno-status { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13.5px; margin: 7px 0 8px; }
+.radic-scope .kpi-turno-line { font-size: 12px; color: var(--text-muted); margin: 2px 0; }
+.radic-scope .kpi-turno-line b { color: var(--text-main); }
+.radic-scope .kpi-turno-timer { font-size: 21px; font-weight: 800; font-family: 'Poppins', sans-serif; color: var(--primary-deep); margin-top: 8px; }
+
+/* Historial (izq, flexible) + Nueva radicación (der, 320px) en la misma fila */
+.radic-scope .radicacion-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
 .radic-scope .radicacion-body.full { grid-template-columns: 1fr; }
 
 .radic-scope .hist-toolbar { display: flex; flex-wrap: wrap; gap: 12px; padding: 20px 24px; border-bottom: 1px solid var(--border); }
@@ -455,8 +478,12 @@
 .radic-scope .side-panel .btn-cancel { width: 100%; background: #fff; color: var(--text-main); border: 1px solid var(--border); padding: 16px 24px; border-radius: var(--radius-md); font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; }
 .radic-scope .side-panel .btn-cancel:hover { background: #f8fafc; }
 
-@media (max-width: 1150px) {
+@media (max-width: 1250px) {
   .radic-scope .radicacion-body { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 1100px) {
+  .radic-scope .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 1024px) {
@@ -464,4 +491,8 @@
   .radic-scope .sidebar { width: 100%; }
   .radic-scope .scroll-area { padding: 20px; }
   .radic-scope .top-bar { padding: 0 20px; }
+}
+
+@media (max-width: 680px) {
+  .radic-scope .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
