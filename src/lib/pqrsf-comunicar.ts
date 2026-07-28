@@ -1,6 +1,6 @@
 import "server-only";
 import * as XLSX from "xlsx";
-import { getSheetsClient, readRange, hoyEnBogota } from "@/lib/sheets";
+import { valuesAppend, getSpreadsheetMeta, batchUpdate, readRange, hoyEnBogota } from "@/lib/sheets";
 
 // ============================================================
 // PQRSF Por comunicar (Registro): importa un .xls/.xlsx descargado del sistema
@@ -171,19 +171,14 @@ export async function importarPqrsfComunicar(buffer: Buffer): Promise<ResultadoI
     "", // N SE ENCONTRO PQRS
   ]);
 
-  const sheets = getSheetsClient();
-
   // 6. Append de valores (RAW → sin coerción: fechas como serial, teléfono/radicado tal cual).
   let rangoNuevas: string | undefined;
   try {
-    const res = await sheets.spreadsheets.values.append({
-      spreadsheetId: id,
-      range: `${TAB}!A:N`,
+    const res = await valuesAppend(id, `${TAB}!A:N`, valores, {
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
-      requestBody: { values: valores },
     });
-    rangoNuevas = res.data.updates?.updatedRange ?? undefined;
+    rangoNuevas = res.updatedRange;
   } catch {
     return { ok: false, error: "Error al registrar los datos en Google Sheets." };
   }
@@ -194,21 +189,16 @@ export async function importarPqrsfComunicar(buffer: Buffer): Promise<ResultadoI
   const filasRango = rangoNuevas ? filasDeRango(rangoNuevas) : null;
   if (filasRango) {
     try {
-      const meta = await sheets.spreadsheets.get({ spreadsheetId: id, fields: "sheets.properties(sheetId,title)" });
-      const hoja = meta.data.sheets?.find((s) => s.properties?.title === TAB);
+      const meta = await getSpreadsheetMeta(id, "sheets.properties(sheetId,title)");
+      const hoja = meta.sheets?.find((s) => s.properties?.title === TAB);
       const gid = hoja?.properties?.sheetId;
       if (gid !== undefined && gid !== null) {
         const source = { sheetId: gid, startRowIndex: TEMPLATE_ROW_0, endRowIndex: TEMPLATE_ROW_0 + 1, startColumnIndex: 0, endColumnIndex: NUM_COLS };
         const destination = { sheetId: gid, startRowIndex: filasRango.inicio, endRowIndex: filasRango.fin, startColumnIndex: 0, endColumnIndex: NUM_COLS };
-        await sheets.spreadsheets.batchUpdate({
-          spreadsheetId: id,
-          requestBody: {
-            requests: [
-              { copyPaste: { source, destination, pasteType: "PASTE_FORMAT", pasteOrientation: "NORMAL" } },
-              { copyPaste: { source, destination, pasteType: "PASTE_DATA_VALIDATION", pasteOrientation: "NORMAL" } },
-            ],
-          },
-        });
+        await batchUpdate(id, [
+          { copyPaste: { source, destination, pasteType: "PASTE_FORMAT", pasteOrientation: "NORMAL" } },
+          { copyPaste: { source, destination, pasteType: "PASTE_DATA_VALIDATION", pasteOrientation: "NORMAL" } },
+        ]);
       }
     } catch (e) {
       // El registro ya quedó guardado; solo falló la réplica de formato. No es fatal.
