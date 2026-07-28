@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readRange } from "@/lib/sheets";
+import { readRange, getSpreadsheetMeta } from "@/lib/sheets";
 
 // TEMPORAL: endpoint de diagnóstico para verificar en el preview que el nuevo
 // cliente de Sheets (fetch + google-auth-library) autentica y lee bien con las
@@ -17,10 +17,16 @@ export async function GET() {
     const t1 = Date.now();
     await readRange(id, "Usuarios!A1:A1"); // 2ª lectura: token ya cacheado
     const t2 = Date.now();
+    // Prueba NO mutante del path de metadatos (usado por asegurarHoja y el
+    // copyPaste de pqrsf-comunicar): confirma que el GET con ?fields funciona.
+    const meta = await getSpreadsheetMeta(id, "sheets.properties(sheetId,title)");
+    const t3 = Date.now();
     return NextResponse.json({
       ok: true,
       firstReadMs: t1 - t0, // incluye emisión del token
       secondReadMs: t2 - t1, // token reutilizado (debe ser mucho menor)
+      metaMs: t3 - t2,
+      metaSheets: meta.sheets?.length ?? 0,
       cols: encabezado[0]?.length ?? 0,
     });
   } catch (e) {
