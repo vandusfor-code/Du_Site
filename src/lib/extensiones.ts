@@ -16,7 +16,7 @@ import type { ExtensionRegistro, ExtensionesData } from "@/lib/extensiones-tipos
 // set de ejemplo entregado en el mockup, para validar la UI.
 // ============================================================
 
-const TAB = "EXTENSIONES";
+const TAB = "EXTENCIONES";
 
 function texto(row: unknown[], idx: number): string {
   return (row[idx] ?? "").toString().trim();
@@ -40,19 +40,35 @@ export async function obtenerExtensiones(): Promise<ExtensionesData> {
   }
 
   const filas = await readRange(id, `${TAB}!A2:F`);
-  const registros: ExtensionRegistro[] = filas
-    .filter((f) => texto(f, 3))
-    .map((f, i) => ({
-      id: `${texto(f, 3)}-${i}`,
-      area: texto(f, 1),
-      cargo: texto(f, 2),
-      extension: texto(f, 3),
-      nombre: texto(f, 4),
-      horario: texto(f, 5)
-        .split(/\n+/)
-        .map((s) => s.trim())
-        .filter(Boolean),
-    }));
+  const registros: ExtensionRegistro[] = [];
+  let i = 0;
+  for (const f of filas) {
+    if (!texto(f, 3)) continue; // sin número de extensión, se descarta
+
+    const area = texto(f, 1);
+    const cargo = texto(f, 2);
+    const extension = texto(f, 3);
+    const horario = texto(f, 5)
+      .split(/\n+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    // Cuando varias personas comparten una extensión, a veces vienen en la
+    // MISMA fila con los nombres separados por salto de línea dentro de la
+    // celda (en vez de una fila por persona). Se separan en registros propios.
+    const nombres = texto(f, 4)
+      .split(/\n+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (nombres.length === 0) {
+      registros.push({ id: `${extension}-${i++}`, area, cargo, extension, nombre: "", horario });
+    } else {
+      for (const nombre of nombres) {
+        registros.push({ id: `${extension}-${i++}`, area, cargo, extension, nombre, horario });
+      }
+    }
+  }
 
   return { registros, conectado: true };
 }
