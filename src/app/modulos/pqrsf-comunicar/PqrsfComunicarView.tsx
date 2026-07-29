@@ -74,6 +74,16 @@ export default function PqrsfComunicarView() {
                   <div className={s.omitidos}><b>{resultado.omitidos}</b> omitidos porque ya existían</div>
                 )}
               </div>
+              {(resultado.duplicados?.length ?? 0) > 0 && (
+                <details className={s.duplicados}>
+                  <summary>Ver radicados repetidos ({resultado.duplicados!.length})</summary>
+                  <ul>
+                    {resultado.duplicados!.map((r, i) => (
+                      <li key={`${r}-${i}`}>{r}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
               <button className={s.primary} onClick={limpiar} type="button">Importar otro archivo</button>
             </div>
           ) : (

@@ -25,6 +25,8 @@ export interface ResultadoImportacion {
   encontrados?: number;
   registrados?: number;
   omitidos?: number;
+  /** Radicados omitidos por estar ya en el Sheet (para mostrarlos en la UI). */
+  duplicados?: string[];
 }
 
 // Columnas obligatorias del ARCHIVO (se localizan por nombre de encabezado).
@@ -142,10 +144,11 @@ export async function importarPqrsfComunicar(buffer: Buffer): Promise<ResultadoI
   const radicadosExistentes = new Set(existentes.map((f) => (f[0] ?? "").toString().trim()).filter(Boolean));
 
   const nuevos = registros.filter((r) => !radicadosExistentes.has(r.radicado));
-  const omitidos = registros.length - nuevos.length;
+  const duplicados = registros.filter((r) => radicadosExistentes.has(r.radicado)).map((r) => r.radicado);
+  const omitidos = duplicados.length;
 
   if (nuevos.length === 0) {
-    return { ok: true, encontrados: registros.length, registrados: 0, omitidos };
+    return { ok: true, encontrados: registros.length, registrados: 0, omitidos, duplicados };
   }
 
   // 5. RECIBIDO PEOPLE = fecha de importación (hoy en Bogotá), como serial.
@@ -206,5 +209,5 @@ export async function importarPqrsfComunicar(buffer: Buffer): Promise<ResultadoI
     }
   }
 
-  return { ok: true, encontrados: registros.length, registrados: nuevos.length, omitidos };
+  return { ok: true, encontrados: registros.length, registrados: nuevos.length, omitidos, duplicados };
 }
