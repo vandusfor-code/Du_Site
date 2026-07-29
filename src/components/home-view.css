@@ -211,6 +211,8 @@
 /* ── Fila de métricas (Admin) ── */
 .dusite-home .metricasRow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin: 15px 0 4px; }
 .dusite-home .metricCard { background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: var(--radius-large); box-shadow: var(--shadow-surface); padding: 16px 18px; min-height: 168px; display: flex; flex-direction: column; }
+.dusite-home a.metricCardLink { text-decoration: none; color: inherit; cursor: pointer; transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+.dusite-home a.metricCardLink:hover { border-color: var(--border-hover); box-shadow: var(--shadow-hover); transform: translateY(-2px); }
 .dusite-home .metricHead { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
 .dusite-home .metricLabel { font-size: 12px; font-weight: 600; color: var(--text-secondary); line-height: 1.35; }
 .dusite-home .metricValor { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); line-height: 1; }

@@ -217,6 +217,127 @@ export async function obtenerHistorial(usuario: string): Promise<HistorialItem[]
 }
 
 /* ===================== */
+/* DETALLE POR ASESORA (Admin) */
+/* ===================== */
+
+export interface DetalleAsesora {
+  nombre: string;
+  inicial: string;
+  total: number;
+  exitosas: number;
+  devueltas: number;
+  sinGestion: number;
+  eficiencia: number; // %
+  ultimaActividad: string;
+  esUsuario: boolean;
+}
+
+export interface ResumenDetalle {
+  totalRadicadas: number;
+  pendientes: number;
+  exitosas: number;
+  devueltas: number;
+  sinGestion: number;
+}
+
+export interface DetalleRadicaciones {
+  resumen: ResumenDetalle;
+  dias: SerieItem[];
+  asesoras: DetalleAsesora[];
+}
+
+const MESES_ABR_RAD = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+function fechaLargaCorta(fecha: Date): string {
+  return `${fecha.getUTCDate()} ${MESES_ABR_RAD[fecha.getUTCMonth()]} ${fecha.getUTCFullYear()}`;
+}
+
+// Agrega el desempeño de radicación de los últimos 5 días (misma ventana que las
+// barras del Home) agrupado por asesora, leyendo la hoja GESTIONES una sola vez.
+// Exitosa = devuelto "No"; Devuelta = "Sí"; Sin gestión = ni Sí ni No; Pendiente
+// = SNC en proceso (col G "SI") aún no solucionado (col H vacío).
+export async function obtenerDetalleRadicaciones(usuarioActual: string): Promise<DetalleRadicaciones> {
+  const vacio: DetalleRadicaciones = {
+    resumen: { totalRadicadas: 0, pendientes: 0, exitosas: 0, devueltas: 0, sinGestion: 0 },
+    dias: [],
+    asesoras: [],
+  };
+  try {
+    const id = sheetId();
+    const data = await readRange(id, "GESTIONES", { unformatted: true });
+    const { dia, mes, anio } = hoyEnBogota();
+    const baseHoy = Date.UTC(anio, mes, dia);
+    const desde = baseHoy - 4 * 86400000; // 5 días (incluye hoy)
+    const uNorm = normalize(usuarioActual);
+
+    const fechasEnVentana: (Date | null)[] = [];
+    const map = new Map<string, DetalleAsesora & { _ts: number }>();
+    let pendientes = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const fecha = parseSheetDate(data[i][0]);
+      if (!fecha) continue;
+      const utc = Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate());
+      if (utc < desde || utc > baseHoy) continue;
+
+      fechasEnVentana.push(fecha);
+
+      const funcionaria = texto(data[i], 2).trim();
+      if (!funcionaria) continue;
+
+      const est = normalize(data[i][4]);
+      const esExito = est === "no";
+      const esDevuelta = est === "si" || est === "sí";
+      const enProceso = texto(data[i], 6) === "SI";
+      const solucionado = Boolean(data[i][7]);
+      if (enProceso && !solucionado) pendientes++;
+
+      const clave = funcionaria.toLowerCase();
+      let a = map.get(clave);
+      if (!a) {
+        a = {
+          nombre: funcionaria,
+          inicial: (funcionaria.charAt(0) || "?").toUpperCase(),
+          total: 0,
+          exitosas: 0,
+          devueltas: 0,
+          sinGestion: 0,
+          eficiencia: 0,
+          ultimaActividad: "",
+          esUsuario: normalize(funcionaria) === uNorm,
+          _ts: 0,
+        };
+        map.set(clave, a);
+      }
+      a.total++;
+      if (esExito) a.exitosas++;
+      else if (esDevuelta) a.devueltas++;
+      else a.sinGestion++;
+      if (utc >= a._ts) {
+        a._ts = utc;
+        a.ultimaActividad = fechaLargaCorta(fecha);
+      }
+    }
+
+    const asesoras: DetalleAsesora[] = Array.from(map.values())
+      .map(({ _ts, ...a }) => {
+        void _ts;
+        return { ...a, eficiencia: a.total > 0 ? Math.round((a.exitosas / a.total) * 1000) / 10 : 0 };
+      })
+      .sort((x, y) => y.total - x.total);
+
+    const totalRadicadas = asesoras.reduce((s, a) => s + a.total, 0);
+    const exitosas = asesoras.reduce((s, a) => s + a.exitosas, 0);
+    const devueltas = asesoras.reduce((s, a) => s + a.devueltas, 0);
+    const sinGestion = asesoras.reduce((s, a) => s + a.sinGestion, 0);
+
+    const { dias } = serieDesdeFechas(fechasEnVentana, 5, 5);
+    return { resumen: { totalRadicadas, pendientes, exitosas, devueltas, sinGestion }, dias, asesoras };
+  } catch {
+    return vacio;
+  }
+}
+
+/* ===================== */
 /* SNC / BÚSQUEDA */
 /* ===================== */
 

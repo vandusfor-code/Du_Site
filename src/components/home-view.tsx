@@ -921,11 +921,11 @@ function BarrasVerticales({ comunicados, faltantes }: { comunicados: number; fal
 }
 
 // Barras verticales de los últimos días (datos REALES): la de hoy resaltada.
-function MetricBarrasDias({ Icon, label, dias }: { Icon: typeof Clock3; label: string; dias: RadicacionDia[] }) {
+function MetricBarrasDias({ Icon, label, dias, href }: { Icon: typeof Clock3; label: string; dias: RadicacionDia[]; href?: string }) {
   const max = Math.max(...dias.map((d) => d.valor), 1);
   const alto = (v: number) => `${Math.max(4, Math.round((v / max) * 100))}%`;
-  return (
-    <article className="metricCard">
+  const contenido = (
+    <>
       <div className="metricHead">
         <div className="statIcon violet">
           <Icon size={20} />
@@ -943,8 +943,16 @@ function MetricBarrasDias({ Icon, label, dias }: { Icon: typeof Clock3; label: s
           </div>
         ))}
       </div>
-    </article>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} className="metricCard metricCardLink" title="Ver detalle por asesora">
+        {contenido}
+      </Link>
+    );
+  }
+  return <article className="metricCard">{contenido}</article>;
 }
 
 // Fila de 5 tarjetas de métricas (solo Admin). Números y barras REALES. La tarjeta
@@ -966,7 +974,7 @@ function MetricasAdmin({
   return (
     <section className="metricasRow">
       {radicacionesDias && radicacionesDias.length > 0 ? (
-        <MetricBarrasDias Icon={FolderOpen} label="Radicaciones registradas (últimos días)" dias={radicacionesDias} />
+        <MetricBarrasDias Icon={FolderOpen} label="Radicaciones registradas (últimos días)" dias={radicacionesDias} href="/detalle-radicaciones" />
       ) : (
         <MetricCard Icon={FolderOpen} label="Radicaciones registradas (Hoy)" valor={gestiones.radicadosHoy} />
       )}
