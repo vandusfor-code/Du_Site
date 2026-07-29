@@ -3,9 +3,20 @@
 import "./detalle-radicaciones.css";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, Download, Filter, Info, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, AlertTriangle, FolderOpen } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, CalendarDays, Download, Filter, Info, Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, AlertTriangle, FolderOpen, Loader2 } from "lucide-react";
 import type { DetalleRadicaciones, DetalleAsesora } from "@/lib/radicaciones";
+import { filtrarDetalleAction } from "./actions";
+
+type Periodo = "hoy" | "ayer" | "7d" | "rango";
+
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function fmtCorta(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${+m[3]}/${+m[2]}` : iso;
+}
 
 type ColOrden = "nombre" | "total" | "exitosas" | "devueltas" | "sinGestion" | "eficiencia" | "ultimaActividad";
 type Dir = "asc" | "desc";
@@ -39,7 +50,7 @@ function Th({ label, col, orden, dir, onSort, tone, align }: { label: string; co
   );
 }
 
-export default function DetalleRadicacionesView({ datos, errorInicial }: { datos: DetalleRadicaciones | null; errorInicial: string | null }) {
+export default function DetalleRadicacionesView({ datosIniciales, errorInicial }: { datosIniciales: DetalleRadicaciones | null; errorInicial: string | null }) {
   const [q, setQ] = useState("");
   const [estado, setEstado] = useState("todos");
   const [devuelto, setDevuelto] = useState("todos");
@@ -49,6 +60,52 @@ export default function DetalleRadicacionesView({ datos, errorInicial }: { datos
   const [filas, setFilas] = useState(10);
 
   const [fecha] = useState(hoyLabel);
+
+  // Filtro por rango de fechas (Hoy / Ayer / Últimos 7 días / rango personalizado).
+  const [datos, setDatos] = useState(datosIniciales);
+  const [periodo, setPeriodo] = useState<Periodo>("7d");
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const [cargando, setCargando] = useState(false);
+  const [rangoDesde, setRangoDesde] = useState("");
+  const [rangoHasta, setRangoHasta] = useState("");
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuAbierto(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  async function aplicar(p: Periodo, desde?: string, hasta?: string) {
+    setCargando(true);
+    setMenuAbierto(false);
+    try {
+      const res = await filtrarDetalleAction(desde, hasta);
+      setDatos(res);
+      setPeriodo(p);
+      setPagina(1);
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  function seleccionar(p: Exclude<Periodo, "rango">) {
+    const hoy = new Date();
+    if (p === "hoy") aplicar("hoy", ymd(hoy), ymd(hoy));
+    else if (p === "ayer") {
+      const ayer = new Date(hoy);
+      ayer.setDate(hoy.getDate() - 1);
+      aplicar("ayer", ymd(ayer), ymd(ayer));
+    } else {
+      const inicio = new Date(hoy);
+      inicio.setDate(hoy.getDate() - 6);
+      aplicar("7d", ymd(inicio), ymd(hoy));
+    }
+  }
+
+  const periodoLabel = periodo === "hoy" ? "Hoy" : periodo === "ayer" ? "Ayer" : periodo === "rango" ? `${fmtCorta(rangoDesde)} – ${fmtCorta(rangoHasta)}` : "Últimos 7 días";
 
   const resumen = datos?.resumen ?? { totalRadicadas: 0, pendientes: 0, exitosas: 0, devueltas: 0, sinGestion: 0 };
   const dias = datos?.dias ?? [];
@@ -115,7 +172,25 @@ export default function DetalleRadicacionesView({ datos, errorInicial }: { datos
           <p>Consulta el desempeño individual de radicación en los últimos días.</p>
         </div>
         <div className="dr-actions">
-          <button type="button" className="dr-outline"><CalendarDays size={16} /> Últimos 7 días <ChevronDown size={15} /></button>
+          <div className="dr-periodo" ref={menuRef}>
+            <button type="button" className="dr-outline" onClick={() => setMenuAbierto((v) => !v)} aria-expanded={menuAbierto}>
+              {cargando ? <Loader2 size={16} className="dr-spin" /> : <CalendarDays size={16} />} {periodoLabel} <ChevronDown size={15} />
+            </button>
+            {menuAbierto && (
+              <div className="dr-menu">
+                <button type="button" className={periodo === "hoy" ? "dr-menuOn" : ""} onClick={() => seleccionar("hoy")}>Hoy</button>
+                <button type="button" className={periodo === "ayer" ? "dr-menuOn" : ""} onClick={() => seleccionar("ayer")}>Ayer</button>
+                <button type="button" className={periodo === "7d" ? "dr-menuOn" : ""} onClick={() => seleccionar("7d")}>Últimos 7 días</button>
+                <div className="dr-menuSep" />
+                <div className="dr-rango">
+                  <span>Rango personalizado</span>
+                  <label>Desde<input type="date" value={rangoDesde} max={rangoHasta || undefined} onChange={(e) => setRangoDesde(e.target.value)} /></label>
+                  <label>Hasta<input type="date" value={rangoHasta} min={rangoDesde || undefined} onChange={(e) => setRangoHasta(e.target.value)} /></label>
+                  <button type="button" className="dr-aplicar" disabled={!rangoDesde || !rangoHasta} onClick={() => aplicar("rango", rangoDesde, rangoHasta)}>Aplicar</button>
+                </div>
+              </div>
+            )}
+          </div>
           <button type="button" className="dr-outline" onClick={exportarCsv}><Download size={16} /> Exportar</button>
         </div>
       </header>
@@ -126,7 +201,7 @@ export default function DetalleRadicacionesView({ datos, errorInicial }: { datos
 
       <section className="dr-summary">
         <div className="dr-summaryLeft">
-          <h3><span className="dr-sumIcon"><FolderOpen size={18} /></span> Resumen general (últimos 7 días)</h3>
+          <h3><span className="dr-sumIcon"><FolderOpen size={18} /></span> Resumen general · {periodoLabel}</h3>
           <div className="dr-metrics">
             <Metric value={resumen.totalRadicadas} label="Total radicadas" />
             <Metric value={resumen.pendientes} label="Pendientes" />

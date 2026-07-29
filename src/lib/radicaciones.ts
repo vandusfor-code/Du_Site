@@ -255,7 +255,10 @@ function fechaLargaCorta(fecha: Date): string {
 // barras del Home) agrupado por asesora, leyendo la hoja GESTIONES una sola vez.
 // Exitosa = devuelto "No"; Devuelta = "Sí"; Sin gestión = ni Sí ni No; Pendiente
 // = SNC en proceso (col G "SI") aún no solucionado (col H vacío).
-export async function obtenerDetalleRadicaciones(usuarioActual: string): Promise<DetalleRadicaciones> {
+export async function obtenerDetalleRadicaciones(
+  usuarioActual: string,
+  opts?: { desde?: string; hasta?: string }
+): Promise<DetalleRadicaciones> {
   const vacio: DetalleRadicaciones = {
     resumen: { totalRadicadas: 0, pendientes: 0, exitosas: 0, devueltas: 0, sinGestion: 0 },
     dias: [],
@@ -266,10 +269,18 @@ export async function obtenerDetalleRadicaciones(usuarioActual: string): Promise
     const data = await readRange(id, "GESTIONES", { unformatted: true });
     const { dia, mes, anio } = hoyEnBogota();
     const baseHoy = Date.UTC(anio, mes, dia);
-    const desde = baseHoy - 4 * 86400000; // 5 días (incluye hoy)
+
+    // Rango [desde, hasta] en días UTC (fechas "yyyy-mm-dd"). Sin opts → últimos 7 días.
+    const parseYMD = (s?: string): number | null => {
+      const m = (s ?? "").match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null;
+    };
+    let hasta = parseYMD(opts?.hasta) ?? baseHoy;
+    let desde = parseYMD(opts?.desde) ?? hasta - 6 * 86400000;
+    if (desde > hasta) [desde, hasta] = [hasta, desde];
     const uNorm = normalize(usuarioActual);
 
-    const fechasEnVentana: (Date | null)[] = [];
+    const conteoDia = new Map<number, number>();
     const map = new Map<string, DetalleAsesora & { _ts: number }>();
     let pendientes = 0;
 
@@ -277,9 +288,9 @@ export async function obtenerDetalleRadicaciones(usuarioActual: string): Promise
       const fecha = parseSheetDate(data[i][0]);
       if (!fecha) continue;
       const utc = Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate());
-      if (utc < desde || utc > baseHoy) continue;
+      if (utc < desde || utc > hasta) continue;
 
-      fechasEnVentana.push(fecha);
+      conteoDia.set(utc, (conteoDia.get(utc) ?? 0) + 1);
 
       const funcionaria = texto(data[i], 2).trim();
       if (!funcionaria) continue;
@@ -330,7 +341,20 @@ export async function obtenerDetalleRadicaciones(usuarioActual: string): Promise
     const devueltas = asesoras.reduce((s, a) => s + a.devueltas, 0);
     const sinGestion = asesoras.reduce((s, a) => s + a.sinGestion, 0);
 
-    const { dias } = serieDesdeFechas(fechasEnVentana, 5, 5);
+    // Barras: un valor por cada día del rango (Hoy resaltado).
+    const dias: SerieItem[] = [];
+    const totalDias = Math.max(1, Math.round((hasta - desde) / 86400000) + 1);
+    for (let i = 0; i < totalDias; i++) {
+      const dUtc = desde + i * 86400000;
+      const d = new Date(dUtc);
+      const esHoy = dUtc === baseHoy;
+      dias.push({
+        fecha: esHoy ? "Hoy" : `${d.getUTCDate()}/${d.getUTCMonth() + 1}`,
+        valor: conteoDia.get(dUtc) ?? 0,
+        esHoy,
+      });
+    }
+
     return { resumen: { totalRadicadas, pendientes, exitosas, devueltas, sinGestion }, dias, asesoras };
   } catch {
     return vacio;

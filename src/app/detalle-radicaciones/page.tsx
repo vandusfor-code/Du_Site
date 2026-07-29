@@ -17,5 +17,5 @@ export default async function DetalleRadicacionesPage() {
     error = e instanceof Error ? e.message : "No fue posible cargar el detalle";
   }
 
-  return <DetalleRadicacionesView datos={datos} errorInicial={error} />;
+  return <DetalleRadicacionesView datosIniciales={datos} errorInicial={error} />;
 }
