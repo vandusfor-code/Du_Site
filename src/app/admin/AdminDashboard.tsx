@@ -2,13 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  LayoutDashboard, ClipboardCheck, Users, CircleGauge, Send, FileBarChart,
-  Bell, Settings, Upload, MoreVertical, CalendarDays,
+  ClipboardCheck, FileBarChart, Bell, Upload, MoreVertical, CalendarDays,
   Search, SlidersHorizontal, Eye, Play, TrendingUp, AlertTriangle, Target,
-  BadgeCheck, ClipboardList, ChevronDown, CheckCircle2, Clock3,
-  XCircle, Loader2, X, LogOut,
+  BadgeCheck, ClipboardList, CheckCircle2, Clock3,
+  XCircle, Loader2, X,
 } from "lucide-react";
-import Link from "next/link";
 import type { DashboardAuditorias, DashboardFiltros, AuditoriaHistorial } from "@/lib/auditorias-admin";
 import {
   ejecutarAuditoriasAction,
@@ -16,6 +14,7 @@ import {
   cargarTranscripcionesAction,
   obtenerDashboardAuditoriasAction,
 } from "./actions";
+import AdminSidebar from "./AdminSidebar";
 import styles from "./auditorias.module.css";
 
 /* Formateo es-CO: 1021 → "1.021", 91.4 → "91,4" */
@@ -174,12 +173,6 @@ export default function AdminDashboard({
       ]
     : [];
 
-  const nav: [typeof LayoutDashboard, string][] = [
-    [LayoutDashboard, "Resumen"], [ClipboardCheck, "Auditorías"], [Users, "Asesores"],
-    [CircleGauge, "Criterios"], [Send, "Cortes de envío"], [FileBarChart, "Reportes"],
-    [Bell, "Alertas"], [Settings, "Configuración"],
-  ];
-
   // ── Paginación del historial (10 por página) ──
   const historialTodo = data?.historial ?? [];
   const totalPaginas = Math.max(1, Math.ceil(historialTodo.length / PAGE_SIZE));
@@ -201,34 +194,8 @@ export default function AdminDashboard({
         }}
       />
 
-      {/* ── Sidebar ── */}
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}>
-          <div className={styles.logo}>Du</div>
-          <b>Du Labs</b>
-        </div>
-        <nav className={styles.nav}>
-          {nav.map(([Icon, label], i) => (
-            <button key={label} className={i === 1 ? styles.navActive : styles.navItem}>
-              <Icon size={19} />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
-        <div className={styles.sidebarBottom}>
-          <div className={styles.profile}>
-            <div className={styles.avatar}>{nombre.slice(0, 2).toUpperCase()}</div>
-            <div>
-              <strong>{nombre}</strong>
-              <small>Administrador</small>
-            </div>
-            <ChevronDown size={16} />
-          </div>
-          <Link href="/" className={styles.collapse}>
-            <LogOut size={16} /> Volver al inicio
-          </Link>
-        </div>
-      </aside>
+      {/* ── Sidebar (compartido con Auditoría Documental) ── */}
+      <AdminSidebar nombre={nombre} activo="Auditorías" />
 
       {/* ── Main ── */}
       <main className={styles.main}>
