@@ -137,7 +137,7 @@ function useCalendario(offsetMeses: number) {
   return { mesLabel, semanas, diaActual: esMesActual ? hoy.getDate() : -1, anioVisible, mesVisible };
 }
 
-function UserMenu({ nombre, logoutAction }: { nombre: string; logoutAction: () => void }) {
+export function UserMenu({ nombre, logoutAction }: { nombre: string; logoutAction: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const inicial = (nombre.trim().charAt(0) || "?").toUpperCase();
@@ -272,7 +272,6 @@ export function HomeView({
   }
   const alertas = tareas.filter((t) => t.prioridad === "Alta").length;
   const [offsetMeses, setOffsetMeses] = useState(0);
-  const [resaltarCalendario, setResaltarCalendario] = useState(false);
   const { mesLabel, semanas, diaActual, anioVisible, mesVisible } = useCalendario(offsetMeses);
 
   const fechaLarga = now
@@ -319,9 +318,7 @@ export function HomeView({
             type="button"
             onClick={() => {
               playClick();
-              document.getElementById("calendario")?.scrollIntoView({ behavior: "smooth", block: "center" });
-              setResaltarCalendario(true);
-              setTimeout(() => setResaltarCalendario(false), 1200);
+              router.push("/calendario");
             }}
           >
             Calendario
@@ -477,7 +474,7 @@ export function HomeView({
         </section>
 
         <aside>
-          <article className={`calendar${resaltarCalendario ? " resaltado" : ""}`} id="calendario">
+          <article className="calendar" id="calendario">
             <div className="calHead">
               <h3>{mesLabel}</h3>
               <div>

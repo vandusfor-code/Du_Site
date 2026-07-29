@@ -1,0 +1,87 @@
+/* Cuerpo del Calendario. El header reutiliza las clases .dusite-home
+   (home-view.css) y sus variables; aquí solo va el contenido del calendario. */
+
+.dusite-cal { padding: 22px clamp(20px, 3vw, 40px) 40px; }
+.dusite-cal * { box-sizing: border-box; }
+.dusite-cal button { font: inherit; cursor: pointer; }
+
+.dusite-cal .cal-titleRow { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; }
+.dusite-cal .cal-titleRow h1 { font-size: 32px; line-height: 1; margin: 0 0 10px; letter-spacing: -0.02em; }
+.dusite-cal .cal-titleRow p { margin: 0; color: var(--text-secondary); font-size: 14px; }
+.dusite-cal .cal-primary { border: 0; background: var(--brand-purple); color: #fff; border-radius: var(--radius-sm); padding: 13px 19px; display: inline-flex; gap: 9px; align-items: center; font-weight: 700; font-size: 14px; box-shadow: 0 5px 14px rgba(40, 27, 91, 0.18); }
+.dusite-cal .cal-primary:hover { background: var(--brand-purple-dark); }
+
+.dusite-cal .cal-workspace { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 16px; max-width: 1560px; margin: 0 auto; align-items: start; }
+.dusite-cal .cal-side, .dusite-cal .cal-card { background: #fff; border: 1px solid var(--border-default); box-shadow: var(--shadow-card); border-radius: var(--radius-card); }
+.dusite-cal .cal-side { overflow: hidden; }
+
+/* Mini calendario */
+.dusite-cal .cal-mini { padding: 20px; }
+.dusite-cal .cal-miniHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.dusite-cal .cal-miniHead strong { font-size: 14px; }
+.dusite-cal .cal-miniHead span { display: flex; gap: 6px; }
+.dusite-cal .cal-miniHead button { width: 26px; height: 26px; border: 0; background: none; border-radius: 8px; color: var(--text-secondary); display: grid; place-items: center; }
+.dusite-cal .cal-miniHead button:hover { background: var(--bg-subtle); }
+.dusite-cal .cal-miniLabels, .dusite-cal .cal-miniGrid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.dusite-cal .cal-miniLabels b { font-size: 10px; color: var(--text-tertiary); text-align: center; padding: 5px 0; font-weight: 700; }
+.dusite-cal .cal-miniDay { border: 0; background: none; font-size: 12px; color: var(--text-primary); height: 32px; border-radius: 50%; display: grid; place-items: center; position: relative; }
+.dusite-cal .cal-miniDay:hover { background: var(--bg-subtle); }
+.dusite-cal .cal-miniDay.otro { color: var(--text-tertiary); }
+.dusite-cal .cal-miniDay.sem { background: var(--brand-purple-soft); color: var(--brand-purple); font-weight: 600; border-radius: 8px; }
+.dusite-cal .cal-miniDay.hoy { background: var(--brand-purple); color: #fff; font-weight: 700; }
+.dusite-cal .cal-miniDay.hoy::after { content: ""; position: absolute; width: 5px; height: 5px; background: var(--lime); border-radius: 50%; bottom: 2px; left: 50%; transform: translateX(-50%); }
+
+.dusite-cal .cal-sideSection { padding: 18px 20px; border-top: 1px solid var(--border-default); }
+.dusite-cal .cal-sectionTitle { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.dusite-cal .cal-sectionTitle strong { font-size: 14px; }
+.dusite-cal .cal-sectionTitle svg { color: var(--text-tertiary); }
+.dusite-cal .cal-check { display: flex; gap: 11px; align-items: flex-start; padding: 7px 0; font-size: 13px; cursor: pointer; }
+.dusite-cal .cal-check input, .dusite-cal .cal-filter input { accent-color: var(--brand-purple); width: 16px; height: 16px; margin-top: 1px; }
+.dusite-cal .cal-check b { font-weight: 500; }
+.dusite-cal .cal-check small { display: block; color: var(--text-secondary); margin-top: 2px; }
+.dusite-cal .cal-more { border: 0; background: none; color: var(--text-secondary); display: flex; gap: 8px; align-items: center; margin: 6px 0 0 30px; font-size: 13px; }
+.dusite-cal .cal-filter { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; cursor: pointer; }
+.dusite-cal .cal-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+/* Tarjeta principal */
+.dusite-cal .cal-card { overflow: hidden; min-width: 0; }
+.dusite-cal .cal-toolbar { min-height: 64px; border-bottom: 1px solid var(--border-default); display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 16px; flex-wrap: wrap; }
+.dusite-cal .cal-toolbarLeft, .dusite-cal .cal-toolbarRight { display: flex; align-items: center; gap: 9px; }
+.dusite-cal .cal-toolbarLeft strong { font-size: 15px; margin-left: 4px; }
+.dusite-cal .cal-outline, .dusite-cal .cal-iconBox, .dusite-cal .cal-iconBtn { border: 1px solid var(--border-default); background: #fff; color: var(--text-primary); }
+.dusite-cal .cal-outline { height: 38px; padding: 0 14px; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
+.dusite-cal .cal-outline:hover { background: var(--bg-subtle); }
+.dusite-cal .cal-iconBtn { border: 0; width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; color: var(--text-secondary); }
+.dusite-cal .cal-iconBtn:hover { background: var(--bg-subtle); }
+.dusite-cal .cal-iconBtn svg, .dusite-cal .cal-iconBox svg { width: 17px; height: 17px; }
+.dusite-cal .cal-iconBox { width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: var(--text-secondary); }
+.dusite-cal .cal-iconBox:hover { background: var(--bg-subtle); }
+.dusite-cal .cal-selectedTool { background: var(--brand-purple-soft); border-color: transparent; color: var(--brand-purple); }
+
+/* Grilla semanal */
+.dusite-cal .cal-gridWrap { overflow: auto; }
+.dusite-cal .cal-dayHeader { display: grid; grid-template-columns: 72px repeat(7, minmax(112px, 1fr)); height: 72px; border-bottom: 1px solid var(--border-default); min-width: 860px; }
+.dusite-cal .cal-tz { font-size: 10px; color: var(--text-tertiary); align-self: end; text-align: right; padding: 0 10px 8px 0; }
+.dusite-cal .cal-dayCell { text-align: center; padding: 12px 0; }
+.dusite-cal .cal-dayCell small { display: block; font-size: 10px; color: var(--text-secondary); font-weight: 700; letter-spacing: 0.03em; }
+.dusite-cal .cal-dayCell span { font-size: 22px; display: inline-grid; place-items: center; margin-top: 5px; width: 40px; height: 40px; }
+.dusite-cal .cal-today { border-radius: 50%; background: var(--brand-purple); color: #fff; margin-top: 0 !important; }
+.dusite-cal .cal-grid { display: grid; grid-template-columns: 72px repeat(7, minmax(112px, 1fr)); height: 660px; position: relative; min-width: 860px; }
+.dusite-cal .cal-times { font-size: 10px; color: var(--text-secondary); }
+.dusite-cal .cal-times div { height: 41.25px; text-align: right; padding: 0 12px; transform: translateY(-6px); }
+.dusite-cal .cal-dayColumn { position: relative; border-left: 1px solid var(--border-default); }
+.dusite-cal .cal-hourLine { height: 41.25px; border-top: 1px solid var(--border-default); }
+.dusite-cal .cal-event { position: absolute; left: 5px; right: 5px; border-radius: 8px; padding: 7px 8px; font-size: 11px; overflow: hidden; z-index: 2; cursor: default; }
+.dusite-cal .cal-event b, .dusite-cal .cal-event span, .dusite-cal .cal-event small { display: block; }
+.dusite-cal .cal-event b { font-size: 11px; font-weight: 700; }
+.dusite-cal .cal-event span { margin-top: 2px; opacity: 0.85; }
+.dusite-cal .cal-event small { margin-top: 4px; display: flex; align-items: center; gap: 4px; opacity: 0.85; }
+.dusite-cal .cal-nowLine { position: absolute; left: 0; right: 0; border-top: 2px solid #f04444; z-index: 3; }
+.dusite-cal .cal-nowLine span { position: absolute; width: 8px; height: 8px; background: #f04444; border-radius: 50%; left: -4px; top: -5px; }
+
+.dusite-cal .cal-toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%); background: var(--brand-purple); color: #fff; padding: 13px 22px; border-radius: 12px; font-size: 13px; font-weight: 600; box-shadow: 0 12px 30px rgba(40, 27, 91, 0.28); z-index: 950; }
+
+@media (max-width: 1050px) {
+  .dusite-cal .cal-workspace { grid-template-columns: 1fr; }
+  .dusite-cal .cal-side { display: none; }
+}
