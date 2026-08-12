@@ -108,6 +108,7 @@ async function llamarClaude(prompt: string, modelo: string, maxTokens: number, i
         body: JSON.stringify({
           model: modelo,
           max_tokens: maxTokens,
+          thinking: { type: "disabled" },
           messages: [{ role: "user", content: prompt }],
         }),
       });
@@ -125,7 +126,10 @@ async function llamarClaude(prompt: string, modelo: string, maxTokens: number, i
         return null;
       }
 
-      if (json.content?.[0]?.text) return json.content[0].text;
+      const bloqueTexto = Array.isArray(json.content)
+        ? json.content.find((b: { type?: string; text?: string }) => b.type === "text")
+        : null;
+      if (bloqueTexto?.text) return bloqueTexto.text;
 
       console.error("Respuesta inesperada de Claude:", JSON.stringify(json).slice(0, 300));
       return null;
