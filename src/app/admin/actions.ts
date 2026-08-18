@@ -6,10 +6,14 @@ import {
   generarResumenCortes,
   cargarTranscripcionesCsv,
   obtenerDashboardAuditorias,
+  obtenerFuncionariosParaSelector,
+  guardarAuditoriaManual,
   type ResultadoProcesamiento,
   type ResultadoCargaCsv,
   type DashboardAuditorias,
   type DashboardFiltros,
+  type FuncionarioOpcion,
+  type AuditoriaManualInput,
 } from "@/lib/auditorias-admin";
 
 async function requireAdminAction(): Promise<void> {
@@ -44,4 +48,16 @@ export async function obtenerDashboardAuditoriasAction(
 ): Promise<DashboardAuditorias> {
   await requireAdminAction();
   return obtenerDashboardAuditorias(filtros);
+}
+
+export async function obtenerFuncionariosAction(): Promise<FuncionarioOpcion[]> {
+  await requireAdminAction();
+  return obtenerFuncionariosParaSelector();
+}
+
+export async function guardarAuditoriaManualAction(
+  input: AuditoriaManualInput
+): Promise<{ nota: string; tipoNota: string }> {
+  await requireAdminAction();
+  return guardarAuditoriaManual(input);
 }

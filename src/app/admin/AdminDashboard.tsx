@@ -7,7 +7,7 @@ import {
   BadgeCheck, ClipboardList, CheckCircle2, Clock3,
   XCircle, Loader2, X,
 } from "lucide-react";
-import type { DashboardAuditorias, DashboardFiltros, AuditoriaHistorial } from "@/lib/auditorias-admin";
+import type { DashboardAuditorias, DashboardFiltros, AuditoriaHistorial, FuncionarioOpcion } from "@/lib/auditorias-admin";
 import {
   ejecutarAuditoriasAction,
   generarResumenCortesAction,
@@ -15,6 +15,7 @@ import {
   obtenerDashboardAuditoriasAction,
 } from "./actions";
 import AdminSidebar from "./AdminSidebar";
+import AuditoriaManualForm from "./AuditoriaManualForm";
 import styles from "./auditorias.module.css";
 
 /* Formateo es-CO: 1021 → "1.021", 91.4 → "91,4" */
@@ -59,14 +60,17 @@ export default function AdminDashboard({
   nombre,
   dashboardInicial,
   errorInicial,
+  funcionarios,
 }: {
   nombre: string;
   dashboardInicial: DashboardAuditorias | null;
   errorInicial: string | null;
+  funcionarios: FuncionarioOpcion[];
 }) {
   const [data, setData] = useState(dashboardInicial);
   const [error, setError] = useState(errorInicial);
   const [banner, setBanner] = useState<{ tipo: "ok" | "error"; msg: string } | null>(null);
+  const [tipoAuditoria, setTipoAuditoria] = useState<"ia" | "co">("ia");
 
   const [filtros, setFiltros] = useState<DashboardFiltros>({});
   const [cargando, setCargando] = useState(false);
@@ -209,17 +213,30 @@ export default function AdminDashboard({
           </div>
           <div className={styles.topActions}>
             <div className={styles.actionRow}>
-              <button className={styles.secondary} onClick={() => inputArchivoRef.current?.click()} disabled={subiendo}>
-                {subiendo ? <Loader2 size={16} className={styles.spin} /> : <Upload size={16} />}
-                Importar CSV
-              </button>
-              <button className={styles.primary} onClick={ejecutarPendientes} disabled={procesando}>
-                {procesando ? <Loader2 size={16} className={styles.spin} /> : <Play size={16} />}
-                Ejecutar pendientes
-              </button>
-              <button className={styles.iconButton} onClick={generarCortes} disabled={generando} title="Generar cortes">
-                {generando ? <Loader2 size={16} className={styles.spin} /> : <MoreVertical size={18} />}
-              </button>
+              <select
+                className={styles.selectButton}
+                value={tipoAuditoria}
+                onChange={(e) => setTipoAuditoria(e.target.value as "ia" | "co")}
+                title="Tipo de auditoría"
+              >
+                <option value="ia">Auditoría IA</option>
+                <option value="co">Auditoría CO</option>
+              </select>
+              {tipoAuditoria === "ia" && (
+                <>
+                  <button className={styles.secondary} onClick={() => inputArchivoRef.current?.click()} disabled={subiendo}>
+                    {subiendo ? <Loader2 size={16} className={styles.spin} /> : <Upload size={16} />}
+                    Importar CSV
+                  </button>
+                  <button className={styles.primary} onClick={ejecutarPendientes} disabled={procesando}>
+                    {procesando ? <Loader2 size={16} className={styles.spin} /> : <Play size={16} />}
+                    Ejecutar pendientes
+                  </button>
+                  <button className={styles.iconButton} onClick={generarCortes} disabled={generando} title="Generar cortes">
+                    {generando ? <Loader2 size={16} className={styles.spin} /> : <MoreVertical size={18} />}
+                  </button>
+                </>
+              )}
             </div>
             <div className={styles.filterRow}>
               <select
@@ -286,30 +303,42 @@ export default function AdminDashboard({
 
         {/* ── Paneles analíticos ── */}
         <div className={styles.analyticsGrid}>
-          {/* Estado */}
-          <section className={styles.panel}>
-            <h2><TrendingUp size={18} />Estado de auditorías</h2>
-            <div className={styles.miniStats}>
-              <div><Clock3 className={styles.warnIcon} /><b>{data?.estado.pendientes ?? 0}</b><span>Pendientes</span></div>
-              <div><CheckCircle2 className={styles.goodIcon} /><b>{data?.estado.procesadasHoy ?? 0}</b><span>Procesadas hoy</span></div>
-              <div><XCircle className={styles.badIcon} /><b>{data?.estado.conError ?? 0}</b><span>Con error</span></div>
-            </div>
-            <div className={styles.progressMeta}>
-              <span><b>{data?.estado.procesadasHoy ?? 0}</b> / {data?.estado.totalLote ?? 0} procesadas</span>
-              <b>{data?.estado.progresoPct ?? 0}%</b>
-            </div>
-            <div className={styles.progress}><span style={{ width: `${data?.estado.progresoPct ?? 0}%` }} /></div>
-            <div className={styles.panelActions}>
-              <button className={styles.primary} onClick={ejecutarPendientes} disabled={procesando}>
-                {procesando ? <Loader2 size={14} className={styles.spin} /> : <Play size={14} />}
-                Ejecutar pendientes
-              </button>
-              <button className={styles.secondary} onClick={generarCortes} disabled={generando}>
-                {generando ? <Loader2 size={14} className={styles.spin} /> : null}
-                Generar cortes
-              </button>
-            </div>
-          </section>
+          {/* Estado (IA) o formulario de registro manual (CO) */}
+          {tipoAuditoria === "co" ? (
+            <AuditoriaManualForm
+              funcionarios={funcionarios}
+              canales={data?.canales ?? []}
+              evaluadorDefault={nombre}
+              onGuardado={async (msg) => {
+                setBanner(msg);
+                if (msg.tipo === "ok") await refrescar();
+              }}
+            />
+          ) : (
+            <section className={styles.panel}>
+              <h2><TrendingUp size={18} />Estado de auditorías</h2>
+              <div className={styles.miniStats}>
+                <div><Clock3 className={styles.warnIcon} /><b>{data?.estado.pendientes ?? 0}</b><span>Pendientes</span></div>
+                <div><CheckCircle2 className={styles.goodIcon} /><b>{data?.estado.procesadasHoy ?? 0}</b><span>Procesadas hoy</span></div>
+                <div><XCircle className={styles.badIcon} /><b>{data?.estado.conError ?? 0}</b><span>Con error</span></div>
+              </div>
+              <div className={styles.progressMeta}>
+                <span><b>{data?.estado.procesadasHoy ?? 0}</b> / {data?.estado.totalLote ?? 0} procesadas</span>
+                <b>{data?.estado.progresoPct ?? 0}%</b>
+              </div>
+              <div className={styles.progress}><span style={{ width: `${data?.estado.progresoPct ?? 0}%` }} /></div>
+              <div className={styles.panelActions}>
+                <button className={styles.primary} onClick={ejecutarPendientes} disabled={procesando}>
+                  {procesando ? <Loader2 size={14} className={styles.spin} /> : <Play size={14} />}
+                  Ejecutar pendientes
+                </button>
+                <button className={styles.secondary} onClick={generarCortes} disabled={generando}>
+                  {generando ? <Loader2 size={14} className={styles.spin} /> : null}
+                  Generar cortes
+                </button>
+              </div>
+            </section>
+          )}
 
           {/* Cumplimiento por criterio */}
           <section className={styles.panel}>

@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/auth-helpers";
-import { obtenerDashboardAuditorias } from "@/lib/auditorias-admin";
+import { obtenerDashboardAuditorias, obtenerFuncionariosParaSelector, type FuncionarioOpcion } from "@/lib/auditorias-admin";
 import AdminDashboard from "./AdminDashboard";
 
 // Ejecutar auditorías puede tardar varios minutos (hasta 50 transcripciones,
@@ -17,5 +17,21 @@ export default async function AdminPage() {
     error = e instanceof Error ? e.message : "Error al cargar el dashboard de auditorías";
   }
 
-  return <AdminDashboard nombre={session.user.nombre} dashboardInicial={dashboard} errorInicial={error} />;
+  // Lista de asesores para el formulario de Auditoría CO: independiente del
+  // dashboard, si falla no debe tumbar toda la página.
+  let funcionarios: FuncionarioOpcion[] = [];
+  try {
+    funcionarios = await obtenerFuncionariosParaSelector();
+  } catch {
+    /* el formulario manual queda con la lista vacía; el asesor se puede escribir a mano */
+  }
+
+  return (
+    <AdminDashboard
+      nombre={session.user.nombre}
+      dashboardInicial={dashboard}
+      errorInicial={error}
+      funcionarios={funcionarios}
+    />
+  );
 }

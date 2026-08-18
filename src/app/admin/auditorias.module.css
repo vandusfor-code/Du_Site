@@ -127,6 +127,22 @@
 .bannerError { background: #fff0f1; color: #d93142; border: 1px solid #ffd4d2; }
 .bannerOk { background: #eafaf1; color: #158a55; border: 1px solid #b7e6cd; }
 
+/* ── Auditoría CO (manual) ── */
+.manualForm { grid-column: 1 / -1; }
+.manualForm h2 { font-size: 14px; margin: 0 0 17px; }
+.formGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+.formGridText { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+.formField { display: flex; flex-direction: column; gap: 6px; }
+.formField label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: #8a93a8; }
+.formField input, .formField select, .formField textarea {
+  border: 1px solid #e0e3eb; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; font-family: inherit; color: #202238; background: #fff; width: 100%;
+}
+.formField textarea { resize: vertical; min-height: 60px; }
+.formField input:focus, .formField select:focus, .formField textarea:focus { outline: 2px solid rgba(112, 68, 237, .2); border-color: #7044ed; }
+.notaPreview { display: flex; align-items: center; gap: 10px; height: 37px; }
+.notaPreview b { font-size: 16px; }
+.formActions { display: flex; justify-content: flex-end; }
+
 /* ── Modal detalle ── */
 .overlay { position: fixed; inset: 0; z-index: 50; background: rgba(15, 18, 40, .45); backdrop-filter: blur(3px); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 32px 16px; }
 .modal { width: 100%; max-width: 640px; background: #fff; border-radius: 18px; box-shadow: 0 30px 70px rgba(0, 0, 0, .3); }
@@ -157,6 +173,8 @@
   .analyticsGrid > section:last-child { grid-column: 1/3; }
   .tableTools { grid-template-columns: 1fr 1fr 1fr; }
   .filterButton { margin: 0; }
+  .formGrid { grid-template-columns: repeat(2, 1fr); }
+  .formGridText { grid-template-columns: 1fr; }
 }
 @media (max-width: 800px) {
   .sidebar { width: 70px; }
@@ -170,4 +188,5 @@
   .analyticsGrid > section:last-child { grid-column: auto; }
   .tableTools { grid-template-columns: 1fr; }
   .metaGrid, .critGrid { grid-template-columns: repeat(2, 1fr); }
+  .formGrid { grid-template-columns: 1fr; }
 }

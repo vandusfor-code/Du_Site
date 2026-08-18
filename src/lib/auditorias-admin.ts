@@ -709,6 +709,127 @@ export async function obtenerEstadoAuditorias(): Promise<EstadoAuditorias> {
 }
 
 /* ===================== */
+/* AUDITORÍA CO (MANUAL) */
+/* ===================== */
+
+export interface FuncionarioOpcion {
+  asesor: string;
+  correo: string;
+  canal: string;
+}
+
+// Lista de asesores (con correo/canal por defecto) para el selector del
+// formulario de Auditoría CO. Misma hoja "Funcionarios" que usa la IA.
+export async function obtenerFuncionariosParaSelector(): Promise<FuncionarioOpcion[]> {
+  const id = sheetId();
+  const funcData = await readRange(id, "Funcionarios", { unformatted: true });
+  const out: FuncionarioOpcion[] = [];
+  for (let i = 1; i < funcData.length; i++) {
+    const asesor = texto(funcData[i], 0);
+    if (!asesor) continue;
+    out.push({ asesor, correo: texto(funcData[i], 1), canal: texto(funcData[i], 2) });
+  }
+  return out;
+}
+
+export interface AuditoriaManualInput {
+  fecha: string; // "YYYY-MM-DD" (input type=date)
+  asesor: string;
+  canal: string;
+  tipoGestion: string;
+  correo: string;
+  idGestion: string;
+  evaluador: string;
+  saludo: string;
+  empatia: string;
+  sonrisa: string;
+  claridad: string;
+  encuesta: string;
+  informacion: string;
+  proceso: string;
+  cierre: string;
+  observacion: string;
+  hallazgos: string;
+  mejora: string;
+  estado: string;
+  grabacion: string;
+  tipoConsulta: string;
+  puntajeTuteo: string;
+}
+
+// Misma fórmula de nota que usa auditarLlamada(): de los 6 criterios que
+// afectan la nota (Saludo/Empatía/Sonrisa/Claridad/Encuesta/Cierre), si hasta
+// 2 quedan en "No cumple" la nota es 100% (OK); de lo contrario, PENC.
+export function calcularNotaManual(criterios: {
+  saludo: string; empatia: string; sonrisa: string; claridad: string; encuesta: string; cierre: string;
+}): { nota: number; tipoNota: string } {
+  const norm = {
+    saludo: normalizar(criterios.saludo, "criterio"),
+    empatia: normalizar(criterios.empatia, "criterio"),
+    sonrisa: normalizar(criterios.sonrisa, "criterio"),
+    claridad: normalizar(criterios.claridad, "criterio"),
+    encuesta: normalizar(criterios.encuesta, "criterio"),
+    cierre: normalizar(criterios.cierre, "criterio"),
+  };
+  const paraNota = Object.values(norm).filter((v): v is string => v !== null && v !== "No aplica");
+  const total = paraNota.length;
+  const cumple = paraNota.filter((v) => v === "Cumple").length;
+  const cantidadNoCumple = paraNota.filter((v) => v === "No cumple").length;
+  if (cantidadNoCumple > 2) {
+    const nota = total > 0 ? Math.round((cumple / total) * 100) : 0;
+    return { nota, tipoNota: "PENC" };
+  }
+  return { nota: 100, tipoNota: "OK" };
+}
+
+export async function guardarAuditoriaManual(input: AuditoriaManualInput): Promise<{ nota: string; tipoNota: string }> {
+  const id = sheetId();
+
+  const idGestion = input.idGestion.trim();
+  const asesor = input.asesor.trim();
+  if (!idGestion) throw new Error("El ID de gestión es obligatorio.");
+  if (!asesor) throw new Error("El asesor es obligatorio.");
+  if (!input.fecha) throw new Error("La fecha es obligatoria.");
+
+  // Evitar duplicados: mismo idGestion que ya exista en Consolidado (columna G).
+  const idsExistentes = await readRange(id, "Consolidado!G2:G", { unformatted: true });
+  const yaExiste = idsExistentes.some((row) => texto(row, 0) === idGestion);
+  if (yaExiste) throw new Error(`Ya existe una auditoría con el ID de gestión "${idGestion}".`);
+
+  const cNorm = {
+    saludo: normalizar(input.saludo, "criterio") ?? "No cumple",
+    empatia: normalizar(input.empatia, "criterio") ?? "No cumple",
+    sonrisa: normalizar(input.sonrisa, "criterio") ?? "No cumple",
+    claridad: normalizar(input.claridad, "criterio") ?? "No cumple",
+    encuesta: normalizar(input.encuesta, "criterio") ?? "No cumple",
+    informacion: normalizar(input.informacion, "criterio") ?? "No cumple",
+    proceso: normalizar(input.proceso, "criterio") ?? "No cumple",
+    cierre: normalizar(input.cierre, "criterio") ?? "No cumple",
+  };
+  const { nota, tipoNota } = calcularNotaManual(input);
+
+  const mesIdx = parseInt(input.fecha.split("-")[1], 10) - 1;
+  const mes = MESES[mesIdx] ?? "";
+  // fechaCorta() (usada por la IA) formatea con locale "sv-SE" → "YYYY-MM-DD";
+  // el <input type="date"> ya entrega ese mismo formato, así que se usa tal cual.
+  const fecha = input.fecha;
+
+  const fila: (string | number)[] = [
+    fecha, mes, asesor, input.canal.trim(), input.tipoGestion.trim() || "Consulta", input.correo.trim(),
+    idGestion, input.evaluador.trim() || "Calidad",
+    cNorm.saludo, cNorm.empatia, cNorm.sonrisa, cNorm.claridad, cNorm.encuesta, cNorm.informacion, cNorm.proceso, cNorm.cierre,
+    nota + "%", tipoNota,
+    input.observacion.trim(), input.hallazgos.trim(), input.mejora.trim(),
+    input.estado.trim() || "Procesado", input.grabacion.trim(), input.tipoConsulta.trim(),
+    normalizar(input.puntajeTuteo, "tuteo") ?? "Sin tuteo", fechaCorta(new Date()), "Medio",
+  ];
+
+  await appendRows(id, "Consolidado!A:AA", [fila]);
+
+  return { nota: nota + "%", tipoNota };
+}
+
+/* ===================== */
 /* CARGA DE TRANSCRIPCIONES (CSV) */
 /* ===================== */
 
