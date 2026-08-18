@@ -174,7 +174,7 @@ export default function DesempenoDashboard({
       <aside className={s.sidebar}>
         <div className={s.brand}>
           <div className={s.logo}>Du</div>
-          <b>Du Labs</b>
+          <b>Du Site</b>
         </div>
         <nav className={s.nav}>
           <Link href="/admin" className={s.navItem}><ClipboardCheck size={19} /><span>Auditorías</span></Link>

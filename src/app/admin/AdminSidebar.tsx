@@ -30,7 +30,7 @@ export default function AdminSidebar({ nombre, activo }: { nombre: string; activ
     <aside className={styles.sidebar}>
       <div className={styles.brand}>
         <div className={styles.logo}>Du</div>
-        <b>Du Labs</b>
+        <b>Du Site</b>
       </div>
       <nav className={styles.nav}>
         {NAV.map(({ icon: Icon, label, href }) => {
