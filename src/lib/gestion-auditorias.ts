@@ -93,39 +93,18 @@ export async function adoptarAuditorias(): Promise<ResultadoAdopcion> {
     .filter((r) => texto(r, 0).trim())
     .map((r) => ({ codigo: texto(r, 0), correo: texto(r, 1) }));
 
-  const idsAAdoptar = [...filaPorIdGestion.keys()];
   const errores: { idGestion: string; motivo: string }[] = [];
 
-  // Una sola consulta para saber qué ya tiene ciclo, en vez de una por fila.
-  const yaExisten = new Set<string>();
-  // Lote pequeño a propósito: .in() va como querystring en un GET, y con
-  // id_gestion siendo UUIDs (~36 caracteres) un lote de 500 arma una URL
-  // que el API gateway de Supabase rechaza como "Bad Request" por longitud.
-  const LOTE = 150;
-  for (let i = 0; i < idsAAdoptar.length; i += LOTE) {
-    const lote = idsAAdoptar.slice(i, i + LOTE);
-    const { data, error } = await supabase.from("ciclo_auditoria").select("id_gestion").in("id_gestion", lote);
-    if (error) {
-      throw new Error(
-        `Supabase (select existentes): ${error.message || "sin mensaje"} | code=${error.code ?? "?"} details=${error.details ?? "?"} hint=${error.hint ?? "?"}`
-      );
-    }
-    for (const row of data ?? []) yaExisten.add((row as { id_gestion: string }).id_gestion);
-  }
-
-  let nuevosCreados = 0;
-  let elegibles = 0;
-  let noElegibles = 0;
-
+  // Resolución de identidad: función pura, sin red — se puede construir en
+  // memoria TODA la lista de candidatos antes de tocar Supabase.
+  const candidatos: CicloAuditoriaInsert[] = [];
   for (const [idGestion, fila] of filaPorIdGestion) {
-    if (yaExisten.has(idGestion)) continue;
-
     try {
       const asesorRaw = texto(fila, COL_ASESOR);
       const resultado = texto(fila, COL_TIPO_NOTA).trim().toUpperCase(); // "OK" | "PENC"
       const identidad = resolverIdentidadAsesor(asesorRaw, asesoresConsolidado, funcionarios);
 
-      const filaInsertar: CicloAuditoriaInsert =
+      candidatos.push(
         identidad.estado === "ELEGIBLE"
           ? {
               id_gestion: idGestion,
@@ -142,51 +121,65 @@ export async function adoptarAuditorias(): Promise<ResultadoAdopcion> {
               estado: "NO_ELEGIBLE",
               motivo_no_elegible: identidad.estado,
               correo_notificacion: null,
-            };
-
-      const { data: insertado, error: errInsert } = await supabase
-        .from("ciclo_auditoria")
-        .insert(filaInsertar)
-        .select("id")
-        .single();
-
-      if (errInsert) {
-        // 23505 = choque contra UNIQUE(id_gestion): otra ejecución concurrente
-        // ya creó este ciclo entre el SELECT de arriba y este INSERT. No es un
-        // error real — es exactamente el caso de idempotencia bajo carrera.
-        if (errInsert.code === "23505") continue;
-        throw new Error(`${errInsert.message || "sin mensaje"} | code=${errInsert.code ?? "?"} details=${errInsert.details ?? "?"} hint=${errInsert.hint ?? "?"}`);
-      }
-
-      const tipoEvento = identidad.estado === "ELEGIBLE" ? "auditoria_creada" : "auditoria_no_elegible";
-      const detalle = identidad.estado === "ELEGIBLE" ? null : { motivo: identidad.estado };
-
-      const { error: errEvento } = await supabase.from("evento_ciclo").insert({
-        ciclo_id: insertado.id,
-        tipo_evento: tipoEvento,
-        origen: "automatico",
-        detalle,
-      });
-      if (errEvento) {
-        throw new Error(`${errEvento.message || "sin mensaje"} | code=${errEvento.code ?? "?"} details=${errEvento.details ?? "?"} hint=${errEvento.hint ?? "?"}`);
-      }
-
-      nuevosCreados++;
-      if (identidad.estado === "ELEGIBLE") elegibles++;
-      else noElegibles++;
+            }
+      );
     } catch (e) {
-      // Un error en una fila no debe abortar la adopción de las demás —
-      // se registra explícitamente en vez de fallar en silencio o tumbar
-      // todo el proceso por un caso puntual.
       errores.push({ idGestion, motivo: e instanceof Error ? e.message : String(e) });
     }
   }
 
+  // Inserción en lotes (no fila por fila): con ~1000+ auditorías, insertar
+  // una a una implicaba miles de idas y vueltas secuenciales a Supabase y
+  // superaba el tiempo límite de la función serverless (ERR_CONNECTION_RESET
+  // en la primera corrida real). upsert + ignoreDuplicates hace en una sola
+  // sentencia SQL lo que antes era un SELECT previo más un INSERT por fila:
+  // "INSERT ... ON CONFLICT (id_gestion) DO NOTHING", que además resuelve
+  // la carrera de idempotencia a nivel de base de datos sin necesitar el
+  // código 23505 explícito. RETURNING (el .select() encadenado) trae SOLO
+  // las filas que de verdad se insertaron, nunca las que ya existían.
+  const LOTE = 300;
+  const insertados: { id: string; estado: string; motivo_no_elegible: string | null }[] = [];
+  for (let i = 0; i < candidatos.length; i += LOTE) {
+    const lote = candidatos.slice(i, i + LOTE);
+    const { data, error } = await supabase
+      .from("ciclo_auditoria")
+      .upsert(lote, { onConflict: "id_gestion", ignoreDuplicates: true })
+      .select("id, estado, motivo_no_elegible");
+    if (error) {
+      throw new Error(
+        `Supabase (upsert ciclo_auditoria): ${error.message || "sin mensaje"} | code=${error.code ?? "?"} details=${error.details ?? "?"} hint=${error.hint ?? "?"}`
+      );
+    }
+    for (const row of data ?? []) insertados.push(row as { id: string; estado: string; motivo_no_elegible: string | null });
+  }
+
+  // Eventos solo para lo que de verdad se creó en esta pasada (nunca para
+  // lo que ya existía) — también en lotes, por la misma razón de arriba.
+  const eventos = insertados.map((c) => ({
+    ciclo_id: c.id,
+    tipo_evento: c.estado === "NO_ELEGIBLE" ? "auditoria_no_elegible" : "auditoria_creada",
+    origen: "automatico" as const,
+    detalle: c.estado === "NO_ELEGIBLE" ? { motivo: c.motivo_no_elegible } : null,
+  }));
+
+  for (let i = 0; i < eventos.length; i += LOTE) {
+    const lote = eventos.slice(i, i + LOTE);
+    const { error } = await supabase.from("evento_ciclo").insert(lote);
+    if (error) {
+      throw new Error(
+        `Supabase (insert evento_ciclo): ${error.message || "sin mensaje"} | code=${error.code ?? "?"} details=${error.details ?? "?"} hint=${error.hint ?? "?"}`
+      );
+    }
+  }
+
+  const elegibles = insertados.filter((c) => c.estado !== "NO_ELEGIBLE").length;
+  const noElegibles = insertados.filter((c) => c.estado === "NO_ELEGIBLE").length;
+
   return {
     filasConsolidado: filasConsolidado.length,
-    idsGestionUnicos: idsAAdoptar.length,
-    yaExistian: yaExisten.size,
-    nuevosCreados,
+    idsGestionUnicos: filaPorIdGestion.size,
+    yaExistian: filaPorIdGestion.size - insertados.length,
+    nuevosCreados: insertados.length,
     elegibles,
     noElegibles,
     errores,

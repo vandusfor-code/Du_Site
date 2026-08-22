@@ -17,6 +17,12 @@ import { verificarAdopcion } from "@/lib/verificacion-fase1";
 // de auditorías (ver diagnóstico de Fase 0, sección de seguridad).
 // ============================================================
 
+// La primera corrida real inserta ~1000 filas nuevas; aunque ahora la
+// adopción va en lotes (ver gestion-auditorias.ts) en vez de fila por fila,
+// se deja el mismo margen que admin/page.tsx usa para el motor de auditoría
+// sobre el mismo Consolidado.
+export const maxDuration = 300;
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.modulos.includes("admin")) {
