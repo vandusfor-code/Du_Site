@@ -235,11 +235,23 @@ export async function diagnosticarBrechaAdopcion(): Promise<DiagnosticoBrechaAdo
 
   const idsValidos = [...filaPorIdGestion.keys()].filter((idg) => idg.length <= 500);
 
-  const { data, error } = await supabase.from("ciclo_auditoria").select("id_gestion");
-  if (error) {
-    throw new Error(`Supabase (select id_gestion): ${error.message || "sin mensaje"} | code=${error.code ?? "?"}`);
+  // PostgREST no devuelve más de 1000 filas por consulta salvo que se
+  // pagine con .range() — con más de 1000 ciclos ya creados, un .select()
+  // sin paginar hacía ver como "faltantes" filas que sí existían.
+  const TAMANO_PAGINA = 1000;
+  const idsEnBd = new Set<string>();
+  for (let desde = 0; ; desde += TAMANO_PAGINA) {
+    const { data, error } = await supabase
+      .from("ciclo_auditoria")
+      .select("id_gestion")
+      .range(desde, desde + TAMANO_PAGINA - 1);
+    if (error) {
+      throw new Error(`Supabase (select id_gestion): ${error.message || "sin mensaje"} | code=${error.code ?? "?"}`);
+    }
+    const pagina = data ?? [];
+    for (const row of pagina) idsEnBd.add((row as { id_gestion: string }).id_gestion);
+    if (pagina.length < TAMANO_PAGINA) break;
   }
-  const idsEnBd = new Set((data ?? []).map((row) => (row as { id_gestion: string }).id_gestion));
 
   const faltantes = idsValidos
     .filter((idg) => !idsEnBd.has(idg))
