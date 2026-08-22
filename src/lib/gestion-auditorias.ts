@@ -201,3 +201,42 @@ export async function adoptarAuditorias(): Promise<ResultadoAdopcion> {
     errores,
   };
 }
+
+export interface DiagnosticoBrechaAdopcion {
+  totalCandidatosValidos: number;
+  totalEnBaseDeDatos: number;
+  faltantes: string[];
+}
+
+// SOLO DIAGNÓSTICO — no escribe nada. Compara, con datos reales, cuántos ID
+// Gestión válidos (largo aceptable) hay en Consolidado contra cuántos
+// existen hoy en ciclo_auditoria, y lista los que faltan. Existe para
+// explicar con evidencia, no con suposición, cualquier diferencia entre lo
+// esperado y lo que reporta adoptarAuditorias() en producción.
+export async function diagnosticarBrechaAdopcion(): Promise<DiagnosticoBrechaAdopcion> {
+  const id = sheetId();
+  const supabase = getSupabase();
+
+  const consolidadoRaw = await readRange(id, "Consolidado!A2:R", { unformatted: true });
+  const filasConsolidado = consolidadoRaw.filter((r) => texto(r, COL_ID_GESTION).trim());
+
+  const idsValidos = new Set<string>();
+  for (const r of filasConsolidado) {
+    const idg = texto(r, COL_ID_GESTION).trim();
+    if (idg.length <= 500) idsValidos.add(idg);
+  }
+
+  const { data, error } = await supabase.from("ciclo_auditoria").select("id_gestion");
+  if (error) {
+    throw new Error(`Supabase (select id_gestion): ${error.message || "sin mensaje"} | code=${error.code ?? "?"}`);
+  }
+  const idsEnBd = new Set((data ?? []).map((row) => (row as { id_gestion: string }).id_gestion));
+
+  const faltantes = [...idsValidos].filter((idg) => !idsEnBd.has(idg));
+
+  return {
+    totalCandidatosValidos: idsValidos.size,
+    totalEnBaseDeDatos: idsEnBd.size,
+    faltantes,
+  };
+}

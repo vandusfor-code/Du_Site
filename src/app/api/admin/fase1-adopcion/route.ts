@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { adoptarAuditorias } from "@/lib/gestion-auditorias";
+import { adoptarAuditorias, diagnosticarBrechaAdopcion } from "@/lib/gestion-auditorias";
 import { verificarAdopcion } from "@/lib/verificacion-fase1";
 
 // ============================================================
@@ -32,9 +32,11 @@ export async function GET() {
   try {
     const resultado = await adoptarAuditorias();
     const verificacion = await verificarAdopcion();
+    const diagnostico = await diagnosticarBrechaAdopcion();
     console.log("[fase1-adopcion] resultado:", JSON.stringify(resultado));
     console.log("[fase1-adopcion] verificacion:", JSON.stringify(verificacion));
-    return NextResponse.json({ resultado, verificacion });
+    console.log("[fase1-adopcion] diagnostico:", JSON.stringify(diagnostico));
+    return NextResponse.json({ resultado, verificacion, diagnostico });
   } catch (e) {
     console.error("[fase1-adopcion] error:", e);
     return NextResponse.json(
