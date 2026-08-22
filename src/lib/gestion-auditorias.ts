@@ -98,11 +98,18 @@ export async function adoptarAuditorias(): Promise<ResultadoAdopcion> {
 
   // Una sola consulta para saber qué ya tiene ciclo, en vez de una por fila.
   const yaExisten = new Set<string>();
-  const LOTE = 500; // Supabase/PostgREST tiene límite práctico de tamaño de .in(); se lotea por seguridad.
+  // Lote pequeño a propósito: .in() va como querystring en un GET, y con
+  // id_gestion siendo UUIDs (~36 caracteres) un lote de 500 arma una URL
+  // que el API gateway de Supabase rechaza como "Bad Request" por longitud.
+  const LOTE = 150;
   for (let i = 0; i < idsAAdoptar.length; i += LOTE) {
     const lote = idsAAdoptar.slice(i, i + LOTE);
     const { data, error } = await supabase.from("ciclo_auditoria").select("id_gestion").in("id_gestion", lote);
-    if (error) throw new Error(`Supabase (select existentes): ${error.message}`);
+    if (error) {
+      throw new Error(
+        `Supabase (select existentes): ${error.message || "sin mensaje"} | code=${error.code ?? "?"} details=${error.details ?? "?"} hint=${error.hint ?? "?"}`
+      );
+    }
     for (const row of data ?? []) yaExisten.add((row as { id_gestion: string }).id_gestion);
   }
 
@@ -148,7 +155,7 @@ export async function adoptarAuditorias(): Promise<ResultadoAdopcion> {
         // ya creó este ciclo entre el SELECT de arriba y este INSERT. No es un
         // error real — es exactamente el caso de idempotencia bajo carrera.
         if (errInsert.code === "23505") continue;
-        throw new Error(errInsert.message);
+        throw new Error(`${errInsert.message || "sin mensaje"} | code=${errInsert.code ?? "?"} details=${errInsert.details ?? "?"} hint=${errInsert.hint ?? "?"}`);
       }
 
       const tipoEvento = identidad.estado === "ELEGIBLE" ? "auditoria_creada" : "auditoria_no_elegible";
@@ -160,7 +167,9 @@ export async function adoptarAuditorias(): Promise<ResultadoAdopcion> {
         origen: "automatico",
         detalle,
       });
-      if (errEvento) throw new Error(errEvento.message);
+      if (errEvento) {
+        throw new Error(`${errEvento.message || "sin mensaje"} | code=${errEvento.code ?? "?"} details=${errEvento.details ?? "?"} hint=${errEvento.hint ?? "?"}`);
+      }
 
       nuevosCreados++;
       if (identidad.estado === "ELEGIBLE") elegibles++;

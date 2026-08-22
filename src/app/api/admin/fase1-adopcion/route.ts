@@ -30,6 +30,7 @@ export async function GET() {
     console.log("[fase1-adopcion] verificacion:", JSON.stringify(verificacion));
     return NextResponse.json({ resultado, verificacion });
   } catch (e) {
+    console.error("[fase1-adopcion] error:", e);
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Error desconocido en la adopción" },
       { status: 500 }
