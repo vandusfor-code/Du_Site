@@ -205,14 +205,21 @@ export async function adoptarAuditorias(): Promise<ResultadoAdopcion> {
 export interface DiagnosticoBrechaAdopcion {
   totalCandidatosValidos: number;
   totalEnBaseDeDatos: number;
-  faltantes: string[];
+  faltantes: {
+    idGestion: string;
+    asesorRaw: string;
+    resultadoRaw: string;
+    resultadoNormalizado: string;
+    resultadoValidoParaElCheck: boolean;
+  }[];
 }
 
 // SOLO DIAGNÓSTICO — no escribe nada. Compara, con datos reales, cuántos ID
 // Gestión válidos (largo aceptable) hay en Consolidado contra cuántos
-// existen hoy en ciclo_auditoria, y lista los que faltan. Existe para
-// explicar con evidencia, no con suposición, cualquier diferencia entre lo
-// esperado y lo que reporta adoptarAuditorias() en producción.
+// existen hoy en ciclo_auditoria, y para los que faltan trae el dato crudo
+// de Consolidado (asesor, Tipo Nota) para ver el patrón real en vez de
+// suponerlo. Existe para explicar con evidencia cualquier diferencia entre
+// lo esperado y lo que reporta adoptarAuditorias() en producción.
 export async function diagnosticarBrechaAdopcion(): Promise<DiagnosticoBrechaAdopcion> {
   const id = sheetId();
   const supabase = getSupabase();
@@ -220,11 +227,13 @@ export async function diagnosticarBrechaAdopcion(): Promise<DiagnosticoBrechaAdo
   const consolidadoRaw = await readRange(id, "Consolidado!A2:R", { unformatted: true });
   const filasConsolidado = consolidadoRaw.filter((r) => texto(r, COL_ID_GESTION).trim());
 
-  const idsValidos = new Set<string>();
+  const filaPorIdGestion = new Map<string, unknown[]>();
   for (const r of filasConsolidado) {
     const idg = texto(r, COL_ID_GESTION).trim();
-    if (idg.length <= 500) idsValidos.add(idg);
+    if (!filaPorIdGestion.has(idg)) filaPorIdGestion.set(idg, r);
   }
+
+  const idsValidos = [...filaPorIdGestion.keys()].filter((idg) => idg.length <= 500);
 
   const { data, error } = await supabase.from("ciclo_auditoria").select("id_gestion");
   if (error) {
@@ -232,10 +241,24 @@ export async function diagnosticarBrechaAdopcion(): Promise<DiagnosticoBrechaAdo
   }
   const idsEnBd = new Set((data ?? []).map((row) => (row as { id_gestion: string }).id_gestion));
 
-  const faltantes = [...idsValidos].filter((idg) => !idsEnBd.has(idg));
+  const faltantes = idsValidos
+    .filter((idg) => !idsEnBd.has(idg))
+    .map((idg) => {
+      const fila = filaPorIdGestion.get(idg)!;
+      const asesorRaw = texto(fila, COL_ASESOR);
+      const resultadoRaw = texto(fila, COL_TIPO_NOTA);
+      const resultadoNormalizado = resultadoRaw.trim().toUpperCase();
+      return {
+        idGestion: idg,
+        asesorRaw,
+        resultadoRaw,
+        resultadoNormalizado,
+        resultadoValidoParaElCheck: resultadoNormalizado === "OK" || resultadoNormalizado === "PENC",
+      };
+    });
 
   return {
-    totalCandidatosValidos: idsValidos.size,
+    totalCandidatosValidos: idsValidos.length,
     totalEnBaseDeDatos: idsEnBd.size,
     faltantes,
   };
