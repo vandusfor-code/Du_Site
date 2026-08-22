@@ -194,7 +194,7 @@ export async function adoptarAuditorias(): Promise<ResultadoAdopcion> {
   return {
     filasConsolidado: filasConsolidado.length,
     idsGestionUnicos: filaPorIdGestion.size,
-    yaExistian: filaPorIdGestion.size - insertados.length,
+    yaExistian: candidatos.length - insertados.length,
     nuevosCreados: insertados.length,
     elegibles,
     noElegibles,
