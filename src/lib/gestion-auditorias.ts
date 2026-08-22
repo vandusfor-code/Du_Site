@@ -95,11 +95,27 @@ export async function adoptarAuditorias(): Promise<ResultadoAdopcion> {
 
   const errores: { idGestion: string; motivo: string }[] = [];
 
+  // Un ID Gestión real mide ~36 caracteres. Postgres no puede indexar un
+  // valor de más de ~2704 bytes en un btree de una sola columna (1/3 de una
+  // página de 8kb) — visto en producción: una fila de Consolidado trae en
+  // esa celda un texto de ~2900 bytes (dato corrupto, no un ID real), que
+  // tumbaba el upsert de todo el lote de 300. Se descarta antes de tocar
+  // Supabase, en vez de dejar que una fila envenene el lote completo.
+  const LARGO_MAXIMO_ID_GESTION = 500;
+
   // Resolución de identidad: función pura, sin red — se puede construir en
   // memoria TODA la lista de candidatos antes de tocar Supabase.
   const candidatos: CicloAuditoriaInsert[] = [];
   for (const [idGestion, fila] of filaPorIdGestion) {
     try {
+      if (idGestion.length > LARGO_MAXIMO_ID_GESTION) {
+        errores.push({
+          idGestion: `${idGestion.slice(0, 60)}… (${idGestion.length} caracteres)`,
+          motivo: "ID Gestión excede el largo esperado — probable dato corrupto en Consolidado, se omite sin crear ciclo",
+        });
+        continue;
+      }
+
       const asesorRaw = texto(fila, COL_ASESOR);
       const resultado = texto(fila, COL_TIPO_NOTA).trim().toUpperCase(); // "OK" | "PENC"
       const identidad = resolverIdentidadAsesor(asesorRaw, asesoresConsolidado, funcionarios);
