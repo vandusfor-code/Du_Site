@@ -7,7 +7,7 @@ export default async function CalidadPage({
 }: {
   searchParams: Promise<{ id?: string }>;
 }) {
-  await requireModulo("calidad");
+  const session = await requireModulo("calidad");
   const { id } = await searchParams;
 
   const [kpis, panel, detalleInicial] = await Promise.all([
@@ -24,6 +24,8 @@ export default async function CalidadPage({
       panelInicial={panel}
       idResaltadoInicial={id ?? null}
       detalleInicial={detalleInicial}
+      nombreUsuario={session.user.nombre || session.user.usuario || "Usuario"}
+      rolUsuario={session.user.rol}
     />
   );
 }

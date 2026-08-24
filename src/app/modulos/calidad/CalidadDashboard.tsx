@@ -2,10 +2,24 @@
 
 import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ModuleTopbar } from "@/components/module-shell";
+import {
+  ClipboardCheck,
+  Download,
+  Mail,
+  Clock,
+  TriangleAlert,
+  Clipboard,
+  RefreshCw,
+  CalendarX,
+  CircleCheck,
+  XCircle,
+  UserRoundX,
+  ChevronRight,
+  type LucideIcon,
+} from "lucide-react";
 import { Drawer } from "@/components/drawer";
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
-import { useModuleSound } from "@/lib/use-module-sound";
+import CalidadSidebar from "./CalidadSidebar";
 import { cargarPanelCalidadAction, cargarDetalleAuditoriaCalidadAction } from "./actions";
 import type {
   FiltrosPanelCalidad,
@@ -25,6 +39,27 @@ const ESTADOS: EstadoCiclo[] = [
   "NO_ELEGIBLE",
 ];
 
+// Mapeo puramente visual (color de insignia) para el estado del ciclo — no
+// altera el cálculo de semaforo/vencimientos, que sigue viniendo intacto
+// desde gestion-calidad.ts.
+const TONO_ESTADO: Record<EstadoCiclo, StatusTone> = {
+  CREADA: "neutral",
+  NOTIFICADA: "info",
+  ACUSADA: "info",
+  COMPROMISO_PENDIENTE: "warning",
+  EN_SEGUIMIENTO: "warning",
+  CERRADA: "success",
+  NO_ELEGIBLE: "neutral",
+};
+
+const TONO_DOT: Record<StatusTone, string> = {
+  success: "bg-success",
+  warning: "bg-warning",
+  error: "bg-error",
+  info: "bg-info",
+  neutral: "bg-neutral",
+};
+
 type TabDetalle = "auditoria" | "ciclo" | "compromiso" | "historial";
 
 function formatearFecha(iso: string | null): string {
@@ -34,19 +69,54 @@ function formatearFecha(iso: string | null): string {
   return d.toLocaleDateString("es-CO", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-const TONO_TEXTO: Record<StatusTone, string> = {
-  success: "text-success",
-  warning: "text-warning",
-  error: "text-error",
-  info: "text-info",
-  neutral: "text-neutral",
-};
+function ResultadoBadge({ resultado }: { resultado: string }) {
+  if (resultado === "OK") {
+    return (
+      <span className="inline-flex rounded-[7px] bg-success-bg px-2.5 py-1 text-[11px] font-bold text-success">
+        OK
+      </span>
+    );
+  }
+  if (resultado === "PENC") {
+    return (
+      <span className="inline-flex rounded-[7px] bg-error-bg px-2.5 py-1 text-[11px] font-bold text-error">
+        PENC
+      </span>
+    );
+  }
+  return <span className="text-foreground">{resultado || "—"}</span>;
+}
 
-function KpiTile({ label, value, tone }: { label: string; value: number; tone: StatusTone }) {
+function KpiCard({
+  icon: Icon,
+  label,
+  value,
+  caption,
+  tone,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  caption: string;
+  tone: StatusTone;
+}) {
+  const TONE_ICON: Record<StatusTone, string> = {
+    success: "bg-success-bg text-success",
+    warning: "bg-warning-bg text-warning",
+    error: "bg-error-bg text-error",
+    info: "bg-info-bg text-info",
+    neutral: "bg-neutral-bg text-neutral",
+  };
   return (
-    <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4 shadow-[var(--shadow-sm)]">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</p>
-      <p className={`mt-1 text-2xl font-bold tabular-nums ${TONO_TEXTO[tone]}`}>{value}</p>
+    <div className="rounded-2xl border border-border bg-surface p-4 shadow-[0_2px_8px_rgba(24,30,55,0.045)]">
+      <div className="flex items-center gap-3">
+        <div className={`grid size-9 shrink-0 place-items-center rounded-[11px] ${TONE_ICON[tone]}`}>
+          <Icon size={17} />
+        </div>
+        <p className="text-[12px] font-semibold text-muted">{label}</p>
+      </div>
+      <p className="mt-3 text-[24px] font-bold tabular-nums text-foreground">{value}</p>
+      <p className="mt-0.5 text-[11px] text-muted">{caption}</p>
     </div>
   );
 }
@@ -56,18 +126,22 @@ export default function CalidadDashboard({
   panelInicial,
   idResaltadoInicial,
   detalleInicial,
+  nombreUsuario,
+  rolUsuario,
 }: {
   kpisIniciales: KPIsPanelCalidad;
   panelInicial: ResultadoPanelCalidad;
   idResaltadoInicial: string | null;
   detalleInicial: DetalleAuditoriaCalidad | null;
+  nombreUsuario: string;
+  rolUsuario?: string;
 }) {
   const router = useRouter();
-  const { soundOn, toggleSound } = useModuleSound();
 
   const [kpis] = useState(kpisIniciales);
   const [panel, setPanel] = useState(panelInicial);
   const [filtros, setFiltros] = useState<FiltrosPanelCalidad>({});
+  const [borrador, setBorrador] = useState<FiltrosPanelCalidad>({});
   const [pagina, setPagina] = useState(0);
   const [cargando, startTransition] = useTransition();
 
@@ -83,11 +157,17 @@ export default function CalidadDashboard({
     });
   }, []);
 
-  function aplicarFiltro(parcial: Partial<FiltrosPanelCalidad>) {
-    const nuevos: FiltrosPanelCalidad = { ...filtros, ...parcial };
-    setFiltros(nuevos);
+  function aplicarFiltros() {
+    setFiltros(borrador);
     setPagina(0);
-    recargar(nuevos, 0);
+    recargar(borrador, 0);
+  }
+
+  function limpiarFiltros() {
+    setBorrador({});
+    setFiltros({});
+    setPagina(0);
+    recargar({}, 0);
   }
 
   function cambiarPagina(nueva: number) {
@@ -117,116 +197,164 @@ export default function CalidadDashboard({
   const totalPaginas = Math.max(1, Math.ceil(panel.totalFilas / panel.tamanoPagina));
 
   return (
-    // ModuleTopbar (module-shell.css) usa var(--primary)/var(--primary-deep),
-    // que globals.css no define (usa --brand/--brand-deep). Se alía aquí,
-    // solo para este módulo, sin tocar module-shell.css ni otros módulos
-    // que ya definen su propio --primary (ej. metricas.css).
-    <div
-      className="min-h-screen bg-background"
-      style={{ "--primary": "var(--brand)", "--primary-deep": "var(--brand-deep)" } as React.CSSProperties}
-    >
-      <ModuleTopbar moduleName="Calidad" soundOn={soundOn} toggleSound={toggleSound} />
+    <div className="min-h-screen bg-background">
+      <CalidadSidebar nombre={nombreUsuario} rol={rolUsuario} />
 
-      <main className="mx-auto max-w-[1400px] px-6 py-8">
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Panel de Calidad</h1>
-          <p className="mt-1 text-sm text-muted">Seguimiento de auditorías, acuses y compromisos.</p>
+      <main className="ml-[228px] max-w-[1700px] px-[30px] py-[26px]">
+        <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="grid size-10 place-items-center rounded-xl bg-brand-soft text-brand">
+              <ClipboardCheck size={20} />
+            </div>
+            <div>
+              <h1 className="text-[28px] font-semibold tracking-tight text-foreground">Calidad</h1>
+              <p className="mt-0.5 text-[13px] text-muted">
+                Seguimiento de auditorías, acuses y compromisos.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="inline-flex h-[39px] items-center gap-2 rounded-lg border border-border bg-surface px-4 text-[13px] font-semibold text-foreground hover:border-muted"
+          >
+            <Download size={15} />
+            Exportar
+          </button>
         </header>
 
-        <section className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <KpiTile label="Notificadas" value={kpis.notificadasTotales} tone="info" />
-          <KpiTile label="Pendientes de acuse" value={kpis.pendientesDeAcuse} tone="neutral" />
-          <KpiTile label="Vencidas sin acuse" value={kpis.vencidasSinAcuse} tone="error" />
-          <KpiTile label="Compromiso pendiente" value={kpis.compromisosPendientesDeRegistro} tone="neutral" />
-          <KpiTile label="En seguimiento" value={kpis.enSeguimiento} tone="info" />
-          <KpiTile label="Compromisos vencidos" value={kpis.compromisosVencidos} tone="error" />
-          <KpiTile label="Cumplidos" value={kpis.cumplidos} tone="success" />
-          <KpiTile label="Incumplidos" value={kpis.incumplidos} tone="error" />
-          <KpiTile label="No elegibles" value={kpis.noElegibles} tone="neutral" />
+        <section className="mb-6 grid grid-cols-5 gap-3">
+          <KpiCard icon={Mail} label="Notificadas" value={kpis.notificadasTotales} tone="info" caption="Ciclos notificados a la fecha" />
+          <KpiCard icon={Clock} label="Pendientes de acuse" value={kpis.pendientesDeAcuse} tone="neutral" caption="Esperando acuse de recibo" />
+          <KpiCard icon={TriangleAlert} label="Vencidas sin acuse" value={kpis.vencidasSinAcuse} tone="error" caption="Sin acuse dentro del plazo" />
+          <KpiCard icon={Clipboard} label="Compromiso pendiente" value={kpis.compromisosPendientesDeRegistro} tone="neutral" caption="Falta registrar el compromiso" />
+          <KpiCard icon={RefreshCw} label="En seguimiento" value={kpis.enSeguimiento} tone="info" caption="Compromiso activo, en plazo" />
+          <KpiCard icon={CalendarX} label="Compromisos vencidos" value={kpis.compromisosVencidos} tone="error" caption="Plazo de compromiso vencido" />
+          <KpiCard icon={CircleCheck} label="Cumplidos" value={kpis.cumplidos} tone="success" caption="Compromisos verificados OK" />
+          <KpiCard icon={XCircle} label="Incumplidos" value={kpis.incumplidos} tone="error" caption="Compromisos verificados NO OK" />
+          <KpiCard icon={UserRoundX} label="No elegibles" value={kpis.noElegibles} tone="neutral" caption="Fuera del ciclo de auditoría" />
         </section>
 
-        <section className="mb-4 flex flex-wrap items-center gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-4">
-          <select
-            className="rounded-md border border-border bg-surface-inset px-3 py-2 text-sm text-foreground"
-            value={filtros.estado ?? ""}
-            onChange={(e) => aplicarFiltro({ estado: (e.target.value || undefined) as EstadoCiclo | undefined })}
-          >
-            <option value="">Todos los estados</option>
-            {ESTADOS.map((e) => (
-              <option key={e} value={e}>
-                {e}
-              </option>
-            ))}
-          </select>
+        <section className="mb-5 rounded-2xl border border-border bg-surface p-4">
+          <div className="grid grid-cols-3 gap-3">
+            <Campo label="Estado">
+              <select
+                className="h-9 w-full rounded-lg border border-border bg-surface-inset px-3 text-[13px] text-foreground"
+                value={borrador.estado ?? ""}
+                onChange={(e) => setBorrador((f) => ({ ...f, estado: (e.target.value || undefined) as EstadoCiclo | undefined }))}
+              >
+                <option value="">Todos los estados</option>
+                {ESTADOS.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+            <Campo label="Código asesor">
+              <input
+                type="text"
+                placeholder="Ej. A1234"
+                className="h-9 w-full rounded-lg border border-border bg-surface-inset px-3 text-[13px] text-foreground"
+                value={borrador.asesorCodigo ?? ""}
+                onChange={(e) => setBorrador((f) => ({ ...f, asesorCodigo: e.target.value || undefined }))}
+              />
+            </Campo>
+            <Campo label="Resultado">
+              <select
+                className="h-9 w-full rounded-lg border border-border bg-surface-inset px-3 text-[13px] text-foreground"
+                value={borrador.resultado ?? ""}
+                onChange={(e) => setBorrador((f) => ({ ...f, resultado: (e.target.value || undefined) as "OK" | "PENC" | undefined }))}
+              >
+                <option value="">Todos</option>
+                <option value="OK">OK</option>
+                <option value="PENC">PENC</option>
+              </select>
+            </Campo>
+          </div>
 
-          <input
-            type="text"
-            placeholder="Código de asesora"
-            className="rounded-md border border-border bg-surface-inset px-3 py-2 text-sm text-foreground"
-            defaultValue={filtros.asesorCodigo ?? ""}
-            onBlur={(e) => aplicarFiltro({ asesorCodigo: e.target.value.trim() || undefined })}
-          />
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            <Campo label="¿Requiere compromiso?">
+              <select
+                className="h-9 w-full rounded-lg border border-border bg-surface-inset px-3 text-[13px] text-foreground"
+                value={borrador.requiereCompromiso === undefined ? "" : String(borrador.requiereCompromiso)}
+                onChange={(e) =>
+                  setBorrador((f) => ({
+                    ...f,
+                    requiereCompromiso: e.target.value === "" ? undefined : e.target.value === "true",
+                  }))
+                }
+              >
+                <option value="">Todos</option>
+                <option value="true">Sí</option>
+                <option value="false">No</option>
+              </select>
+            </Campo>
+            <div className="flex items-end pb-2">
+              <label className="flex items-center gap-2 text-[13px] text-foreground">
+                <input
+                  type="checkbox"
+                  checked={!!borrador.vencidas}
+                  onChange={(e) => setBorrador((f) => ({ ...f, vencidas: e.target.checked || undefined }))}
+                />
+                Solo vencidas
+              </label>
+            </div>
+          </div>
 
-          <select
-            className="rounded-md border border-border bg-surface-inset px-3 py-2 text-sm text-foreground"
-            value={filtros.resultado ?? ""}
-            onChange={(e) => aplicarFiltro({ resultado: (e.target.value || undefined) as "OK" | "PENC" | undefined })}
-          >
-            <option value="">Resultado (todos)</option>
-            <option value="OK">OK</option>
-            <option value="PENC">PENC</option>
-          </select>
-
-          <select
-            className="rounded-md border border-border bg-surface-inset px-3 py-2 text-sm text-foreground"
-            value={filtros.requiereCompromiso === undefined ? "" : String(filtros.requiereCompromiso)}
-            onChange={(e) =>
-              aplicarFiltro({ requiereCompromiso: e.target.value === "" ? undefined : e.target.value === "true" })
-            }
-          >
-            <option value="">Requiere compromiso (todos)</option>
-            <option value="true">Sí</option>
-            <option value="false">No</option>
-          </select>
-
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={!!filtros.vencidas}
-              onChange={(e) => aplicarFiltro({ vencidas: e.target.checked || undefined })}
-            />
-            Solo vencidas
-          </label>
-
-          <div className="flex items-center gap-2 text-sm text-muted">
-            <span>Auditoría entre</span>
-            <input
-              type="date"
-              className="rounded-md border border-border bg-surface-inset px-2 py-1.5 text-sm text-foreground"
-              onChange={(e) =>
-                aplicarFiltro({ fechaAuditoriaDesde: e.target.value ? new Date(e.target.value).toISOString() : undefined })
-              }
-            />
-            <span>y</span>
-            <input
-              type="date"
-              className="rounded-md border border-border bg-surface-inset px-2 py-1.5 text-sm text-foreground"
-              onChange={(e) =>
-                aplicarFiltro({ fechaAuditoriaHasta: e.target.value ? new Date(e.target.value).toISOString() : undefined })
-              }
-            />
+          <div className="mt-3 grid grid-cols-[2fr_1fr] items-end gap-3">
+            <Campo label="Fecha de auditoría (rango)">
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  className="h-9 w-full rounded-lg border border-border bg-surface-inset px-2.5 text-[13px] text-foreground"
+                  onChange={(e) =>
+                    setBorrador((f) => ({
+                      ...f,
+                      fechaAuditoriaDesde: e.target.value ? new Date(e.target.value).toISOString() : undefined,
+                    }))
+                  }
+                />
+                <span className="text-[12px] text-muted">a</span>
+                <input
+                  type="date"
+                  className="h-9 w-full rounded-lg border border-border bg-surface-inset px-2.5 text-[13px] text-foreground"
+                  onChange={(e) =>
+                    setBorrador((f) => ({
+                      ...f,
+                      fechaAuditoriaHasta: e.target.value ? new Date(e.target.value).toISOString() : undefined,
+                    }))
+                  }
+                />
+              </div>
+            </Campo>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={limpiarFiltros}
+                className="h-9 rounded-lg border border-border bg-surface px-4 text-[13px] font-semibold text-foreground hover:border-muted"
+              >
+                Limpiar filtros
+              </button>
+              <button
+                type="button"
+                onClick={aplicarFiltros}
+                className="h-9 rounded-lg bg-brand px-4 text-[13px] font-semibold text-white hover:bg-brand-deep"
+              >
+                Aplicar filtros
+              </button>
+            </div>
           </div>
         </section>
 
-        <section className="overflow-x-auto rounded-[var(--radius-md)] border border-border bg-surface">
-          <table className="w-full min-w-[1300px] text-sm">
+        <section className="overflow-x-auto rounded-2xl border border-border bg-surface">
+          <table className="w-full min-w-[1500px] text-[12.5px]">
             <thead>
-              <tr className="border-b border-border text-left text-[11px] font-semibold uppercase tracking-wide text-muted">
+              <tr className="bg-surface-inset text-left text-[10px] font-semibold uppercase tracking-wide text-muted">
+                <th className="px-3 py-3">Estado</th>
                 <th className="px-3 py-3">Asesora</th>
                 <th className="px-3 py-3">ID Gestión</th>
                 <th className="px-3 py-3">Fecha auditoría</th>
                 <th className="px-3 py-3">Resultado</th>
-                <th className="px-3 py-3">Estado</th>
                 <th className="px-3 py-3">Notificación</th>
                 <th className="px-3 py-3">Acuse</th>
                 <th className="px-3 py-3">¿Compromiso?</th>
@@ -235,13 +363,14 @@ export default function CalidadDashboard({
                 <th className="px-3 py-3">Días</th>
                 <th className="px-3 py-3">Record.</th>
                 <th className="px-3 py-3">Última notif.</th>
-                <th className="px-3 py-3">Cumplimiento</th>
+                <th className="px-3 py-3">Semáforo</th>
+                <th className="px-3 py-3">Acción</th>
               </tr>
             </thead>
             <tbody className={cargando ? "opacity-50" : ""}>
               {panel.filas.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="px-3 py-10 text-center text-muted">
+                  <td colSpan={15} className="px-3 py-10 text-center text-muted">
                     Sin resultados para estos filtros.
                   </td>
                 </tr>
@@ -252,24 +381,43 @@ export default function CalidadDashboard({
                     className="cursor-pointer border-b border-border last:border-0 hover:bg-surface-inset"
                     onClick={() => abrirDetalle(f.idGestion)}
                   >
-                    <td className="px-3 py-3 font-medium text-foreground">{f.nombreAsesora}</td>
-                    <td className="px-3 py-3 font-mono text-xs text-muted">{f.idGestion.slice(0, 8)}…</td>
-                    <td className="px-3 py-3 text-muted">{formatearFecha(f.fechaAuditoria)}</td>
-                    <td className="px-3 py-3 text-foreground">{f.resultado}</td>
-                    <td className="px-3 py-3">
-                      <StatusBadge tone={f.semaforo.tone} label={f.semaforo.etiqueta} />
+                    <td className="px-3 py-2.5">
+                      <StatusBadge tone={TONO_ESTADO[f.estado]} label={f.estado} />
                     </td>
-                    <td className="px-3 py-3 text-muted">{formatearFecha(f.fechaNotificacion)}</td>
-                    <td className="px-3 py-3 text-muted">{formatearFecha(f.fechaAcuse)}</td>
-                    <td className="px-3 py-3 text-foreground">{f.requiereCompromiso ? "Sí" : "No"}</td>
-                    <td className="px-3 py-3 text-muted">{formatearFecha(f.fechaRegistroCompromiso)}</td>
-                    <td className="px-3 py-3 text-muted">{formatearFecha(f.fechaPrometida)}</td>
-                    <td className="px-3 py-3 tabular-nums text-foreground">
+                    <td className="px-3 py-2.5 font-medium text-foreground">{f.nombreAsesora}</td>
+                    <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{f.idGestion.slice(0, 8)}…</td>
+                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.fechaAuditoria)}</td>
+                    <td className="px-3 py-2.5">
+                      <ResultadoBadge resultado={f.resultado} />
+                    </td>
+                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.fechaNotificacion)}</td>
+                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.fechaAcuse)}</td>
+                    <td className="px-3 py-2.5 text-foreground">{f.requiereCompromiso ? "Sí" : "No"}</td>
+                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.fechaRegistroCompromiso)}</td>
+                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.fechaPrometida)}</td>
+                    <td className="px-3 py-2.5 tabular-nums text-foreground">
                       {f.diasRestantes === null ? "—" : f.diasRestantes}
                     </td>
-                    <td className="px-3 py-3 tabular-nums text-foreground">{f.recordatoriosEnviados}</td>
-                    <td className="px-3 py-3 text-muted">{formatearFecha(f.ultimaNotificacion)}</td>
-                    <td className="px-3 py-3 text-foreground">{f.cumplimiento ?? "—"}</td>
+                    <td className="px-3 py-2.5 tabular-nums text-foreground">{f.recordatoriosEnviados}</td>
+                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.ultimaNotificacion)}</td>
+                    <td className="px-3 py-2.5">
+                      <span
+                        title={f.semaforo.etiqueta}
+                        className={`inline-block size-2.5 rounded-full ${TONO_DOT[f.semaforo.tone]}`}
+                      />
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          abrirDetalle(f.idGestion);
+                        }}
+                        className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-brand hover:underline"
+                      >
+                        Ver <ChevronRight size={13} />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -277,7 +425,7 @@ export default function CalidadDashboard({
           </table>
         </section>
 
-        <div className="mt-4 flex items-center justify-between text-sm text-muted">
+        <div className="mt-4 flex items-center justify-between text-[12px] text-muted">
           <span>
             {panel.totalFilas} auditorías · página {pagina + 1} de {totalPaginas}
           </span>
@@ -318,6 +466,15 @@ export default function CalidadDashboard({
   );
 }
 
+function Campo({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[10px] font-bold uppercase tracking-wide text-muted">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 function DetalleAuditoriaContenido({
   detalle,
   tabActiva,
@@ -336,14 +493,14 @@ function DetalleAuditoriaContenido({
 
   return (
     <div>
-      <div className="mb-4 flex gap-1 rounded-md bg-surface-inset p-1">
+      <div className="mb-4 flex gap-4 border-b border-border">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTabActiva(t.id)}
-            className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-              tabActiva === t.id ? "bg-surface text-foreground shadow-[var(--shadow-sm)]" : "text-muted hover:text-foreground"
+            className={`border-b-2 pb-2 text-[13px] font-semibold transition-colors ${
+              tabActiva === t.id ? "border-brand text-brand" : "border-transparent text-muted hover:text-foreground"
             }`}
           >
             {t.label}
@@ -353,62 +510,68 @@ function DetalleAuditoriaContenido({
 
       {tabActiva === "auditoria" && (
         <dl className="space-y-3 text-sm">
-          <Campo label="Asesora" valor={detalle.nombreAsesora} />
-          <Campo label="ID Gestión" valor={detalle.idGestion} mono />
-          <Campo label="Fecha (Consolidado)" valor={detalle.fechaAuditoriaConsolidado || "—"} />
-          <Campo label="Resultado" valor={detalle.resultadoConsolidado || "—"} />
-          <Campo label="Nota" valor={detalle.nota || "—"} />
-          <Campo label="Observación" valor={detalle.observacion || "—"} multilinea />
-          <Campo label="Hallazgos" valor={detalle.hallazgos || "—"} multilinea />
-          <Campo label="Puntos de mejora" valor={detalle.mejora || "—"} multilinea />
+          <Dato label="Asesora" valor={detalle.nombreAsesora} />
+          <Dato label="ID Gestión" valor={detalle.idGestion} mono />
+          <Dato label="Fecha (Consolidado)" valor={detalle.fechaAuditoriaConsolidado || "—"} />
+          <Dato label="Resultado" valor={detalle.resultadoConsolidado || "—"} />
+          <Dato label="Nota" valor={detalle.nota || "—"} />
+          <Dato label="Observación" valor={detalle.observacion || "—"} multilinea />
+          <Dato label="Hallazgos" valor={detalle.hallazgos || "—"} multilinea />
+          <Dato label="Puntos de mejora" valor={detalle.mejora || "—"} multilinea />
         </dl>
       )}
 
       {tabActiva === "ciclo" && (
         <dl className="space-y-3 text-sm">
-          <Campo label="Estado" valor={detalle.estado} />
-          {detalle.motivoNoElegible && <Campo label="Motivo NO_ELEGIBLE" valor={detalle.motivoNoElegible} />}
-          <Campo label="Fecha de notificación" valor={formatearFecha(detalle.fechaNotificacion)} />
-          <Campo label="Fecha de acuse" valor={formatearFecha(detalle.fechaAcuse)} />
-          <Campo label="Requiere compromiso" valor={detalle.requiereCompromiso ? "Sí" : "No"} />
+          <Dato label="Estado" valor={detalle.estado} />
+          {detalle.motivoNoElegible && <Dato label="Motivo NO_ELEGIBLE" valor={detalle.motivoNoElegible} />}
+          <Dato label="Fecha de notificación" valor={formatearFecha(detalle.fechaNotificacion)} />
+          <Dato label="Fecha de acuse" valor={formatearFecha(detalle.fechaAcuse)} />
+          <Dato label="Requiere compromiso" valor={detalle.requiereCompromiso ? "Sí" : "No"} />
         </dl>
       )}
 
       {tabActiva === "compromiso" &&
         (detalle.compromiso ? (
           <dl className="space-y-3 text-sm">
-            <Campo label="Texto del compromiso" valor={detalle.compromiso.texto} multilinea />
-            <Campo label="Fecha de registro" valor={formatearFecha(detalle.compromiso.fechaRegistro)} />
-            <Campo label="Fecha prometida (original)" valor={formatearFecha(detalle.compromiso.fechaPrometidaOriginal)} />
-            <Campo label="Fecha prometida (vigente)" valor={formatearFecha(detalle.compromiso.fechaPrometida)} />
-            <Campo label="Cumplimiento" valor={detalle.compromiso.cumplimiento} />
-            <Campo label="Fecha de verificación" valor={formatearFecha(detalle.compromiso.fechaVerificacion)} />
-            <Campo label="Observación de Calidad" valor={detalle.compromiso.observacionVerificacion || "—"} multilinea />
+            <Dato label="Texto del compromiso" valor={detalle.compromiso.texto} multilinea />
+            <Dato label="Fecha de registro" valor={formatearFecha(detalle.compromiso.fechaRegistro)} />
+            <Dato label="Fecha prometida (original)" valor={formatearFecha(detalle.compromiso.fechaPrometidaOriginal)} />
+            <Dato label="Fecha prometida (vigente)" valor={formatearFecha(detalle.compromiso.fechaPrometida)} />
+            <Dato label="Cumplimiento" valor={detalle.compromiso.cumplimiento} />
+            <Dato label="Fecha de verificación" valor={formatearFecha(detalle.compromiso.fechaVerificacion)} />
+            <Dato label="Observación de Calidad" valor={detalle.compromiso.observacionVerificacion || "—"} multilinea />
           </dl>
         ) : (
           <p className="text-sm text-muted">Esta auditoría todavía no tiene un compromiso registrado.</p>
         ))}
 
       {tabActiva === "historial" && (
-        <ol className="space-y-3">
+        <ol className="relative">
           {detalle.historial.length === 0 ? (
             <p className="text-sm text-muted">Sin eventos todavía.</p>
           ) : (
             detalle.historial.map((e, i) => (
-              <li key={i} className="rounded-md border border-border p-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-foreground">{e.tipoEvento}</span>
-                  <span className="text-muted">{formatearFecha(e.creadoEn)}</span>
+              <li key={i} className="relative flex gap-3 pb-5 last:pb-0">
+                <div className="flex flex-col items-center">
+                  <span className="mt-1 size-2.5 shrink-0 rounded-full bg-brand" />
+                  {i < detalle.historial.length - 1 && <span className="w-px flex-1 bg-border" />}
                 </div>
-                <p className="mt-1 text-muted">
-                  origen: {e.origen}
-                  {e.actor ? ` · actor: ${e.actor}` : ""}
-                </p>
-                {!!e.detalle && (
-                  <pre className="mt-2 overflow-x-auto rounded bg-surface-inset p-2 text-[11px] text-muted">
-                    {JSON.stringify(e.detalle, null, 2)}
-                  </pre>
-                )}
+                <div className="flex-1 pb-1 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-foreground">{e.tipoEvento}</span>
+                    <span className="whitespace-nowrap text-muted">{formatearFecha(e.creadoEn)}</span>
+                  </div>
+                  <p className="mt-1 text-muted">
+                    origen: {e.origen}
+                    {e.actor ? ` · actor: ${e.actor}` : ""}
+                  </p>
+                  {!!e.detalle && (
+                    <pre className="mt-2 overflow-x-auto rounded bg-surface-inset p-2 text-[11px] text-muted">
+                      {JSON.stringify(e.detalle, null, 2)}
+                    </pre>
+                  )}
+                </div>
               </li>
             ))
           )}
@@ -418,7 +581,7 @@ function DetalleAuditoriaContenido({
   );
 }
 
-function Campo({
+function Dato({
   label,
   valor,
   mono,
