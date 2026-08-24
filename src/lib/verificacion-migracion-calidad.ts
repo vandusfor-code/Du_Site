@@ -89,3 +89,70 @@ export async function verificarCompatibilidadMigracion(): Promise<ReporteCompati
     migracionSegunDatosActuales: estadosIncompatiblesConElNuevoCheck.length === 0,
   };
 }
+
+// ============================================================
+// SOLO LECTURA — verifica, DESPUÉS de ejecutar 0003, que los 1090 ciclos
+// existentes quedaron intactos y que las tablas nuevas están en el estado
+// esperado. No escribe nada.
+// ============================================================
+
+export interface ReporteVerificacionPostMigracion {
+  totalCiclos: number;
+  ciclosPorEstado: Record<string, number>;
+  ciclosConFechaAuditoriaNoNula: number;
+  ciclosConFechaAcuseNoNula: number;
+  totalEventos: number;
+  eventosPorTipo: Record<string, number>;
+  configuracionCiclo: {
+    totalFilas: number;
+    diasHabilesCompromiso: number | null;
+  };
+  totalCompromisos: number;
+}
+
+export async function verificarEstadoPostMigracion(): Promise<ReporteVerificacionPostMigracion> {
+  const supabase = getSupabase();
+
+  const [ciclosPorEstado, eventosPorTipo] = await Promise.all([
+    contarPorValor("ciclo_auditoria", "estado"),
+    contarPorValor("evento_ciclo", "tipo_evento"),
+  ]);
+  const totalCiclos = Object.values(ciclosPorEstado).reduce((a, b) => a + b, 0);
+  const totalEventos = Object.values(eventosPorTipo).reduce((a, b) => a + b, 0);
+
+  const { count: ciclosConFechaAuditoriaNoNula, error: err1 } = await supabase
+    .from("ciclo_auditoria")
+    .select("id", { count: "exact", head: true })
+    .not("fecha_auditoria", "is", null);
+  if (err1) throw new Error(`Supabase (fecha_auditoria): ${err1.message}`);
+
+  const { count: ciclosConFechaAcuseNoNula, error: err2 } = await supabase
+    .from("ciclo_auditoria")
+    .select("id", { count: "exact", head: true })
+    .not("fecha_acuse", "is", null);
+  if (err2) throw new Error(`Supabase (fecha_acuse): ${err2.message}`);
+
+  const { data: configData, error: err3 } = await supabase
+    .from("configuracion_ciclo")
+    .select("dias_habiles_compromiso");
+  if (err3) throw new Error(`Supabase (configuracion_ciclo): ${err3.message}`);
+
+  const { count: totalCompromisos, error: err4 } = await supabase
+    .from("compromiso")
+    .select("id", { count: "exact", head: true });
+  if (err4) throw new Error(`Supabase (compromiso): ${err4.message}`);
+
+  return {
+    totalCiclos,
+    ciclosPorEstado,
+    ciclosConFechaAuditoriaNoNula: ciclosConFechaAuditoriaNoNula ?? 0,
+    ciclosConFechaAcuseNoNula: ciclosConFechaAcuseNoNula ?? 0,
+    totalEventos,
+    eventosPorTipo,
+    configuracionCiclo: {
+      totalFilas: configData?.length ?? 0,
+      diasHabilesCompromiso: configData?.[0]?.dias_habiles_compromiso ?? null,
+    },
+    totalCompromisos: totalCompromisos ?? 0,
+  };
+}
