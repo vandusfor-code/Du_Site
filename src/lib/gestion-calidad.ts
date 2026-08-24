@@ -40,6 +40,15 @@ const TAMANO_PAGINA_LISTADO = 25;
 // grande que esto.
 const TAMANO_LOTE_EVENTOS = 150;
 
+// Fecha de corte acordada explícitamente con Calidad: el panel oculta el
+// backlog histórico adoptado en la Fase 1 (~1090 ciclos importados de
+// Consolidado sin fecha_auditoria real, todos con creado_en del día de la
+// migración) y solo muestra ciclos creados desde el arranque operativo
+// del módulo. Es un filtro de PRESENTACIÓN sobre creado_en — no borra ni
+// modifica ningún registro histórico en ciclo_auditoria.
+// 2026-08-24T00:00:00 hora Colombia (UTC-5, sin horario de verano).
+const CORTE_HISTORICO_CALIDAD = "2026-08-24T05:00:00.000Z";
+
 export type EstadoCiclo =
   | "CREADA"
   | "NOTIFICADA"
@@ -264,7 +273,11 @@ async function obtenerEventosNotificacionPorCiclo(
 
 async function idsVencidosSinAcuse(): Promise<string[]> {
   const supabase = getSupabase();
-  const { data, error } = await supabase.from("ciclo_auditoria").select("id").eq("estado", "NOTIFICADA");
+  const { data, error } = await supabase
+    .from("ciclo_auditoria")
+    .select("id")
+    .eq("estado", "NOTIFICADA")
+    .gte("creado_en", CORTE_HISTORICO_CALIDAD);
   if (error) throw new Error(`Supabase (vencidas ruta A): ${error.message}`);
 
   const ids = (data ?? []).map((r) => (r as { id: string }).id);
@@ -284,7 +297,8 @@ async function idsVencidosSinCompromiso(): Promise<string[]> {
   const { data, error } = await supabase
     .from("ciclo_auditoria")
     .select("id, fecha_acuse")
-    .eq("estado", "COMPROMISO_PENDIENTE");
+    .eq("estado", "COMPROMISO_PENDIENTE")
+    .gte("creado_en", CORTE_HISTORICO_CALIDAD);
   if (error) throw new Error(`Supabase (vencidas ruta B): ${error.message}`);
 
   const ahora = Date.now();
@@ -304,7 +318,8 @@ async function idsCompromisoVencido(): Promise<string[]> {
     .select("id, compromiso!inner(id)")
     .eq("estado", "EN_SEGUIMIENTO")
     .eq("compromiso.cumplimiento", "PENDIENTE")
-    .lt("compromiso.fecha_prometida", new Date().toISOString());
+    .lt("compromiso.fecha_prometida", new Date().toISOString())
+    .gte("creado_en", CORTE_HISTORICO_CALIDAD);
   if (error) throw new Error(`Supabase (vencidas ruta C): ${error.message}`);
   return (data ?? []).map((r) => (r as { id: string }).id);
 }
@@ -337,7 +352,10 @@ export async function obtenerPanelCalidad(
     }
   }
 
-  let query = supabase.from("ciclo_auditoria").select("*, compromiso(*)", { count: "exact" });
+  let query = supabase
+    .from("ciclo_auditoria")
+    .select("*, compromiso(*)", { count: "exact" })
+    .gte("creado_en", CORTE_HISTORICO_CALIDAD);
 
   // idsVencidas viene de estados transitorios (acotados, no crecen como el
   // histórico) — en la práctica nunca debería acercarse al límite de URL
@@ -429,14 +447,31 @@ export async function obtenerKPIsPanelCalidad(): Promise<KPIsPanelCalidad> {
     supabase
       .from("ciclo_auditoria")
       .select("id", { count: "exact", head: true })
-      .in("estado", ["NOTIFICADA", "ACUSADA", "COMPROMISO_PENDIENTE", "EN_SEGUIMIENTO", "CERRADA"]),
-    supabase.from("ciclo_auditoria").select("id", { count: "exact", head: true }).eq("estado", "NOTIFICADA"),
-    supabase.from("ciclo_auditoria").select("id", { count: "exact", head: true }).eq("estado", "COMPROMISO_PENDIENTE"),
-    supabase.from("ciclo_auditoria").select("id", { count: "exact", head: true }).eq("estado", "EN_SEGUIMIENTO"),
+      .in("estado", ["NOTIFICADA", "ACUSADA", "COMPROMISO_PENDIENTE", "EN_SEGUIMIENTO", "CERRADA"])
+      .gte("creado_en", CORTE_HISTORICO_CALIDAD),
+    supabase
+      .from("ciclo_auditoria")
+      .select("id", { count: "exact", head: true })
+      .eq("estado", "NOTIFICADA")
+      .gte("creado_en", CORTE_HISTORICO_CALIDAD),
+    supabase
+      .from("ciclo_auditoria")
+      .select("id", { count: "exact", head: true })
+      .eq("estado", "COMPROMISO_PENDIENTE")
+      .gte("creado_en", CORTE_HISTORICO_CALIDAD),
+    supabase
+      .from("ciclo_auditoria")
+      .select("id", { count: "exact", head: true })
+      .eq("estado", "EN_SEGUIMIENTO")
+      .gte("creado_en", CORTE_HISTORICO_CALIDAD),
     supabase.from("compromiso").select("id", { count: "exact", head: true }).eq("cumplimiento", "PENDIENTE").lt("fecha_prometida", ahora),
     supabase.from("compromiso").select("id", { count: "exact", head: true }).eq("cumplimiento", "CUMPLIDO"),
     supabase.from("compromiso").select("id", { count: "exact", head: true }).eq("cumplimiento", "INCUMPLIDO"),
-    supabase.from("ciclo_auditoria").select("id", { count: "exact", head: true }).eq("estado", "NO_ELEGIBLE"),
+    supabase
+      .from("ciclo_auditoria")
+      .select("id", { count: "exact", head: true })
+      .eq("estado", "NO_ELEGIBLE")
+      .gte("creado_en", CORTE_HISTORICO_CALIDAD),
     // Misma ruta A que usa el filtro "Vencidas" del listado — una sola
     // implementación, reutilizada aquí en vez de duplicarla.
     idsVencidosSinAcuse(),
