@@ -99,7 +99,15 @@ function esLimiteDeCuota(err: unknown): boolean {
   return msg.includes("quota exceeded") || msg.includes("ratelimitexceeded") || msg.includes("resource_exhausted");
 }
 
-async function conReintentosDeLectura<T>(fn: () => Promise<T>, intentos = 3): Promise<T> {
+// La cuota de Sheets se mide POR MINUTO ("Read requests per minute per
+// user") — el backoff anterior (3 intentos, ~1.2s acumulados) prácticamente
+// no le daba tiempo a la cuota de liberarse, así que un 429 real casi
+// siempre se propagaba como error visible (como el que se vio en /admin).
+// Más intentos y un backoff en segundos (tope 4s por intento, ~9.6s
+// acumulados en el peor caso) da una probabilidad real de recuperarse
+// dentro de la misma solicitud, sin arriesgar los límites de tiempo de
+// rutas que no tienen maxDuration extendido.
+async function conReintentosDeLectura<T>(fn: () => Promise<T>, intentos = 5): Promise<T> {
   let ultimoError: unknown;
   for (let i = 0; i < intentos; i++) {
     try {
@@ -107,7 +115,8 @@ async function conReintentosDeLectura<T>(fn: () => Promise<T>, intentos = 3): Pr
     } catch (err) {
       ultimoError = err;
       if (!esLimiteDeCuota(err) || i === intentos - 1) throw err;
-      const espera = 400 * 2 ** i + Math.floor(Math.random() * 250);
+      const espera = Math.min(800 * 2 ** i, 4000) + Math.floor(Math.random() * 250);
+      console.warn(`[sheets] 429 de cuota, reintento ${i + 1}/${intentos} en ${espera}ms`);
       await new Promise((r) => setTimeout(r, espera));
     }
   }
