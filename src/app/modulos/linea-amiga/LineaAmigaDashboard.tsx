@@ -348,8 +348,12 @@ export default function LineaAmigaDashboard({
     obtenerHorarioHoyAction().then(setSchedule);
     obtenerResumenGestionAction().then(setResumenGestion);
 
-    const pollChat = setInterval(cargarChat, 5000);
-    const pollNotif = setInterval(cargarNotificaciones, 10000);
+    // Mismo motivo que en Radicaciones: la cuota de Sheets es compartida por
+    // todo el proyecto, y varias pestañas sondeando cada 5-10s pueden
+    // saturarla de forma sostenida durante todo el turno. Se reduce a la
+    // mitad la frecuencia.
+    const pollChat = setInterval(cargarChat, 8000);
+    const pollNotif = setInterval(cargarNotificaciones, 20000);
     const pollSched = setInterval(() => {
       verificarHorariosAction();
       obtenerHorarioHoyAction().then(setSchedule);

@@ -202,8 +202,15 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
     refreshChat();
     refreshNotifs();
 
-    const pollChat = setInterval(refreshChat, 4000);
-    const pollNotif = setInterval(refreshNotifs, 10000);
+    // Cada lectura de estos pollers pega contra Sheets, y la cuota
+    // ("Read requests per minute") es compartida por todo el proyecto, no
+    // por usuario — con varias pestañas de Radicaciones/Línea Amiga
+    // abiertas a la vez, el sondeo agresivo (antes 4s/10s) por sí solo podía
+    // superar el límite de forma sostenida durante todo el turno, afectando
+    // a cualquier otra página del portal. Se reduce la frecuencia a la
+    // mitad — sigue sintiéndose "en vivo" con mucha menos carga constante.
+    const pollChat = setInterval(refreshChat, 8000);
+    const pollNotif = setInterval(refreshNotifs, 20000);
     const tick = setInterval(() => setNow(new Date()), 1000);
     const pollHorarios = setInterval(() => {
       verificarHorariosAction();
