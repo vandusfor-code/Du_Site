@@ -219,6 +219,7 @@ export function HomeView({
   usuario,
   esAdmin,
   mostrarIndicadoresGestion,
+  tieneModulosTrackables,
   modulos,
   logoutAction,
   tareas,
@@ -232,6 +233,11 @@ export function HomeView({
   // radicaciones/PQRSF — quien tenga el módulo autorizado las ve igual que
   // Admin, sin que eso implique ningún otro privilegio de Admin.
   mostrarIndicadoresGestion: boolean;
+  // false cuando el usuario no tiene ningún módulo de TRACKABLE (page.tsx) —
+  // en ese caso progresoPct cae a un 100% "por defecto" que no representa
+  // ningún progreso real, así que ProgresoSemanal no debe mostrarse (solo
+  // aplica a la rama no-Admin; el comportamiento de esAdmin no cambia).
+  tieneModulosTrackables: boolean;
   modulos: Modulo[];
   logoutAction: () => void;
   tareas: TareaPendiente[];
@@ -404,7 +410,9 @@ export function HomeView({
             />
           ) : (
             <div className="middleRow">
-              <ProgresoSemanal pct={progresoPct} label={data?.progresoLabel ?? "—"} mensaje={progresoMensaje} />
+              {tieneModulosTrackables && (
+                <ProgresoSemanal pct={progresoPct} label={data?.progresoLabel ?? "—"} mensaje={progresoMensaje} />
+              )}
 
               {data?.resumen && (
                 <article className="summary">
@@ -569,7 +577,7 @@ export function HomeView({
             )}
           </article>
 
-          {(esAdmin || mostrarIndicadoresGestion) && (
+          {(esAdmin || (mostrarIndicadoresGestion && tieneModulosTrackables)) && (
             <ProgresoSemanal pct={progresoPct} label={data?.progresoLabel ?? "—"} mensaje={progresoMensaje} />
           )}
         </aside>

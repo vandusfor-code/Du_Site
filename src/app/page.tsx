@@ -78,6 +78,7 @@ export default async function Home() {
         usuario=""
         esAdmin={false}
         mostrarIndicadoresGestion={false}
+        tieneModulosTrackables={false}
         modulos={modulos}
         logoutAction={logoutAction}
         tareas={[]}
@@ -257,6 +258,9 @@ export default async function Home() {
   const alDia = trackables.filter((id) => !conPendientes.has(id)).length;
   const progresoPct = trackables.length > 0 ? Math.round((alDia / trackables.length) * 100) : 100;
   const progresoLabel = progresoPct >= 80 ? "Excelente 🔥" : progresoPct >= 50 ? "En progreso" : "Ponte al día";
+  // Sin ningún módulo rastreable, progresoPct cae al 100% "por defecto" (línea
+  // de arriba) — no es un progreso real, así que el widget no debe mostrarse.
+  const tieneModulosTrackables = trackables.length > 0;
 
   // Resumen de compromisos: mismo dataset de auditorías ya cargado (sin releer).
   let resumen: HomeData["resumen"] = null;
@@ -293,6 +297,7 @@ export default async function Home() {
       usuario={usuario}
       esAdmin={esAdmin}
       mostrarIndicadoresGestion={tieneAccesoIndicadoresGestion}
+      tieneModulosTrackables={tieneModulosTrackables}
       modulos={modulos}
       logoutAction={logoutAction}
       tareas={listaTareas}
