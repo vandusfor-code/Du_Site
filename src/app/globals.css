@@ -41,6 +41,8 @@
   --error-bg: #fff1f2;
   --info: #2563eb;
   --info-bg: #eff6ff;
+  --neutral: #475569;
+  --neutral-bg: #f1f5f9;
 
   /* Sidebar (always dark indigo) */
   --sidebar: #201a3d;
@@ -120,6 +122,8 @@
     --error-bg: rgba(251, 113, 133, 0.12);
     --info: #60a5fa;
     --info-bg: rgba(96, 165, 250, 0.12);
+    --neutral: #94a3b8;
+    --neutral-bg: rgba(148, 163, 184, 0.14);
 
     --sidebar: #100d20;
     --sidebar-2: #16132a;
@@ -163,6 +167,8 @@
   --color-error-bg: var(--error-bg);
   --color-info: var(--info);
   --color-info-bg: var(--info-bg);
+  --color-neutral: var(--neutral);
+  --color-neutral-bg: var(--neutral-bg);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-2: var(--sidebar-2);
