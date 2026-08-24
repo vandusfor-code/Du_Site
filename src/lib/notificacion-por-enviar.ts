@@ -332,3 +332,55 @@ export async function procesarNotificacionesPendientes(soloIdGestion?: string): 
 
   return { candidatosDetectados: candidatos.length, notificadas, fallidas, casos };
 }
+
+// ============================================================
+// VERIFICACIÓN — solo lectura. Para confirmar, después del envío, el estado
+// real del ciclo y el contenido exacto de los eventos registrados, sin
+// depender de lo que haya reportado la escritura.
+// ============================================================
+
+export interface VerificacionNotificacion {
+  idGestion: string;
+  estado: string;
+  requiereCompromiso: boolean;
+  eventos: {
+    tipoEvento: string;
+    origen: string;
+    actor: string | null;
+    detalle: unknown;
+    creadoEn: string;
+  }[];
+}
+
+export async function verificarNotificacion(idGestion: string): Promise<VerificacionNotificacion> {
+  const supabase = getSupabase();
+
+  const { data: ciclo, error: errCiclo } = await supabase
+    .from("ciclo_auditoria")
+    .select("id, estado, requiere_compromiso")
+    .eq("id_gestion", idGestion)
+    .maybeSingle();
+  if (errCiclo) throw new Error(`Supabase (ciclo_auditoria): ${errCiclo.message}`);
+  if (!ciclo) throw new Error(`No existe ciclo_auditoria para id_gestion=${idGestion}`);
+
+  const { data: eventos, error: errEventos } = await supabase
+    .from("evento_ciclo")
+    .select("tipo_evento, origen, actor, detalle, creado_en")
+    .eq("ciclo_id", ciclo.id)
+    .in("tipo_evento", ["notificacion_enviada", "notificacion_fallida"])
+    .order("creado_en", { ascending: true });
+  if (errEventos) throw new Error(`Supabase (evento_ciclo): ${errEventos.message}`);
+
+  return {
+    idGestion,
+    estado: ciclo.estado,
+    requiereCompromiso: ciclo.requiere_compromiso,
+    eventos: (eventos ?? []).map((e) => ({
+      tipoEvento: e.tipo_evento,
+      origen: e.origen,
+      actor: e.actor,
+      detalle: e.detalle,
+      creadoEn: e.creado_en,
+    })),
+  };
+}
