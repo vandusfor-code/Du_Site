@@ -576,6 +576,10 @@
   border-color: rgba(204,255,0,0.3);
   background: #f7ffe8;
 }
+.metricas-scope .audit-compromiso-card.resaltada {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(43,35,79,0.15), var(--shadow-card);
+}
 
 .metricas-scope .auc-header {
   display: flex;

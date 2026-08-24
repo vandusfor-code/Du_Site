@@ -32,3 +32,38 @@ export async function enviarCorreoMasivo(
     destinatarios.map((to) => transport.sendMail({ from, to, subject: asunto, html }))
   );
 }
+
+export interface ResultadoEnvioIndividual {
+  // true solo si el SMTP confirmó aceptar ESE destinatario puntual (no basta
+  // con que sendMail() no haya lanzado una excepción — un servidor puede
+  // "aceptar la conexión" y aun así rechazar la dirección en `rejected`).
+  aceptado: boolean;
+  messageId: string | null;
+  respuestaServidor: string | null;
+}
+
+// Mismo transporte que enviarCorreoMasivo() — no es un sistema de correo
+// nuevo, es la variante de UN destinatario que sí expone lo necesario para
+// confirmar aceptación real (ver SentMessageInfo en
+// @types/nodemailer/lib/smtp-transport). enviarCorreoMasivo() no se toca.
+export async function enviarCorreoIndividual(
+  destinatario: string,
+  asunto: string,
+  html: string
+): Promise<ResultadoEnvioIndividual> {
+  const transport = getTransport();
+  const from = process.env.MAIL_FROM || process.env.SMTP_USER;
+  const info = await transport.sendMail({ from, to: destinatario, subject: asunto, html });
+
+  const objetivo = destinatario.trim().toLowerCase();
+  const aceptado = info.accepted.some((a) => {
+    const direccion = typeof a === "string" ? a : a.address;
+    return direccion.trim().toLowerCase() === objetivo;
+  });
+
+  return {
+    aceptado,
+    messageId: info.messageId ?? null,
+    respuestaServidor: info.response ?? null,
+  };
+}

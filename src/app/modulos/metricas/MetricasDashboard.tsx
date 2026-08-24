@@ -83,13 +83,20 @@ function extractNumericPercent(value: string): number {
 export default function MetricasDashboard({
   nombre,
   datos,
+  seccionInicial,
+  idResaltado,
 }: {
   nombre: string;
   datos: MetricasAsesor;
+  // Deep-link desde el correo de notificación (?seccion=auditorias&id=...):
+  // abre directo en "Auditorías Recibidas" y resalta la auditoría puntual.
+  seccionInicial?: "auditorias";
+  idResaltado?: string;
 }) {
-  const [seccion, setSeccion] = useState<"panel" | "auditorias">("panel");
+  const [seccion, setSeccion] = useState<"panel" | "auditorias">(seccionInicial ?? "panel");
   const [auditorias, setAuditorias] = useState<AuditoriaConEstado[] | null>(null);
   const cargandoRef = useRef(false);
+  const resaltadoAplicadoRef = useRef(false);
   const [comentarios, setComentarios] = useState<Record<string, string>>({});
   const [guardandoId, setGuardandoId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
@@ -122,6 +129,19 @@ export default function MetricasDashboard({
         cargandoRef.current = false;
       });
   }, [seccion, auditorias]);
+
+  // Deep-link: cuando la lista termina de cargar, si venimos con ?id=...
+  // llevamos la vista hasta esa auditoría (el resaltado visual lo da la
+  // clase "resaltada" en el render, comparando contra idResaltado).
+  useEffect(() => {
+    if (!idResaltado || !auditorias || resaltadoAplicadoRef.current) return;
+    resaltadoAplicadoRef.current = true;
+    const nodo = document.getElementById(`auditoria-${idResaltado}`);
+    if (nodo) {
+      const t = setTimeout(() => nodo.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+      return () => clearTimeout(t);
+    }
+  }, [auditorias, idResaltado]);
 
   useEffect(() => {
     if (!chartMainRef.current) return;
@@ -553,7 +573,10 @@ export default function MetricasDashboard({
               auditorias.map((item, i) => (
                 <div
                   key={item.idGestion + i}
-                  className={`audit-compromiso-card ${item.comprometido ? "firmada" : "pendiente"}`}
+                  id={`auditoria-${item.idGestion}`}
+                  className={`audit-compromiso-card ${item.comprometido ? "firmada" : "pendiente"} ${
+                    idResaltado && item.idGestion === idResaltado ? "resaltada" : ""
+                  }`}
                   style={{ animation: "fadeInUp 0.4s ease both", animationDelay: `${i * 0.05}s` }}
                 >
                   <div className="auc-header">

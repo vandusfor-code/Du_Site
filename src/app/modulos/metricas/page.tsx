@@ -3,8 +3,13 @@ import { requireModulo } from "@/lib/auth-helpers";
 import { obtenerMetricas } from "@/lib/metricas";
 import MetricasDashboard from "./MetricasDashboard";
 
-export default async function MetricasPage() {
+export default async function MetricasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ seccion?: string; id?: string }>;
+}) {
   const session = await requireModulo("metricas");
+  const { seccion, id } = await searchParams;
 
   let datos;
   let error: string | null = null;
@@ -26,5 +31,12 @@ export default async function MetricasPage() {
     );
   }
 
-  return <MetricasDashboard nombre={session.user.nombre} datos={datos} />;
+  return (
+    <MetricasDashboard
+      nombre={session.user.nombre}
+      datos={datos}
+      seccionInicial={seccion === "auditorias" ? "auditorias" : undefined}
+      idResaltado={id}
+    />
+  );
 }
