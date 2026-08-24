@@ -114,6 +114,18 @@ export function construirUrlAuditoria(idGestion: string): string {
   return `${appUrl()}/modulos/metricas?seccion=auditorias&id=${encodeURIComponent(idGestion)}`;
 }
 
+// Modo de prueba explícito y temporal: si NOTIFICACION_CORREO_PRUEBA existe,
+// TODO envío de esta ejecución se entrega físicamente a esa dirección en vez
+// del correo real del asesor. No cambia nada de la resolución de identidad
+// ni de la comparación snapshot-vs-actual (ambas siguen evaluándose contra
+// el correo real) — es el ÚNICO punto donde se decide a qué dirección
+// física llega el correo. Sin esta variable (comportamiento normal en
+// producción), correoDeEnvio() devuelve exactamente el correo real.
+function correoDeEnvio(correoReal: string): { destino: string; modoPrueba: boolean } {
+  const override = process.env.NOTIFICACION_CORREO_PRUEBA;
+  return override ? { destino: override, modoPrueba: true } : { destino: correoReal, modoPrueba: false };
+}
+
 async function registrarNotificacionFallida(cicloId: string, motivo: string): Promise<void> {
   const supabase = getSupabase();
   const { error } = await supabase.from("evento_ciclo").insert({
@@ -144,6 +156,11 @@ export interface CasoDryRunNotificacion {
   nombreQueSeUsaria: string;
   urlQueSeEnviaria: string;
   asunto: string;
+  // Reflejan exactamente lo que haría procesarNotificacionesPendientes():
+  // destinatarioEnvioReal es a quién llegaría físicamente el correo, que
+  // difiere de correoActual solo si NOTIFICACION_CORREO_PRUEBA está activo.
+  destinatarioEnvioReal: string | null;
+  modoPrueba: boolean;
   problema: string | null;
 }
 
@@ -163,6 +180,8 @@ export async function dryRunNotificaciones(soloIdGestion?: string): Promise<Repo
 
     let correoActual: string | null = null;
     let correosCoinciden: boolean | null = null;
+    let destinatarioEnvioReal: string | null = null;
+    let modoPrueba = false;
     let problema: string | null = null;
 
     if (identidad.estado === "ELEGIBLE") {
@@ -170,6 +189,10 @@ export async function dryRunNotificaciones(soloIdGestion?: string): Promise<Repo
       correosCoinciden = (c.correoSnapshot ?? "").trim().toLowerCase() === identidad.correo;
       if (!correosCoinciden) {
         problema = `El correo actual en Funcionarios ("${identidad.correo}") no coincide con el snapshot guardado ("${c.correoSnapshot}")`;
+      } else {
+        const envio = correoDeEnvio(identidad.correo);
+        destinatarioEnvioReal = envio.destino;
+        modoPrueba = envio.modoPrueba;
       }
     } else {
       problema = `No se pudo confirmar un correo único al revalidar: ${identidad.estado}`;
@@ -186,6 +209,8 @@ export async function dryRunNotificaciones(soloIdGestion?: string): Promise<Repo
       nombreQueSeUsaria: nombre,
       urlQueSeEnviaria: url,
       asunto: ASUNTO_NOTIFICACION,
+      destinatarioEnvioReal,
+      modoPrueba,
       problema,
     });
   }
@@ -245,7 +270,8 @@ export async function procesarNotificacionesPendientes(soloIdGestion?: string): 
       const url = construirUrlAuditoria(c.idGestion);
       const html = correoNuevaAuditoria(nombre, url);
 
-      const envio = await enviarCorreoIndividual(identidad.correo, ASUNTO_NOTIFICACION, html);
+      const { destino: destinatarioFisico, modoPrueba } = correoDeEnvio(identidad.correo);
+      const envio = await enviarCorreoIndividual(destinatarioFisico, ASUNTO_NOTIFICACION, html);
 
       if (!envio.aceptado) {
         fallidas++;
@@ -285,6 +311,8 @@ export async function procesarNotificacionesPendientes(soloIdGestion?: string): 
         actor: null,
         detalle: {
           destinatario: identidad.correo,
+          destinatario_envio_real: destinatarioFisico,
+          modo_prueba: modoPrueba,
           tipo_notificacion: "auditoria_creada",
           message_id: envio.messageId,
           timestamp: new Date().toISOString(),
