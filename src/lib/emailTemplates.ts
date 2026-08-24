@@ -118,11 +118,15 @@ export function correoNuevaAuditoria(nombreAsesor: string, url: string): string 
                 </p>
 
                 <p style="font-size:15px; line-height:1.6;">
-                  Se ha generado una nueva auditoría de calidad para ti.
+                  Se ha generado una nueva auditoría de calidad correspondiente a una de tus gestiones.
                 </p>
 
                 <p style="font-size:15px; line-height:1.6;">
-                  Te invitamos a ingresar a Du Academy para revisar la evaluación y registrar el compromiso correspondiente.
+                  La evaluación ya se encuentra disponible en Du Academy y requiere tu revisión.
+                </p>
+
+                <p style="font-size:15px; line-height:1.6;">
+                  Ingresa para consultar los resultados, revisar las observaciones de Calidad y, cuando corresponda, registrar tu compromiso de mejora.
                 </p>
 
                 <div style="text-align:center; margin:35px 0;">
