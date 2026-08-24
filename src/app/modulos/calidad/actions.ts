@@ -1,6 +1,6 @@
 "use server";
 
-import { requireModulo } from "@/lib/auth-helpers";
+import { requireModuloOAdmin } from "@/lib/auth-helpers";
 import {
   obtenerPanelCalidad,
   obtenerKPIsPanelCalidad,
@@ -18,16 +18,16 @@ export async function cargarPanelCalidadAction(
   filtros: FiltrosPanelCalidad,
   pagina: number
 ): Promise<ResultadoPanelCalidad> {
-  await requireModulo("calidad");
+  await requireModuloOAdmin("calidad");
   return obtenerPanelCalidad(filtros, pagina);
 }
 
 export async function cargarKPIsCalidadAction(): Promise<KPIsPanelCalidad> {
-  await requireModulo("calidad");
+  await requireModuloOAdmin("calidad");
   return obtenerKPIsPanelCalidad();
 }
 
 export async function cargarDetalleAuditoriaCalidadAction(idGestion: string): Promise<DetalleAuditoriaCalidad> {
-  await requireModulo("calidad");
+  await requireModuloOAdmin("calidad");
   return obtenerDetalleAuditoriaCalidad(idGestion);
 }

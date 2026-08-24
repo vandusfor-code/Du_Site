@@ -23,3 +23,14 @@ export async function requireAdmin() {
   if (!esAdmin(session)) redirect("/");
   return session;
 }
+
+// Aditivo — NO reemplaza requireModulo(), que siguen usando otras 13
+// páginas de módulo sin ningún cambio de comportamiento. Un Admin entra
+// aunque su lista de módulos no incluya `id`; no se le agrega el módulo
+// ni se modifica Usuarios!F.
+export async function requireModuloOAdmin(id: ModuloId) {
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+  if (!esAdmin(session) && !session.user.modulos.includes(id)) redirect("/");
+  return session;
+}

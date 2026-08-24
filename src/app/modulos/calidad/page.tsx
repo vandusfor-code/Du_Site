@@ -1,4 +1,4 @@
-import { requireModulo } from "@/lib/auth-helpers";
+import { requireModuloOAdmin } from "@/lib/auth-helpers";
 import { obtenerPanelCalidad, obtenerKPIsPanelCalidad, obtenerDetalleAuditoriaCalidad } from "@/lib/gestion-calidad";
 import CalidadDashboard from "./CalidadDashboard";
 
@@ -7,7 +7,7 @@ export default async function CalidadPage({
 }: {
   searchParams: Promise<{ id?: string }>;
 }) {
-  const session = await requireModulo("calidad");
+  const session = await requireModuloOAdmin("calidad");
   const { id } = await searchParams;
 
   const [kpis, panel, detalleInicial] = await Promise.all([
