@@ -394,7 +394,7 @@ export function HomeView({
             </article>
           </div>
 
-          {esAdmin ? (
+          {esAdmin || mostrarIndicadoresGestion ? (
             <MetricasAdmin
               gestiones={data?.gestionesMes ?? null}
               radicacionesDias={data?.radicacionesDias ?? null}
@@ -445,16 +445,6 @@ export function HomeView({
                 </article>
               )}
             </div>
-          )}
-
-          {!esAdmin && mostrarIndicadoresGestion && (
-            <MetricasAdmin
-              gestiones={data?.gestionesMes ?? null}
-              radicacionesDias={data?.radicacionesDias ?? null}
-              radicacionesMeses={data?.radicacionesMeses ?? null}
-              pqrsfDias={data?.pqrsfDias ?? null}
-              pqrsfMeses={data?.pqrsfMeses ?? null}
-            />
           )}
 
           <div className="sectionTitle">
@@ -579,7 +569,9 @@ export function HomeView({
             )}
           </article>
 
-          {esAdmin && <ProgresoSemanal pct={progresoPct} label={data?.progresoLabel ?? "—"} mensaje={progresoMensaje} />}
+          {(esAdmin || mostrarIndicadoresGestion) && (
+            <ProgresoSemanal pct={progresoPct} label={data?.progresoLabel ?? "—"} mensaje={progresoMensaje} />
+          )}
         </aside>
       </div>
 
