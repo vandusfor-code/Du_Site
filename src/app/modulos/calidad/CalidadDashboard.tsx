@@ -53,6 +53,20 @@ const TEMA_CALIDAD = {
   "--cal-accent-deep": "#5c34d1",
   "--cal-accent-soft": "#f1ecff",
   "--cal-shadow": "0 2px 8px rgba(24,30,55,0.045)",
+
+  // El Drawer compartido (src/components/drawer.tsx) usa los tokens
+  // globales --surface/--foreground/--muted-foreground/--border/
+  // --shadow-hover, que cambian con prefers-color-scheme: dark. Se
+  // sobrescriben aquí SOLO dentro del árbol de Calidad (este objeto se
+  // aplica al contenedor raíz, del cual el Drawer es hijo) para que se
+  // vea siempre blanco en este módulo, sin editar drawer.tsx ni afectar
+  // el chat/notificaciones que también lo usan en modo oscuro.
+  "--surface": "#ffffff",
+  "--surface-inset": "#f5f6f9",
+  "--foreground": "#0f0f14",
+  "--muted-foreground": "#64748b",
+  "--border": "rgba(15, 15, 20, 0.07)",
+  "--shadow-hover": "0 2px 8px rgba(43, 35, 79, 0.08), 0 18px 44px rgba(43, 35, 79, 0.12)",
 } as CSSProperties;
 
 // Mismos valores pastel que success/warning/error/info/neutral en
