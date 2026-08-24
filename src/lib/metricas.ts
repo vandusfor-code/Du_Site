@@ -300,6 +300,81 @@ export async function obtenerConteoMesAnterior(asesor: string): Promise<number> 
   }
 }
 
+// Combina obtenerAuditoriasConEstado() + obtenerConteoMesAnterior() en UNA
+// sola lectura de Consolidado en vez de dos — el Home las pedía por
+// separado y cada una releía la hoja completa, duplicando innecesariamente
+// una de las lecturas más pesadas de la cuota compartida de Sheets
+// (Google factura "Read requests per minute" a nivel de proyecto, no por
+// usuario). obtenerAuditoriasConEstado() y obtenerConteoMesAnterior() se
+// dejan intactas para su otro uso (la acción del propio módulo Métricas).
+export async function obtenerAuditoriasYConteoAnterior(
+  asesor: string
+): Promise<{ auditorias: AuditoriaConEstado[]; conteoMesAnterior: number }> {
+  try {
+    const id = sheetId();
+    const asesorBuscado = (asesor || "").trim().toUpperCase();
+
+    const [dataConsolidado, dataCompromisos] = await Promise.all([
+      readRange(id, "Consolidado!A2:W", { unformatted: true }),
+      readRange(id, "Compromisos!A2:E", { unformatted: true }),
+    ]);
+
+    const mapaCompromisos = new Map<string, { comentario: string; fechaCompromiso: string }>();
+    dataCompromisos.forEach((row) => {
+      const asesorComp = texto(row, 0).trim().toUpperCase();
+      const idGestion = texto(row, 1).trim();
+      if (asesorComp === asesorBuscado && idGestion) {
+        mapaCompromisos.set(idGestion, {
+          comentario: texto(row, 3),
+          fechaCompromiso: formatSheetDate(row[4], "dd-MM-yyyy HH:mm"),
+        });
+      }
+    });
+
+    const { mes: mesActual, anio: anioActual } = mesYAnioBogota();
+    const mesAnterior = mesActual === 0 ? 11 : mesActual - 1;
+    const anioAnterior = mesActual === 0 ? anioActual - 1 : anioActual;
+
+    const conOrden: { item: AuditoriaConEstado; orden: number }[] = [];
+    let conteoMesAnterior = 0;
+
+    for (const row of dataConsolidado) {
+      if (texto(row, 2).trim().toUpperCase() !== asesorBuscado) continue;
+      const fechaDate = parseSheetDate(row[0]);
+      if (!fechaDate) continue;
+
+      if (fechaDate.getUTCMonth() === mesAnterior && fechaDate.getUTCFullYear() === anioAnterior) {
+        conteoMesAnterior++;
+      }
+
+      if (fechaDate.getUTCMonth() !== mesActual || fechaDate.getUTCFullYear() !== anioActual) continue;
+
+      const idGestion = texto(row, 6).trim();
+      const comp = mapaCompromisos.get(idGestion);
+      const item: AuditoriaConEstado = {
+        fecha: formatSheetDate(row[0], "dd-MM-yyyy HH:mm"),
+        mes: texto(row, 1),
+        asesor: texto(row, 2),
+        canal: texto(row, 3),
+        tipoGestion: texto(row, 4),
+        idGestion,
+        evaluador: texto(row, 7),
+        puntosMejora: texto(row, 20),
+        grabacion: texto(row, 22).trim(),
+        comprometido: !!comp,
+        comentario: comp?.comentario ?? "",
+        fechaCompromiso: comp?.fechaCompromiso ?? "",
+      };
+      conOrden.push({ item, orden: fechaDate.getTime() });
+    }
+
+    conOrden.sort((a, b) => b.orden - a.orden);
+    return { auditorias: conOrden.map((x) => x.item), conteoMesAnterior };
+  } catch {
+    return { auditorias: [], conteoMesAnterior: 0 };
+  }
+}
+
 export async function guardarCompromiso(
   asesor: string,
   idGestion: string,

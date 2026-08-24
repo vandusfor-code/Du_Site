@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { modulosPermitidos } from "@/lib/modulos";
 import { HomeView, type TareaPendiente, type HomeData } from "@/components/home-view";
 import { logoutAction } from "./logout/actions";
-import { obtenerAuditoriasConEstado, obtenerConteoMesAnterior, obtenerCronograma } from "@/lib/metricas";
+import { obtenerAuditoriasYConteoAnterior, obtenerCronograma } from "@/lib/metricas";
 import { obtenerDatosCompletos } from "@/lib/duacademy";
 import { obtenerNotificaciones as obtenerNotificacionesRadicaciones, obtenerRadicacionesSerie, type RadicacionDia } from "@/lib/radicaciones";
 import { getNotificaciones as obtenerNotificacionesLineaAmiga, obtenerGestionesMes, obtenerPqrsfSerie, type PqrsfDia } from "@/lib/lineaAmiga";
@@ -96,16 +96,17 @@ export default async function Home() {
   const tieneAccesoIndicadoresGestion = esAdmin || has("linea-amiga");
 
   // TODAS las lecturas externas del Home en un solo batch paralelo, cada una
-  // gateada por el módulo real del usuario. obtenerAuditoriasConEstado se llama
-  // UNA sola vez y su resultado alimenta tanto Pendientes como el resumen.
-  const [auditoriasR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, conteoMesAnteriorR, gestionesMesR, cronogramaR, bannerR, serieRadR, seriePqrsfR] =
+  // gateada por el módulo real del usuario. obtenerAuditoriasYConteoAnterior
+  // hace UNA sola lectura de Consolidado (antes eran dos llamadas separadas,
+  // cada una releyendo la hoja completa) y alimenta tanto Pendientes como
+  // el resumen — menos presión sobre la cuota compartida de Sheets.
+  const [auditoriasYConteoR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, gestionesMesR, cronogramaR, bannerR, serieRadR, seriePqrsfR] =
     await Promise.allSettled([
-      tieneMetricas ? obtenerAuditoriasConEstado(usuario) : Promise.resolve([]),
+      tieneMetricas ? obtenerAuditoriasYConteoAnterior(usuario) : Promise.resolve({ auditorias: [], conteoMesAnterior: 0 }),
       has("quiz") ? obtenerDatosCompletos(nombre) : Promise.resolve(null),
       has("radicaciones") ? obtenerNotificacionesRadicaciones(nombre) : Promise.resolve([]),
       has("linea-amiga") ? obtenerNotificacionesLineaAmiga(nombre) : Promise.resolve([]),
       has("documentacion") ? resolverAsesoraId(usuario).then((id) => obtenerPendientesDocumentacion(id)) : Promise.resolve([]),
-      tieneMetricas ? obtenerConteoMesAnterior(usuario) : Promise.resolve(0),
       has("linea-amiga") || esAdmin ? obtenerGestionesMes() : Promise.resolve(null),
       tieneMetricas ? obtenerCronograma(nombre) : Promise.resolve([]),
       obtenerBannerHome(),
@@ -115,7 +116,7 @@ export default async function Home() {
 
   const banner: BannerHome | null = bannerR.status === "fulfilled" ? bannerR.value : null;
 
-  const auditorias = auditoriasR.status === "fulfilled" ? auditoriasR.value : [];
+  const auditorias = auditoriasYConteoR.status === "fulfilled" ? auditoriasYConteoR.value.auditorias : [];
 
   // ── Construcción de Pendientes desde los datos ya cargados ──
   const listaTareas: TareaPendiente[] = [];
@@ -264,12 +265,12 @@ export default async function Home() {
 
   // Resumen de compromisos: mismo dataset de auditorías ya cargado (sin releer).
   let resumen: HomeData["resumen"] = null;
-  if (tieneMetricas && auditoriasR.status === "fulfilled") {
+  if (tieneMetricas && auditoriasYConteoR.status === "fulfilled") {
     const items = auditorias;
     const firmados = items.filter((a) => a.comprometido).length;
     const pendientes = items.filter((a) => !a.comprometido);
     const vencidos = pendientes.filter((a) => diasDesde(a.fecha) > 5).length;
-    const mesAnterior = conteoMesAnteriorR.status === "fulfilled" ? conteoMesAnteriorR.value : 0;
+    const mesAnterior = auditoriasYConteoR.value.conteoMesAnterior;
     const tendenciaPct = mesAnterior > 0 ? Math.round(((items.length - mesAnterior) / mesAnterior) * 100) : null;
 
     resumen = {
