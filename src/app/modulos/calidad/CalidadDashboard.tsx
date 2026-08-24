@@ -170,21 +170,21 @@ function KpiCard({
 }) {
   return (
     <div
-      className="rounded-2xl border p-4"
+      className="rounded-2xl border p-3"
       style={{ borderColor: "var(--cal-border)", background: "var(--cal-surface)", boxShadow: "var(--cal-shadow)" }}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <div
-          className="grid size-9 shrink-0 place-items-center rounded-[11px]"
+          className="grid size-8 shrink-0 place-items-center rounded-[10px]"
           style={{ background: TONO_BG[tone], color: TONO_FG[tone] }}
         >
-          <Icon size={17} />
+          <Icon size={16} />
         </div>
         <p className="text-[12px] font-semibold" style={{ color: "var(--cal-muted)" }}>
           {label}
         </p>
       </div>
-      <p className="mt-3 text-[24px] font-bold tabular-nums" style={{ color: "var(--cal-text-strong)" }}>
+      <p className="mt-2 text-[22px] font-bold tabular-nums" style={{ color: "var(--cal-text-strong)" }}>
         {value}
       </p>
       <p className="mt-0.5 text-[11px]" style={{ color: "var(--cal-muted-2)" }}>
@@ -273,14 +273,14 @@ export default function CalidadDashboard({
     <div className="min-h-screen" style={{ ...TEMA_CALIDAD, background: "var(--cal-bg)" }}>
       <CalidadSidebar nombre={nombreUsuario} rol={rolUsuario} />
 
-      <main className="ml-[228px] max-w-[1700px] px-[30px] py-[26px]">
-        <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <main className="ml-[228px] max-w-[1700px] px-[30px] pt-5 pb-7">
+        <header className="mb-4 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
-              className="grid size-10 place-items-center rounded-xl"
+              className="grid size-9 place-items-center rounded-xl"
               style={{ background: "var(--cal-accent-soft)", color: "var(--cal-accent)" }}
             >
-              <ClipboardCheck size={20} />
+              <ClipboardCheck size={19} />
             </div>
             <div>
               <h1 className="text-[28px] font-semibold tracking-tight" style={{ color: "var(--cal-text-strong)" }}>
@@ -293,7 +293,7 @@ export default function CalidadDashboard({
           </div>
           <button
             type="button"
-            className="inline-flex h-[39px] items-center gap-2 rounded-lg border px-4 text-[13px] font-semibold"
+            className="inline-flex h-[36px] items-center gap-2 rounded-lg border px-4 text-[13px] font-semibold"
             style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
           >
             <Download size={15} />
@@ -301,7 +301,7 @@ export default function CalidadDashboard({
           </button>
         </header>
 
-        <section className="mb-6 grid grid-cols-5 gap-3">
+        <section className="mb-4 grid grid-cols-5 gap-2.5">
           <KpiCard icon={Mail} label="Notificadas" value={kpis.notificadasTotales} tone="info" caption="Ciclos notificados a la fecha" />
           <KpiCard icon={Clock} label="Pendientes de acuse" value={kpis.pendientesDeAcuse} tone="warning" caption="Esperando acuse de recibo" />
           <KpiCard icon={TriangleAlert} label="Vencidas sin acuse" value={kpis.vencidasSinAcuse} tone="error" caption="Sin acuse dentro del plazo" />
@@ -313,7 +313,7 @@ export default function CalidadDashboard({
           <KpiCard icon={UserRoundX} label="No elegibles" value={kpis.noElegibles} tone="neutral" caption="Fuera del ciclo de auditoría" />
         </section>
 
-        <section className="mb-5 rounded-2xl border p-4" style={{ borderColor: "var(--cal-border)", background: "var(--cal-surface)" }}>
+        <section className="mb-4 rounded-2xl border p-3.5" style={{ borderColor: "var(--cal-border)", background: "var(--cal-surface)" }}>
           <div className="grid grid-cols-3 gap-3">
             <Campo label="Estado">
               <select
@@ -354,39 +354,38 @@ export default function CalidadDashboard({
             </Campo>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            <Campo label="¿Requiere compromiso?">
-              <select
-                className="h-9 w-full rounded-lg border px-3 text-[13px]"
-                style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
-                value={borrador.requiereCompromiso === undefined ? "" : String(borrador.requiereCompromiso)}
-                onChange={(e) =>
-                  setBorrador((f) => ({
-                    ...f,
-                    requiereCompromiso: e.target.value === "" ? undefined : e.target.value === "true",
-                  }))
-                }
-              >
-                <option value="">Todos</option>
-                <option value="true">Sí</option>
-                <option value="false">No</option>
-              </select>
-            </Campo>
-            <div className="flex items-end pb-2">
-              <label className="flex items-center gap-2 text-[13px]" style={{ color: "var(--cal-text)" }}>
-                <input
-                  type="checkbox"
-                  checked={!!borrador.vencidas}
-                  onChange={(e) => setBorrador((f) => ({ ...f, vencidas: e.target.checked || undefined }))}
-                />
-                Solo vencidas
-              </label>
+          <div className="mt-2.5 flex flex-wrap items-end gap-3">
+            <div className="w-[190px]">
+              <Campo label="¿Requiere compromiso?">
+                <select
+                  className="h-9 w-full rounded-lg border px-3 text-[13px]"
+                  style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
+                  value={borrador.requiereCompromiso === undefined ? "" : String(borrador.requiereCompromiso)}
+                  onChange={(e) =>
+                    setBorrador((f) => ({
+                      ...f,
+                      requiereCompromiso: e.target.value === "" ? undefined : e.target.value === "true",
+                    }))
+                  }
+                >
+                  <option value="">Todos</option>
+                  <option value="true">Sí</option>
+                  <option value="false">No</option>
+                </select>
+              </Campo>
             </div>
-          </div>
 
-          <div className="mt-3 grid grid-cols-[2fr_1fr] items-end gap-3">
-            <Campo label="Fecha de auditoría (rango)">
-              <div className="flex items-center gap-2">
+            <label className="flex h-9 items-center gap-2 text-[13px]" style={{ color: "var(--cal-text)" }}>
+              <input
+                type="checkbox"
+                checked={!!borrador.vencidas}
+                onChange={(e) => setBorrador((f) => ({ ...f, vencidas: e.target.checked || undefined }))}
+              />
+              Solo vencidas
+            </label>
+
+            <div className="w-[160px]">
+              <Campo label="Fecha auditoría desde">
                 <input
                   type="date"
                   className="h-9 w-full rounded-lg border px-2.5 text-[13px]"
@@ -398,9 +397,10 @@ export default function CalidadDashboard({
                     }))
                   }
                 />
-                <span className="text-[12px]" style={{ color: "var(--cal-muted)" }}>
-                  a
-                </span>
+              </Campo>
+            </div>
+            <div className="w-[160px]">
+              <Campo label="Fecha auditoría hasta">
                 <input
                   type="date"
                   className="h-9 w-full rounded-lg border px-2.5 text-[13px]"
@@ -412,9 +412,10 @@ export default function CalidadDashboard({
                     }))
                   }
                 />
-              </div>
-            </Campo>
-            <div className="flex justify-end gap-2">
+              </Campo>
+            </div>
+
+            <div className="ml-auto flex gap-2">
               <button
                 type="button"
                 onClick={limpiarFiltros}
@@ -444,27 +445,27 @@ export default function CalidadDashboard({
                 className="text-left text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--cal-surface-inset)", color: "var(--cal-muted)" }}
               >
-                <th className="px-3 py-3">Estado</th>
-                <th className="px-3 py-3">Asesora</th>
-                <th className="px-3 py-3">ID Gestión</th>
-                <th className="px-3 py-3">Fecha auditoría</th>
-                <th className="px-3 py-3">Resultado</th>
-                <th className="px-3 py-3">Notificación</th>
-                <th className="px-3 py-3">Acuse</th>
-                <th className="px-3 py-3">¿Compromiso?</th>
-                <th className="px-3 py-3">Registro</th>
-                <th className="px-3 py-3">Prometida</th>
-                <th className="px-3 py-3">Días</th>
-                <th className="px-3 py-3">Record.</th>
-                <th className="px-3 py-3">Última notif.</th>
-                <th className="px-3 py-3">Semáforo</th>
-                <th className="px-3 py-3">Acción</th>
+                <th className="px-3 py-2">Estado</th>
+                <th className="px-3 py-2">Asesora</th>
+                <th className="px-3 py-2">ID Gestión</th>
+                <th className="px-3 py-2">Fecha auditoría</th>
+                <th className="px-3 py-2">Resultado</th>
+                <th className="px-3 py-2">Notificación</th>
+                <th className="px-3 py-2">Acuse</th>
+                <th className="px-3 py-2">¿Compromiso?</th>
+                <th className="px-3 py-2">Registro</th>
+                <th className="px-3 py-2">Prometida</th>
+                <th className="px-3 py-2">Días</th>
+                <th className="px-3 py-2">Record.</th>
+                <th className="px-3 py-2">Última notif.</th>
+                <th className="px-3 py-2">Semáforo</th>
+                <th className="px-3 py-2">Acción</th>
               </tr>
             </thead>
             <tbody className={cargando ? "opacity-50" : ""}>
               {panel.filas.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="px-3 py-10 text-center" style={{ color: "var(--cal-muted)" }}>
+                  <td colSpan={15} className="px-3 py-6 text-center" style={{ color: "var(--cal-muted)" }}>
                     Sin resultados para estos filtros.
                   </td>
                 </tr>
@@ -478,53 +479,53 @@ export default function CalidadDashboard({
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                     onClick={() => abrirDetalle(f.idGestion)}
                   >
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2">
                       <Badge tone={TONO_ESTADO[f.estado]} label={f.estado} />
                     </td>
-                    <td className="px-3 py-2.5 font-medium" style={{ color: "var(--cal-text-strong)" }}>
+                    <td className="px-3 py-2 font-medium" style={{ color: "var(--cal-text-strong)" }}>
                       {f.nombreAsesora}
                     </td>
-                    <td className="px-3 py-2.5 font-mono text-[11px]" style={{ color: "var(--cal-muted)" }}>
+                    <td className="px-3 py-2 font-mono text-[11px]" style={{ color: "var(--cal-muted)" }}>
                       {f.idGestion.slice(0, 8)}…
                     </td>
-                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                    <td className="px-3 py-2" style={{ color: "var(--cal-muted)" }}>
                       {formatearFecha(f.fechaAuditoria)}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2">
                       <ResultadoBadge resultado={f.resultado} />
                     </td>
-                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                    <td className="px-3 py-2" style={{ color: "var(--cal-muted)" }}>
                       {formatearFecha(f.fechaNotificacion)}
                     </td>
-                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                    <td className="px-3 py-2" style={{ color: "var(--cal-muted)" }}>
                       {formatearFecha(f.fechaAcuse)}
                     </td>
-                    <td className="px-3 py-2.5" style={{ color: "var(--cal-text)" }}>
+                    <td className="px-3 py-2" style={{ color: "var(--cal-text)" }}>
                       {f.requiereCompromiso ? "Sí" : "No"}
                     </td>
-                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                    <td className="px-3 py-2" style={{ color: "var(--cal-muted)" }}>
                       {formatearFecha(f.fechaRegistroCompromiso)}
                     </td>
-                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                    <td className="px-3 py-2" style={{ color: "var(--cal-muted)" }}>
                       {formatearFecha(f.fechaPrometida)}
                     </td>
-                    <td className="px-3 py-2.5 tabular-nums" style={{ color: "var(--cal-text)" }}>
+                    <td className="px-3 py-2 tabular-nums" style={{ color: "var(--cal-text)" }}>
                       {f.diasRestantes === null ? "—" : f.diasRestantes}
                     </td>
-                    <td className="px-3 py-2.5 tabular-nums" style={{ color: "var(--cal-text)" }}>
+                    <td className="px-3 py-2 tabular-nums" style={{ color: "var(--cal-text)" }}>
                       {f.recordatoriosEnviados}
                     </td>
-                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                    <td className="px-3 py-2" style={{ color: "var(--cal-muted)" }}>
                       {formatearFecha(f.ultimaNotificacion)}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2">
                       <span
                         title={f.semaforo.etiqueta}
                         className="inline-block size-2.5 rounded-full"
                         style={{ background: TONO_FG[f.semaforo.tone] }}
                       />
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -544,7 +545,7 @@ export default function CalidadDashboard({
           </table>
         </section>
 
-        <div className="mt-4 flex items-center justify-between text-[12px]" style={{ color: "var(--cal-muted)" }}>
+        <div className="mt-3 flex items-center justify-between text-[12px]" style={{ color: "var(--cal-muted)" }}>
           <span>
             {panel.totalFilas} auditorías · página {pagina + 1} de {totalPaginas}
           </span>
