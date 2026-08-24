@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useState, useTransition, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import {
   ClipboardCheck,
@@ -18,7 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Drawer } from "@/components/drawer";
-import { StatusBadge, type StatusTone } from "@/components/status-badge";
+import type { StatusTone } from "@/components/status-badge";
 import CalidadSidebar from "./CalidadSidebar";
 import { cargarPanelCalidadAction, cargarDetalleAuditoriaCalidadAction } from "./actions";
 import type {
@@ -28,6 +28,50 @@ import type {
   DetalleAuditoriaCalidad,
   EstadoCiclo,
 } from "@/lib/gestion-calidad";
+
+/**
+ * Paleta LOCAL de Calidad — a propósito NO reutiliza --brand/--brand-deep
+ * de globals.css (esos tokens son un índigo oscuro pensado para el fondo
+ * del login/home, no para un shell claro). Tampoco usa los tokens
+ * flippable de modo oscuro (bg-surface, text-foreground, etc.) para que
+ * este módulo se vea siempre claro, igual que Auditorías/Documental —que
+ * tampoco tienen modo oscuro—, sin depender de las preferencias del
+ * sistema. Son variables exclusivas de este archivo/módulo: no tocan
+ * globals.css ni el aspecto de ningún otro módulo.
+ */
+const TEMA_CALIDAD = {
+  "--cal-bg": "#f7f8fc",
+  "--cal-surface": "#ffffff",
+  "--cal-surface-inset": "#f5f6f9",
+  "--cal-border": "#e5e7ef",
+  "--cal-border-input": "#e0e3eb",
+  "--cal-text": "#15162b",
+  "--cal-text-strong": "#0f1022",
+  "--cal-muted": "#68738c",
+  "--cal-muted-2": "#97a0b4",
+  "--cal-accent": "#7044ed",
+  "--cal-accent-deep": "#5c34d1",
+  "--cal-accent-soft": "#f1ecff",
+  "--cal-shadow": "0 2px 8px rgba(24,30,55,0.045)",
+} as CSSProperties;
+
+// Mismos valores pastel que success/warning/error/info/neutral en
+// globals.css (modo claro), pero fijos — no cambian con el modo oscuro
+// del sistema, para que Calidad se vea siempre clara.
+const TONO_BG: Record<StatusTone, string> = {
+  success: "#ecfdf5",
+  warning: "#fffbeb",
+  error: "#fff1f2",
+  info: "#eff6ff",
+  neutral: "#f1f5f9",
+};
+const TONO_FG: Record<StatusTone, string> = {
+  success: "#059669",
+  warning: "#d97706",
+  error: "#e11d48",
+  info: "#2563eb",
+  neutral: "#475569",
+};
 
 const ESTADOS: EstadoCiclo[] = [
   "CREADA",
@@ -52,14 +96,6 @@ const TONO_ESTADO: Record<EstadoCiclo, StatusTone> = {
   NO_ELEGIBLE: "neutral",
 };
 
-const TONO_DOT: Record<StatusTone, string> = {
-  success: "bg-success",
-  warning: "bg-warning",
-  error: "bg-error",
-  info: "bg-info",
-  neutral: "bg-neutral",
-};
-
 type TabDetalle = "auditoria" | "ciclo" | "compromiso" | "historial";
 
 function formatearFecha(iso: string | null): string {
@@ -69,22 +105,40 @@ function formatearFecha(iso: string | null): string {
   return d.toLocaleDateString("es-CO", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function Badge({ tone, label }: { tone: StatusTone; label: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold"
+      style={{ background: TONO_BG[tone], color: TONO_FG[tone] }}
+    >
+      <span className="size-1.5 shrink-0 rounded-full" style={{ background: TONO_FG[tone] }} />
+      {label}
+    </span>
+  );
+}
+
 function ResultadoBadge({ resultado }: { resultado: string }) {
   if (resultado === "OK") {
     return (
-      <span className="inline-flex rounded-[7px] bg-success-bg px-2.5 py-1 text-[11px] font-bold text-success">
+      <span
+        className="inline-flex rounded-[7px] px-2.5 py-1 text-[11px] font-bold"
+        style={{ background: TONO_BG.success, color: TONO_FG.success }}
+      >
         OK
       </span>
     );
   }
   if (resultado === "PENC") {
     return (
-      <span className="inline-flex rounded-[7px] bg-error-bg px-2.5 py-1 text-[11px] font-bold text-error">
+      <span
+        className="inline-flex rounded-[7px] px-2.5 py-1 text-[11px] font-bold"
+        style={{ background: TONO_BG.error, color: TONO_FG.error }}
+      >
         PENC
       </span>
     );
   }
-  return <span className="text-foreground">{resultado || "—"}</span>;
+  return <span style={{ color: "var(--cal-text)" }}>{resultado || "—"}</span>;
 }
 
 function KpiCard({
@@ -100,23 +154,28 @@ function KpiCard({
   caption: string;
   tone: StatusTone;
 }) {
-  const TONE_ICON: Record<StatusTone, string> = {
-    success: "bg-success-bg text-success",
-    warning: "bg-warning-bg text-warning",
-    error: "bg-error-bg text-error",
-    info: "bg-info-bg text-info",
-    neutral: "bg-neutral-bg text-neutral",
-  };
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4 shadow-[0_2px_8px_rgba(24,30,55,0.045)]">
+    <div
+      className="rounded-2xl border p-4"
+      style={{ borderColor: "var(--cal-border)", background: "var(--cal-surface)", boxShadow: "var(--cal-shadow)" }}
+    >
       <div className="flex items-center gap-3">
-        <div className={`grid size-9 shrink-0 place-items-center rounded-[11px] ${TONE_ICON[tone]}`}>
+        <div
+          className="grid size-9 shrink-0 place-items-center rounded-[11px]"
+          style={{ background: TONO_BG[tone], color: TONO_FG[tone] }}
+        >
           <Icon size={17} />
         </div>
-        <p className="text-[12px] font-semibold text-muted">{label}</p>
+        <p className="text-[12px] font-semibold" style={{ color: "var(--cal-muted)" }}>
+          {label}
+        </p>
       </div>
-      <p className="mt-3 text-[24px] font-bold tabular-nums text-foreground">{value}</p>
-      <p className="mt-0.5 text-[11px] text-muted">{caption}</p>
+      <p className="mt-3 text-[24px] font-bold tabular-nums" style={{ color: "var(--cal-text-strong)" }}>
+        {value}
+      </p>
+      <p className="mt-0.5 text-[11px]" style={{ color: "var(--cal-muted-2)" }}>
+        {caption}
+      </p>
     </div>
   );
 }
@@ -197,25 +256,31 @@ export default function CalidadDashboard({
   const totalPaginas = Math.max(1, Math.ceil(panel.totalFilas / panel.tamanoPagina));
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ ...TEMA_CALIDAD, background: "var(--cal-bg)" }}>
       <CalidadSidebar nombre={nombreUsuario} rol={rolUsuario} />
 
       <main className="ml-[228px] max-w-[1700px] px-[30px] py-[26px]">
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-brand-soft text-brand">
+            <div
+              className="grid size-10 place-items-center rounded-xl"
+              style={{ background: "var(--cal-accent-soft)", color: "var(--cal-accent)" }}
+            >
               <ClipboardCheck size={20} />
             </div>
             <div>
-              <h1 className="text-[28px] font-semibold tracking-tight text-foreground">Calidad</h1>
-              <p className="mt-0.5 text-[13px] text-muted">
+              <h1 className="text-[28px] font-semibold tracking-tight" style={{ color: "var(--cal-text-strong)" }}>
+                Calidad
+              </h1>
+              <p className="mt-0.5 text-[13px]" style={{ color: "var(--cal-muted)" }}>
                 Seguimiento de auditorías, acuses y compromisos.
               </p>
             </div>
           </div>
           <button
             type="button"
-            className="inline-flex h-[39px] items-center gap-2 rounded-lg border border-border bg-surface px-4 text-[13px] font-semibold text-foreground hover:border-muted"
+            className="inline-flex h-[39px] items-center gap-2 rounded-lg border px-4 text-[13px] font-semibold"
+            style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
           >
             <Download size={15} />
             Exportar
@@ -224,9 +289,9 @@ export default function CalidadDashboard({
 
         <section className="mb-6 grid grid-cols-5 gap-3">
           <KpiCard icon={Mail} label="Notificadas" value={kpis.notificadasTotales} tone="info" caption="Ciclos notificados a la fecha" />
-          <KpiCard icon={Clock} label="Pendientes de acuse" value={kpis.pendientesDeAcuse} tone="neutral" caption="Esperando acuse de recibo" />
+          <KpiCard icon={Clock} label="Pendientes de acuse" value={kpis.pendientesDeAcuse} tone="warning" caption="Esperando acuse de recibo" />
           <KpiCard icon={TriangleAlert} label="Vencidas sin acuse" value={kpis.vencidasSinAcuse} tone="error" caption="Sin acuse dentro del plazo" />
-          <KpiCard icon={Clipboard} label="Compromiso pendiente" value={kpis.compromisosPendientesDeRegistro} tone="neutral" caption="Falta registrar el compromiso" />
+          <KpiCard icon={Clipboard} label="Compromiso pendiente" value={kpis.compromisosPendientesDeRegistro} tone="warning" caption="Falta registrar el compromiso" />
           <KpiCard icon={RefreshCw} label="En seguimiento" value={kpis.enSeguimiento} tone="info" caption="Compromiso activo, en plazo" />
           <KpiCard icon={CalendarX} label="Compromisos vencidos" value={kpis.compromisosVencidos} tone="error" caption="Plazo de compromiso vencido" />
           <KpiCard icon={CircleCheck} label="Cumplidos" value={kpis.cumplidos} tone="success" caption="Compromisos verificados OK" />
@@ -234,11 +299,12 @@ export default function CalidadDashboard({
           <KpiCard icon={UserRoundX} label="No elegibles" value={kpis.noElegibles} tone="neutral" caption="Fuera del ciclo de auditoría" />
         </section>
 
-        <section className="mb-5 rounded-2xl border border-border bg-surface p-4">
+        <section className="mb-5 rounded-2xl border p-4" style={{ borderColor: "var(--cal-border)", background: "var(--cal-surface)" }}>
           <div className="grid grid-cols-3 gap-3">
             <Campo label="Estado">
               <select
-                className="h-9 w-full rounded-lg border border-border bg-surface-inset px-3 text-[13px] text-foreground"
+                className="h-9 w-full rounded-lg border px-3 text-[13px]"
+                style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
                 value={borrador.estado ?? ""}
                 onChange={(e) => setBorrador((f) => ({ ...f, estado: (e.target.value || undefined) as EstadoCiclo | undefined }))}
               >
@@ -254,14 +320,16 @@ export default function CalidadDashboard({
               <input
                 type="text"
                 placeholder="Ej. A1234"
-                className="h-9 w-full rounded-lg border border-border bg-surface-inset px-3 text-[13px] text-foreground"
+                className="h-9 w-full rounded-lg border px-3 text-[13px]"
+                style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
                 value={borrador.asesorCodigo ?? ""}
                 onChange={(e) => setBorrador((f) => ({ ...f, asesorCodigo: e.target.value || undefined }))}
               />
             </Campo>
             <Campo label="Resultado">
               <select
-                className="h-9 w-full rounded-lg border border-border bg-surface-inset px-3 text-[13px] text-foreground"
+                className="h-9 w-full rounded-lg border px-3 text-[13px]"
+                style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
                 value={borrador.resultado ?? ""}
                 onChange={(e) => setBorrador((f) => ({ ...f, resultado: (e.target.value || undefined) as "OK" | "PENC" | undefined }))}
               >
@@ -275,7 +343,8 @@ export default function CalidadDashboard({
           <div className="mt-3 grid grid-cols-3 gap-3">
             <Campo label="¿Requiere compromiso?">
               <select
-                className="h-9 w-full rounded-lg border border-border bg-surface-inset px-3 text-[13px] text-foreground"
+                className="h-9 w-full rounded-lg border px-3 text-[13px]"
+                style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
                 value={borrador.requiereCompromiso === undefined ? "" : String(borrador.requiereCompromiso)}
                 onChange={(e) =>
                   setBorrador((f) => ({
@@ -290,7 +359,7 @@ export default function CalidadDashboard({
               </select>
             </Campo>
             <div className="flex items-end pb-2">
-              <label className="flex items-center gap-2 text-[13px] text-foreground">
+              <label className="flex items-center gap-2 text-[13px]" style={{ color: "var(--cal-text)" }}>
                 <input
                   type="checkbox"
                   checked={!!borrador.vencidas}
@@ -306,7 +375,8 @@ export default function CalidadDashboard({
               <div className="flex items-center gap-2">
                 <input
                   type="date"
-                  className="h-9 w-full rounded-lg border border-border bg-surface-inset px-2.5 text-[13px] text-foreground"
+                  className="h-9 w-full rounded-lg border px-2.5 text-[13px]"
+                  style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
                   onChange={(e) =>
                     setBorrador((f) => ({
                       ...f,
@@ -314,10 +384,13 @@ export default function CalidadDashboard({
                     }))
                   }
                 />
-                <span className="text-[12px] text-muted">a</span>
+                <span className="text-[12px]" style={{ color: "var(--cal-muted)" }}>
+                  a
+                </span>
                 <input
                   type="date"
-                  className="h-9 w-full rounded-lg border border-border bg-surface-inset px-2.5 text-[13px] text-foreground"
+                  className="h-9 w-full rounded-lg border px-2.5 text-[13px]"
+                  style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
                   onChange={(e) =>
                     setBorrador((f) => ({
                       ...f,
@@ -331,14 +404,18 @@ export default function CalidadDashboard({
               <button
                 type="button"
                 onClick={limpiarFiltros}
-                className="h-9 rounded-lg border border-border bg-surface px-4 text-[13px] font-semibold text-foreground hover:border-muted"
+                className="h-9 rounded-lg border px-4 text-[13px] font-semibold"
+                style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
               >
                 Limpiar filtros
               </button>
               <button
                 type="button"
                 onClick={aplicarFiltros}
-                className="h-9 rounded-lg bg-brand px-4 text-[13px] font-semibold text-white hover:bg-brand-deep"
+                className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white"
+                style={{ background: "var(--cal-accent)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--cal-accent-deep)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "var(--cal-accent)")}
               >
                 Aplicar filtros
               </button>
@@ -346,10 +423,13 @@ export default function CalidadDashboard({
           </div>
         </section>
 
-        <section className="overflow-x-auto rounded-2xl border border-border bg-surface">
+        <section className="overflow-x-auto rounded-2xl border" style={{ borderColor: "var(--cal-border)", background: "var(--cal-surface)" }}>
           <table className="w-full min-w-[1500px] text-[12.5px]">
             <thead>
-              <tr className="bg-surface-inset text-left text-[10px] font-semibold uppercase tracking-wide text-muted">
+              <tr
+                className="text-left text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "var(--cal-surface-inset)", color: "var(--cal-muted)" }}
+              >
                 <th className="px-3 py-3">Estado</th>
                 <th className="px-3 py-3">Asesora</th>
                 <th className="px-3 py-3">ID Gestión</th>
@@ -370,7 +450,7 @@ export default function CalidadDashboard({
             <tbody className={cargando ? "opacity-50" : ""}>
               {panel.filas.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="px-3 py-10 text-center text-muted">
+                  <td colSpan={15} className="px-3 py-10 text-center" style={{ color: "var(--cal-muted)" }}>
                     Sin resultados para estos filtros.
                   </td>
                 </tr>
@@ -378,32 +458,56 @@ export default function CalidadDashboard({
                 panel.filas.map((f) => (
                   <tr
                     key={f.cicloId}
-                    className="cursor-pointer border-b border-border last:border-0 hover:bg-surface-inset"
+                    className="cursor-pointer border-b last:border-0"
+                    style={{ borderColor: "var(--cal-border)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--cal-surface-inset)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                     onClick={() => abrirDetalle(f.idGestion)}
                   >
                     <td className="px-3 py-2.5">
-                      <StatusBadge tone={TONO_ESTADO[f.estado]} label={f.estado} />
+                      <Badge tone={TONO_ESTADO[f.estado]} label={f.estado} />
                     </td>
-                    <td className="px-3 py-2.5 font-medium text-foreground">{f.nombreAsesora}</td>
-                    <td className="px-3 py-2.5 font-mono text-[11px] text-muted">{f.idGestion.slice(0, 8)}…</td>
-                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.fechaAuditoria)}</td>
+                    <td className="px-3 py-2.5 font-medium" style={{ color: "var(--cal-text-strong)" }}>
+                      {f.nombreAsesora}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-[11px]" style={{ color: "var(--cal-muted)" }}>
+                      {f.idGestion.slice(0, 8)}…
+                    </td>
+                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                      {formatearFecha(f.fechaAuditoria)}
+                    </td>
                     <td className="px-3 py-2.5">
                       <ResultadoBadge resultado={f.resultado} />
                     </td>
-                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.fechaNotificacion)}</td>
-                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.fechaAcuse)}</td>
-                    <td className="px-3 py-2.5 text-foreground">{f.requiereCompromiso ? "Sí" : "No"}</td>
-                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.fechaRegistroCompromiso)}</td>
-                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.fechaPrometida)}</td>
-                    <td className="px-3 py-2.5 tabular-nums text-foreground">
+                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                      {formatearFecha(f.fechaNotificacion)}
+                    </td>
+                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                      {formatearFecha(f.fechaAcuse)}
+                    </td>
+                    <td className="px-3 py-2.5" style={{ color: "var(--cal-text)" }}>
+                      {f.requiereCompromiso ? "Sí" : "No"}
+                    </td>
+                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                      {formatearFecha(f.fechaRegistroCompromiso)}
+                    </td>
+                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                      {formatearFecha(f.fechaPrometida)}
+                    </td>
+                    <td className="px-3 py-2.5 tabular-nums" style={{ color: "var(--cal-text)" }}>
                       {f.diasRestantes === null ? "—" : f.diasRestantes}
                     </td>
-                    <td className="px-3 py-2.5 tabular-nums text-foreground">{f.recordatoriosEnviados}</td>
-                    <td className="px-3 py-2.5 text-muted">{formatearFecha(f.ultimaNotificacion)}</td>
+                    <td className="px-3 py-2.5 tabular-nums" style={{ color: "var(--cal-text)" }}>
+                      {f.recordatoriosEnviados}
+                    </td>
+                    <td className="px-3 py-2.5" style={{ color: "var(--cal-muted)" }}>
+                      {formatearFecha(f.ultimaNotificacion)}
+                    </td>
                     <td className="px-3 py-2.5">
                       <span
                         title={f.semaforo.etiqueta}
-                        className={`inline-block size-2.5 rounded-full ${TONO_DOT[f.semaforo.tone]}`}
+                        className="inline-block size-2.5 rounded-full"
+                        style={{ background: TONO_FG[f.semaforo.tone] }}
                       />
                     </td>
                     <td className="px-3 py-2.5">
@@ -413,7 +517,8 @@ export default function CalidadDashboard({
                           e.stopPropagation();
                           abrirDetalle(f.idGestion);
                         }}
-                        className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-brand hover:underline"
+                        className="inline-flex items-center gap-0.5 text-[12px] font-semibold hover:underline"
+                        style={{ color: "var(--cal-accent)" }}
                       >
                         Ver <ChevronRight size={13} />
                       </button>
@@ -425,7 +530,7 @@ export default function CalidadDashboard({
           </table>
         </section>
 
-        <div className="mt-4 flex items-center justify-between text-[12px] text-muted">
+        <div className="mt-4 flex items-center justify-between text-[12px]" style={{ color: "var(--cal-muted)" }}>
           <span>
             {panel.totalFilas} auditorías · página {pagina + 1} de {totalPaginas}
           </span>
@@ -434,7 +539,8 @@ export default function CalidadDashboard({
               type="button"
               disabled={pagina === 0 || cargando}
               onClick={() => cambiarPagina(pagina - 1)}
-              className="rounded-md border border-border px-3 py-1.5 text-foreground disabled:opacity-40"
+              className="rounded-md border px-3 py-1.5 disabled:opacity-40"
+              style={{ borderColor: "var(--cal-border-input)", color: "var(--cal-text)" }}
             >
               Anterior
             </button>
@@ -442,7 +548,8 @@ export default function CalidadDashboard({
               type="button"
               disabled={pagina + 1 >= totalPaginas || cargando}
               onClick={() => cambiarPagina(pagina + 1)}
-              className="rounded-md border border-border px-3 py-1.5 text-foreground disabled:opacity-40"
+              className="rounded-md border px-3 py-1.5 disabled:opacity-40"
+              style={{ borderColor: "var(--cal-border-input)", color: "var(--cal-text)" }}
             >
               Siguiente
             </button>
@@ -456,11 +563,15 @@ export default function CalidadDashboard({
         title={detalle ? `${detalle.nombreAsesora} · ${detalle.idGestion.slice(0, 8)}…` : "Auditoría"}
         width={520}
       >
-        {cargandoDetalle || !detalle ? (
-          <p className="text-sm text-muted">Cargando…</p>
-        ) : (
-          <DetalleAuditoriaContenido detalle={detalle} tabActiva={tabActiva} setTabActiva={setTabActiva} />
-        )}
+        <div style={TEMA_CALIDAD}>
+          {cargandoDetalle || !detalle ? (
+            <p className="text-sm" style={{ color: "var(--cal-muted)" }}>
+              Cargando…
+            </p>
+          ) : (
+            <DetalleAuditoriaContenido detalle={detalle} tabActiva={tabActiva} setTabActiva={setTabActiva} />
+          )}
+        </div>
       </Drawer>
     </div>
   );
@@ -469,7 +580,9 @@ export default function CalidadDashboard({
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-[10px] font-bold uppercase tracking-wide text-muted">{label}</label>
+      <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--cal-muted-2)" }}>
+        {label}
+      </label>
       {children}
     </div>
   );
@@ -493,15 +606,17 @@ function DetalleAuditoriaContenido({
 
   return (
     <div>
-      <div className="mb-4 flex gap-4 border-b border-border">
+      <div className="mb-4 flex gap-4 border-b" style={{ borderColor: "var(--cal-border)" }}>
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTabActiva(t.id)}
-            className={`border-b-2 pb-2 text-[13px] font-semibold transition-colors ${
-              tabActiva === t.id ? "border-brand text-brand" : "border-transparent text-muted hover:text-foreground"
-            }`}
+            className="border-b-2 pb-2 text-[13px] font-semibold transition-colors"
+            style={{
+              borderColor: tabActiva === t.id ? "var(--cal-accent)" : "transparent",
+              color: tabActiva === t.id ? "var(--cal-accent)" : "var(--cal-muted)",
+            }}
           >
             {t.label}
           </button>
@@ -543,31 +658,44 @@ function DetalleAuditoriaContenido({
             <Dato label="Observación de Calidad" valor={detalle.compromiso.observacionVerificacion || "—"} multilinea />
           </dl>
         ) : (
-          <p className="text-sm text-muted">Esta auditoría todavía no tiene un compromiso registrado.</p>
+          <p className="text-sm" style={{ color: "var(--cal-muted)" }}>
+            Esta auditoría todavía no tiene un compromiso registrado.
+          </p>
         ))}
 
       {tabActiva === "historial" && (
         <ol className="relative">
           {detalle.historial.length === 0 ? (
-            <p className="text-sm text-muted">Sin eventos todavía.</p>
+            <p className="text-sm" style={{ color: "var(--cal-muted)" }}>
+              Sin eventos todavía.
+            </p>
           ) : (
             detalle.historial.map((e, i) => (
               <li key={i} className="relative flex gap-3 pb-5 last:pb-0">
                 <div className="flex flex-col items-center">
-                  <span className="mt-1 size-2.5 shrink-0 rounded-full bg-brand" />
-                  {i < detalle.historial.length - 1 && <span className="w-px flex-1 bg-border" />}
+                  <span className="mt-1 size-2.5 shrink-0 rounded-full" style={{ background: "var(--cal-accent)" }} />
+                  {i < detalle.historial.length - 1 && (
+                    <span className="w-px flex-1" style={{ background: "var(--cal-border)" }} />
+                  )}
                 </div>
                 <div className="flex-1 pb-1 text-xs">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-foreground">{e.tipoEvento}</span>
-                    <span className="whitespace-nowrap text-muted">{formatearFecha(e.creadoEn)}</span>
+                    <span className="font-semibold" style={{ color: "var(--cal-text-strong)" }}>
+                      {e.tipoEvento}
+                    </span>
+                    <span className="whitespace-nowrap" style={{ color: "var(--cal-muted)" }}>
+                      {formatearFecha(e.creadoEn)}
+                    </span>
                   </div>
-                  <p className="mt-1 text-muted">
+                  <p className="mt-1" style={{ color: "var(--cal-muted)" }}>
                     origen: {e.origen}
                     {e.actor ? ` · actor: ${e.actor}` : ""}
                   </p>
                   {!!e.detalle && (
-                    <pre className="mt-2 overflow-x-auto rounded bg-surface-inset p-2 text-[11px] text-muted">
+                    <pre
+                      className="mt-2 overflow-x-auto rounded p-2 text-[11px]"
+                      style={{ background: "var(--cal-surface-inset)", color: "var(--cal-muted)" }}
+                    >
                       {JSON.stringify(e.detalle, null, 2)}
                     </pre>
                   )}
@@ -594,8 +722,13 @@ function Dato({
 }) {
   return (
     <div>
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</dt>
-      <dd className={`mt-0.5 text-foreground ${mono ? "font-mono text-xs" : ""} ${multilinea ? "whitespace-pre-wrap" : ""}`}>
+      <dt className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--cal-muted)" }}>
+        {label}
+      </dt>
+      <dd
+        className={`mt-0.5 ${mono ? "font-mono text-xs" : ""} ${multilinea ? "whitespace-pre-wrap" : ""}`}
+        style={{ color: "var(--cal-text-strong)" }}
+      >
         {valor}
       </dd>
     </div>
