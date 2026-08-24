@@ -1,4 +1,4 @@
-export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno" | "documentacion" | "pqrsf-comunicar" | "extensiones";
+export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno" | "documentacion" | "pqrsf-comunicar" | "extensiones" | "calidad";
 
 export interface Modulo {
   id: ModuloId;
@@ -78,6 +78,13 @@ export const MODULOS: Modulo[] = [
     descripcion: "Consulta las extensiones telefónicas disponibles en la organización.",
     href: "/modulos/extensiones",
     color: "#2f1b72",
+  },
+  {
+    id: "calidad",
+    nombre: "Calidad",
+    descripcion: "Seguimiento de auditorías y compromisos de mejora.",
+    href: "/modulos/calidad",
+    color: "#0d9488",
   },
 ];
 

@@ -8,6 +8,7 @@ import {
   BookOpen,
   Upload,
   Phone,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuloId } from "@/lib/modulos";
@@ -31,4 +32,5 @@ export const MODULO_VISUALS: Record<ModuloId, ModuloVisual> = {
   documentacion: { icon: BookOpen, accentBg: "#e0e7ff", accentFg: "#4f46e5" },
   "pqrsf-comunicar": { icon: Upload, accentBg: "#e0d7ff", accentFg: "#6d28d9" },
   extensiones: { icon: Phone, accentBg: "#efeaff", accentFg: "#2f1b72" },
+  calidad: { icon: ClipboardCheck, accentBg: "#ccfbf1", accentFg: "#0d9488" },
 };

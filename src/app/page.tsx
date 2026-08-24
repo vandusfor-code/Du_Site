@@ -72,11 +72,27 @@ export default async function Home() {
   const modulos = modulosPermitidos(moduloIds);
 
   if (!usuario) {
-    return <HomeView nombre={nombre} usuario="" esAdmin={false} modulos={modulos} logoutAction={logoutAction} tareas={[]} data={null} banner={null} />;
+    return (
+      <HomeView
+        nombre={nombre}
+        usuario=""
+        esAdmin={false}
+        mostrarIndicadoresGestion={false}
+        modulos={modulos}
+        logoutAction={logoutAction}
+        tareas={[]}
+        data={null}
+        banner={null}
+      />
+    );
   }
 
   const has = (id: string) => moduloIds.includes(id);
   const tieneMetricas = has("metricas");
+  // Las 5 tarjetas de indicadores (radicaciones/PQRSF) eran exclusivas de
+  // esAdmin. Se extiende a quien tenga el módulo "linea-amiga" SIN tocar
+  // esAdmin ni el Rol — es un permiso adicional, no una redefinición de Admin.
+  const tieneAccesoIndicadoresGestion = esAdmin || has("linea-amiga");
 
   // TODAS las lecturas externas del Home en un solo batch paralelo, cada una
   // gateada por el módulo real del usuario. obtenerAuditoriasConEstado se llama
@@ -92,8 +108,8 @@ export default async function Home() {
       has("linea-amiga") || esAdmin ? obtenerGestionesMes() : Promise.resolve(null),
       tieneMetricas ? obtenerCronograma(nombre) : Promise.resolve([]),
       obtenerBannerHome(),
-      esAdmin ? obtenerRadicacionesSerie() : Promise.resolve(null),
-      esAdmin ? obtenerPqrsfSerie() : Promise.resolve(null),
+      tieneAccesoIndicadoresGestion ? obtenerRadicacionesSerie() : Promise.resolve(null),
+      tieneAccesoIndicadoresGestion ? obtenerPqrsfSerie() : Promise.resolve(null),
     ]);
 
   const banner: BannerHome | null = bannerR.status === "fulfilled" ? bannerR.value : null;
@@ -271,5 +287,17 @@ export default async function Home() {
 
   const data: HomeData = { progresoPct, progresoLabel, resumen, gestionesMes, radicacionesDias, radicacionesMeses, pqrsfDias, pqrsfMeses, calendario };
 
-  return <HomeView nombre={nombre} usuario={usuario} esAdmin={esAdmin} modulos={modulos} logoutAction={logoutAction} tareas={listaTareas} data={data} banner={banner} />;
+  return (
+    <HomeView
+      nombre={nombre}
+      usuario={usuario}
+      esAdmin={esAdmin}
+      mostrarIndicadoresGestion={tieneAccesoIndicadoresGestion}
+      modulos={modulos}
+      logoutAction={logoutAction}
+      tareas={listaTareas}
+      data={data}
+      banner={banner}
+    />
+  );
 }

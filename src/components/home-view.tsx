@@ -86,6 +86,7 @@ const MODULO_TONE: Record<ModuloId, string> = {
   documentacion: "violet",
   "pqrsf-comunicar": "violet",
   extensiones: "violet",
+  calidad: "teal",
 };
 
 const PENDIENTES_VISIBLES = 5;
@@ -217,6 +218,7 @@ export function HomeView({
   nombre,
   usuario,
   esAdmin,
+  mostrarIndicadoresGestion,
   modulos,
   logoutAction,
   tareas,
@@ -226,6 +228,10 @@ export function HomeView({
   nombre: string;
   usuario: string;
   esAdmin: boolean;
+  // Extiende (sin reemplazar) esAdmin para las 5 tarjetas de indicadores de
+  // radicaciones/PQRSF — quien tenga el módulo autorizado las ve igual que
+  // Admin, sin que eso implique ningún otro privilegio de Admin.
+  mostrarIndicadoresGestion: boolean;
   modulos: Modulo[];
   logoutAction: () => void;
   tareas: TareaPendiente[];
@@ -441,6 +447,16 @@ export function HomeView({
             </div>
           )}
 
+          {!esAdmin && mostrarIndicadoresGestion && (
+            <MetricasAdmin
+              gestiones={data?.gestionesMes ?? null}
+              radicacionesDias={data?.radicacionesDias ?? null}
+              radicacionesMeses={data?.radicacionesMeses ?? null}
+              pqrsfDias={data?.pqrsfDias ?? null}
+              pqrsfMeses={data?.pqrsfMeses ?? null}
+            />
+          )}
+
           <div className="sectionTitle">
             <span>Tus módulos</span>
             <div className="sectionActions">
@@ -567,7 +583,9 @@ export function HomeView({
         </aside>
       </div>
 
-      {!esAdmin && data?.gestionesMes && (
+      {/* Se oculta para quien ya ve las 5 tarjetas (mostrarIndicadoresGestion)
+          para no repetir los mismos números en dos formatos distintos. */}
+      {!esAdmin && !mostrarIndicadoresGestion && data?.gestionesMes && (
         <div className="gestionesStripWrap">
           <article className="gestionesStrip">
             <div className="gestionesStripLabel">
@@ -955,7 +973,8 @@ function MetricBarrasDias({ Icon, label, dias, href }: { Icon: typeof Clock3; la
   return <article className="metricCard">{contenido}</article>;
 }
 
-// Fila de 5 tarjetas de métricas (solo Admin). Números y barras REALES. La tarjeta
+// Fila de 5 tarjetas de métricas (Admin, o quien tenga el módulo "linea-amiga"
+// vía mostrarIndicadoresGestion — ver HomeView). Números y barras REALES. La tarjeta
 // "Radicaciones registradas (Hoy)" muestra barras de los últimos días desde GESTIONES.
 function MetricasAdmin({
   gestiones,
