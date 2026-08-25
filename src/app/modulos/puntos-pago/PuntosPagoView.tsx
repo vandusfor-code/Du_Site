@@ -107,8 +107,7 @@ export function PuntosPagoView({
       return;
     }
     const XLSX = await import("xlsx");
-    const lib = (XLSX as { default?: typeof XLSX }).default ?? XLSX;
-    const hoja = lib.utils.json_to_sheet(
+    const hoja = XLSX.utils.json_to_sheet(
       filas.map((p) => ({
         "Punto de pago": p.nombre,
         Dirección: p.direccion,
@@ -118,9 +117,9 @@ export function PuntosPagoView({
         Horario: p.horario ?? "Horario no disponible",
       }))
     );
-    const libro = lib.utils.book_new();
-    lib.utils.book_append_sheet(libro, hoja, "Puntos de pago");
-    lib.writeFile(libro, "puntos-de-pago.xlsx");
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Puntos de pago");
+    XLSX.writeFile(libro, "puntos-de-pago.xlsx");
   }
 
   return (
