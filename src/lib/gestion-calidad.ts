@@ -47,7 +47,9 @@ const TAMANO_LOTE_EVENTOS = 150;
 // del módulo. Es un filtro de PRESENTACIÓN sobre creado_en — no borra ni
 // modifica ningún registro histórico en ciclo_auditoria.
 // 2026-08-24T00:00:00 hora Colombia (UTC-5, sin horario de verano).
-const CORTE_HISTORICO_CALIDAD = "2026-08-24T05:00:00.000Z";
+// Exportada para que recordatorios-calidad.ts respete el mismo corte —
+// nunca una segunda fecha hardcodeada en otro archivo.
+export const CORTE_HISTORICO_CALIDAD = "2026-08-24T05:00:00.000Z";
 
 export type EstadoCiclo =
   | "CREADA"
@@ -226,7 +228,9 @@ async function resolverNombresAsesoras(codigos: string[]): Promise<Map<string, s
 // Trae, en un solo lote por página (nunca por fila), los eventos de
 // notificación/recordatorio de los ciclos de esa página, para calcular
 // fechaNotificacion / ultimaNotificacion / recordatoriosEnviados sin N+1.
-async function obtenerEventosNotificacionPorCiclo(
+// Exportada para que recordatorios-calidad.ts reutilice fechaNotificacion
+// como fechaBase del reloj de acuse, en vez de releer evento_ciclo aparte.
+export async function obtenerEventosNotificacionPorCiclo(
   cicloIds: string[]
 ): Promise<Map<string, { fechaNotificacion: string | null; ultimaNotificacion: string | null; recordatorios: number }>> {
   const mapa = new Map<string, { fechaNotificacion: string | null; ultimaNotificacion: string | null; recordatorios: number }>();

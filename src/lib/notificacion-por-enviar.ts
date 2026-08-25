@@ -84,7 +84,10 @@ async function obtenerCandidatos(soloIdGestion?: string): Promise<CicloCandidato
 // identidad de Fase 1 (nunca coincidencia aproximada). Se pasa [asesorCodigo]
 // como "asesoresConsolidado" a propósito: ya sabemos que existe (el ciclo
 // está en CREADA); lo único que interesa revalidar aquí es el correo.
-async function revalidarCorreoAsesor(asesorCodigo: string): Promise<ResultadoIdentidad> {
+// Exportada por la misma razón: revalida SIEMPRE contra Funcionarios en
+// vivo con la misma función de identidad de Fase 1 — recordatorios-
+// calidad.ts nunca debe tener su propia copia de esta revalidación.
+export async function revalidarCorreoAsesor(asesorCodigo: string): Promise<ResultadoIdentidad> {
   const id = sheetId();
   const funcionariosRaw = await readRange(id, "Funcionarios", { unformatted: true });
   const funcionarios: FilaFuncionario[] = funcionariosRaw
@@ -101,7 +104,11 @@ async function revalidarCorreoAsesor(asesorCodigo: string): Promise<ResultadoIde
 // nombre real bajo la misma clave. Si por lo que sea no se encuentra, se usa
 // el código tal cual — nunca se inventa. Esto es solo para el saludo del
 // correo, no es una condición para enviar o no.
-async function resolverNombreAsesor(asesorCodigo: string): Promise<string> {
+// Exportada para que recordatorios-calidad.ts la reutilice tal cual — un
+// segundo lugar que resuelve el nombre para el saludo del correo repetiría
+// exactamente esta misma lógica (Usuarios primero, código como respaldo,
+// nunca un nombre inventado).
+export async function resolverNombreAsesor(asesorCodigo: string): Promise<string> {
   try {
     const usuario = await buscarUsuario(asesorCodigo);
     return usuario?.nombre || asesorCodigo;
@@ -121,7 +128,10 @@ export function construirUrlAuditoria(idGestion: string): string {
 // el correo real) — es el ÚNICO punto donde se decide a qué dirección
 // física llega el correo. Sin esta variable (comportamiento normal en
 // producción), correoDeEnvio() devuelve exactamente el correo real.
-function correoDeEnvio(correoReal: string): { destino: string; modoPrueba: boolean } {
+// Exportada por la misma razón que resolverNombreAsesor(): recordatorios-
+// calidad.ts necesita el MISMO override, nunca una segunda variable de
+// entorno ni una segunda decisión de a quién llega físicamente el correo.
+export function correoDeEnvio(correoReal: string): { destino: string; modoPrueba: boolean } {
   const override = process.env.NOTIFICACION_CORREO_PRUEBA;
   return override ? { destino: override, modoPrueba: true } : { destino: correoReal, modoPrueba: false };
 }
