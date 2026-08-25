@@ -33,11 +33,13 @@ export function PuntosPagoView({
   nombre,
   puntos,
   fuente,
+  avisos = [],
   logoutAction,
 }: {
   nombre: string;
   puntos: PuntoPago[];
   fuente: "sheets" | "mock";
+  avisos?: string[];
   logoutAction: () => void;
 }) {
   const { toast, showToast } = useToast();
@@ -173,6 +175,9 @@ export function PuntosPagoView({
             Mostrando datos de ejemplo — todavía no se pudo leer las hojas de Puntos de pago.
           </div>
         )}
+        {avisos.map((aviso) => (
+          <div className="pp-aviso" key={aviso}>{aviso}</div>
+        ))}
 
         <PuntosPagoFiltros
           filtros={filtros}

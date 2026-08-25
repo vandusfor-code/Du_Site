@@ -7,13 +7,14 @@ export const maxDuration = 60;
 
 export default async function PuntosPagoPage() {
   const session = await requireModuloOAdmin("puntos-pago");
-  const { puntos, fuente } = await obtenerPuntosPago();
+  const { puntos, fuente, avisos } = await obtenerPuntosPago();
 
   return (
     <PuntosPagoView
       nombre={session.user.nombre}
       puntos={puntos}
       fuente={fuente}
+      avisos={avisos}
       logoutAction={logoutAction}
     />
   );
