@@ -542,6 +542,9 @@ export interface DetalleAuditoriaCalidad {
     fechaVerificacion: string | null;
     verificadoPor: string | null;
     observacionVerificacion: string | null;
+    // Misma diasRestantes() que ya usa el listado — null una vez que
+    // cumplimiento deja de ser PENDIENTE (ya no aplica "restantes").
+    diasRestantes: number | null;
   } | null;
 
   historial: { tipoEvento: string; origen: string; actor: string | null; detalle: unknown; creadoEn: string }[];
@@ -602,6 +605,7 @@ export async function obtenerDetalleAuditoriaCalidad(idGestion: string): Promise
           fechaVerificacion: compromiso.fecha_verificacion,
           verificadoPor: compromiso.verificado_por,
           observacionVerificacion: compromiso.observacion_verificacion,
+          diasRestantes: diasRestantes(compromiso.fecha_prometida, compromiso.cumplimiento),
         }
       : null,
 
@@ -613,6 +617,127 @@ export async function obtenerDetalleAuditoriaCalidad(idGestion: string): Promise
       creadoEn: e.creado_en,
     })),
   };
+}
+
+export type ResultadoVerificacion = Extract<Cumplimiento, "CUMPLIDO" | "INCUMPLIDO">;
+
+export interface ResultadoVerificarCumplimiento {
+  // false cuando esta solicitud llegó tarde (doble clic, refresh, dos
+  // pestañas): el compromiso ya lo verificó otra solicitud primero. No es
+  // un error — el estado devuelto ya refleja lo que de verdad quedó en la
+  // base de datos.
+  aplicado: boolean;
+  estado: EstadoCiclo;
+}
+
+// ------------------------------------------------------------
+// Etapa 3 — verificar cumplimiento de un compromiso EN_SEGUIMIENTO.
+// Único punto que decide "quién ganó" es el UPDATE condicional sobre
+// compromiso (paso 3 más abajo) — mismo patrón que
+// notificacion-por-enviar.ts (transición NOTIFICADA) y
+// corrida2-por-enviar.ts (requiere_compromiso): WHERE con el valor
+// esperado + .select().maybeSingle() para saber si esta llamada afectó
+// la fila o llegó después de que alguien más ya la cambió.
+// ------------------------------------------------------------
+export async function verificarCumplimiento(
+  idGestion: string,
+  resultado: ResultadoVerificacion,
+  observacion: string,
+  verificadoPor: string
+): Promise<ResultadoVerificarCumplimiento> {
+  const supabase = getSupabase();
+
+  // 1. Buscar ciclo_auditoria por id_gestion.
+  const { data: ciclo, error: errCiclo } = await supabase
+    .from("ciclo_auditoria")
+    .select("id, estado")
+    .eq("id_gestion", idGestion)
+    .maybeSingle();
+  if (errCiclo) throw new Error(`Supabase (ciclo_auditoria verificar cumplimiento): ${errCiclo.message}`);
+  if (!ciclo) throw new Error(`No existe ciclo_auditoria para id_gestion=${idGestion}`);
+  const cicloRaw = ciclo as { id: string; estado: EstadoCiclo };
+
+  // 2. Precondición dura: solo se puede verificar un ciclo EN_SEGUIMIENTO.
+  // A diferencia del paso 4 (más abajo), esto NO es una carrera esperable
+  // en operación normal — si la UI está bien (los botones solo aparecen
+  // en EN_SEGUIMIENTO), llegar aquí con otro estado es una condición de
+  // datos obsoletos en el cliente, no una concurrencia legítima.
+  if (cicloRaw.estado !== "EN_SEGUIMIENTO") {
+    throw new Error(
+      `El ciclo no está EN_SEGUIMIENTO (estado actual: ${cicloRaw.estado}) — no se puede verificar cumplimiento.`
+    );
+  }
+
+  const ahoraIso = new Date().toISOString();
+
+  // 3. UPDATE condicional sobre compromiso — WHERE cumplimiento='PENDIENTE'.
+  // Esto SÍ es la carrera legítima (doble clic, dos pestañas, refresh):
+  // solo una solicitud concurrente encuentra la fila en PENDIENTE.
+  const { data: compromisoActualizado, error: errUpdateCompromiso } = await supabase
+    .from("compromiso")
+    .update({
+      cumplimiento: resultado,
+      fecha_verificacion: ahoraIso,
+      verificado_por: verificadoPor,
+      observacion_verificacion: observacion,
+      fecha_cierre: ahoraIso,
+    })
+    .eq("ciclo_id", cicloRaw.id)
+    .eq("cumplimiento", "PENDIENTE")
+    .select("id")
+    .maybeSingle();
+  if (errUpdateCompromiso) throw new Error(`Supabase (update compromiso): ${errUpdateCompromiso.message}`);
+
+  if (!compromisoActualizado) {
+    // 4. El UPDATE no afectó ninguna fila: otra solicitud ya verificó este
+    // compromiso primero. No se duplica ningún evento ni se vuelve a tocar
+    // el ciclo — se devuelve el estado real tal como quedó.
+    const { data: cicloActual, error: errCicloActual } = await supabase
+      .from("ciclo_auditoria")
+      .select("estado")
+      .eq("id", cicloRaw.id)
+      .maybeSingle();
+    if (errCicloActual) throw new Error(`Supabase (releer ciclo_auditoria): ${errCicloActual.message}`);
+    return { aplicado: false, estado: (cicloActual?.estado as EstadoCiclo) ?? cicloRaw.estado };
+  }
+
+  // 5. Esta solicitud ganó la carrera — registra el evento de verificación.
+  const { error: errEventoVerificado } = await supabase.from("evento_ciclo").insert({
+    ciclo_id: cicloRaw.id,
+    tipo_evento: "compromiso_verificado",
+    origen: "calidad",
+    actor: verificadoPor,
+    detalle: { resultado, observacion, verificado_por: verificadoPor },
+  });
+  if (errEventoVerificado) throw new Error(`Supabase (evento compromiso_verificado): ${errEventoVerificado.message}`);
+
+  // 6. Cierra el ciclo — también condicional (mismo patrón), aunque en el
+  // modelo actual nada más puede haber movido EN_SEGUIMIENTO entre el
+  // paso 2 y aquí: el UPDATE de compromiso ya "reservó" esta transición.
+  const { data: cicloCerrado, error: errCierre } = await supabase
+    .from("ciclo_auditoria")
+    .update({ estado: "CERRADA" })
+    .eq("id", cicloRaw.id)
+    .eq("estado", "EN_SEGUIMIENTO")
+    .select("id")
+    .maybeSingle();
+  if (errCierre) throw new Error(`Supabase (cerrar ciclo_auditoria): ${errCierre.message}`);
+
+  // Defensivo: solo registra auditoria_cerrada si este llamado fue el que
+  // de verdad cerró el ciclo (evita un evento duplicado en el caso teórico
+  // de que ya estuviera CERRADA por otra vía).
+  if (cicloCerrado) {
+    const { error: errEventoCierre } = await supabase.from("evento_ciclo").insert({
+      ciclo_id: cicloRaw.id,
+      tipo_evento: "auditoria_cerrada",
+      origen: "calidad",
+      actor: verificadoPor,
+      detalle: { motivo_cierre: "COMPROMISO_VERIFICADO" },
+    });
+    if (errEventoCierre) throw new Error(`Supabase (evento auditoria_cerrada): ${errEventoCierre.message}`);
+  }
+
+  return { aplicado: true, estado: "CERRADA" };
 }
 
 async function buscarFilaConsolidado(idGestion: string): Promise<unknown[] | null> {

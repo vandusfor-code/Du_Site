@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useTransition, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, useTransition, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import {
   ClipboardCheck,
@@ -20,13 +20,19 @@ import {
 import { Drawer } from "@/components/drawer";
 import type { StatusTone } from "@/components/status-badge";
 import CalidadSidebar from "./CalidadSidebar";
-import { cargarPanelCalidadAction, cargarDetalleAuditoriaCalidadAction } from "./actions";
+import {
+  cargarPanelCalidadAction,
+  cargarKPIsCalidadAction,
+  cargarDetalleAuditoriaCalidadAction,
+  verificarCumplimientoAction,
+} from "./actions";
 import type {
   FiltrosPanelCalidad,
   ResultadoPanelCalidad,
   KPIsPanelCalidad,
   DetalleAuditoriaCalidad,
   EstadoCiclo,
+  ResultadoVerificacion,
 } from "@/lib/gestion-calidad";
 
 /**
@@ -211,7 +217,7 @@ export default function CalidadDashboard({
 }) {
   const router = useRouter();
 
-  const [kpis] = useState(kpisIniciales);
+  const [kpis, setKpis] = useState(kpisIniciales);
   const [panel, setPanel] = useState(panelInicial);
   const [filtros, setFiltros] = useState<FiltrosPanelCalidad>({});
   const [borrador, setBorrador] = useState<FiltrosPanelCalidad>({});
@@ -222,6 +228,12 @@ export default function CalidadDashboard({
   const [detalle, setDetalle] = useState<DetalleAuditoriaCalidad | null>(detalleInicial);
   const [tabActiva, setTabActiva] = useState<TabDetalle>("auditoria");
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
+
+  // Etapa 3 — modal de confirmación de verificación y toast de resultado.
+  const [modalVerificacion, setModalVerificacion] = useState<{ resultado: ResultadoVerificacion } | null>(null);
+  const [observacionModal, setObservacionModal] = useState("");
+  const [verificando, setVerificando] = useState(false);
+  const [toast, setToast] = useState<{ tono: "success" | "error" | "info"; mensaje: string } | null>(null);
 
   const recargar = useCallback((nuevosFiltros: FiltrosPanelCalidad, nuevaPagina: number) => {
     startTransition(async () => {
@@ -265,6 +277,47 @@ export default function CalidadDashboard({
   function cerrarDetalle() {
     setDrawerAbierto(false);
     router.replace("/modulos/calidad", { scroll: false });
+  }
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  function abrirModalVerificacion(resultado: ResultadoVerificacion) {
+    setObservacionModal("");
+    setModalVerificacion({ resultado });
+  }
+
+  // Tras verificar: se mantiene el Drawer abierto (no se cierra) y se
+  // refresca su detalle en el sitio para que estado/compromiso/historial
+  // reflejen de inmediato el cierre — junto con KPIs y el listado, sin
+  // recargar la página.
+  async function confirmarVerificacion() {
+    if (!detalle || !modalVerificacion) return;
+    const { resultado } = modalVerificacion;
+    if (resultado === "INCUMPLIDO" && !observacionModal.trim()) return;
+
+    setVerificando(true);
+    try {
+      const r = await verificarCumplimientoAction(detalle.idGestion, resultado, observacionModal.trim());
+      setModalVerificacion(null);
+      setToast({
+        tono: r.aplicado ? "success" : "info",
+        mensaje: r.aplicado
+          ? `Compromiso marcado como ${resultado}. El ciclo quedó CERRADA.`
+          : "Este compromiso ya había sido verificado desde otra sesión — se actualizó con el estado real.",
+      });
+      const nuevoDetalle = await cargarDetalleAuditoriaCalidadAction(detalle.idGestion);
+      setDetalle(nuevoDetalle);
+      cargarKPIsCalidadAction().then(setKpis);
+      recargar(filtros, pagina);
+    } catch (e) {
+      setToast({ tono: "error", mensaje: e instanceof Error ? e.message : "No se pudo verificar el compromiso." });
+    } finally {
+      setVerificando(false);
+    }
   }
 
   const totalPaginas = Math.max(1, Math.ceil(panel.totalFilas / panel.tamanoPagina));
@@ -584,10 +637,112 @@ export default function CalidadDashboard({
               Cargando…
             </p>
           ) : (
-            <DetalleAuditoriaContenido detalle={detalle} tabActiva={tabActiva} setTabActiva={setTabActiva} />
+            <DetalleAuditoriaContenido
+              detalle={detalle}
+              tabActiva={tabActiva}
+              setTabActiva={setTabActiva}
+              onVerificar={abrirModalVerificacion}
+            />
           )}
         </div>
       </Drawer>
+
+      {modalVerificacion && (
+        <ModalVerificacion
+          resultado={modalVerificacion.resultado}
+          observacion={observacionModal}
+          setObservacion={setObservacionModal}
+          cargando={verificando}
+          onCancelar={() => setModalVerificacion(null)}
+          onConfirmar={confirmarVerificacion}
+        />
+      )}
+
+      {toast && (
+        <div
+          className="fixed bottom-6 right-6 z-[70] rounded-xl border px-4 py-3 text-[13px] font-medium shadow-lg"
+          style={{
+            borderColor: "var(--cal-border)",
+            background: TONO_BG[toast.tono === "success" ? "success" : toast.tono === "error" ? "error" : "info"],
+            color: TONO_FG[toast.tono === "success" ? "success" : toast.tono === "error" ? "error" : "info"],
+          }}
+        >
+          {toast.mensaje}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModalVerificacion({
+  resultado,
+  observacion,
+  setObservacion,
+  cargando,
+  onCancelar,
+  onConfirmar,
+}: {
+  resultado: ResultadoVerificacion;
+  observacion: string;
+  setObservacion: (v: string) => void;
+  cargando: boolean;
+  onCancelar: () => void;
+  onConfirmar: () => void;
+}) {
+  const esIncumplido = resultado === "INCUMPLIDO";
+  const observacionValida = !esIncumplido || observacion.trim().length > 0;
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
+      onClick={onCancelar}
+    >
+      <div
+        className="w-full max-w-[420px] rounded-2xl border p-5"
+        style={{ borderColor: "var(--cal-border)", background: "var(--cal-surface)", boxShadow: "0 20px 60px rgba(15,15,20,0.25)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-[16px] font-semibold" style={{ color: "var(--cal-text-strong)" }}>
+          {esIncumplido ? "Marcar compromiso como INCUMPLIDO" : "Marcar compromiso como CUMPLIDO"}
+        </h3>
+        <p className="mt-1 text-[13px]" style={{ color: "var(--cal-muted)" }}>
+          Esta acción cierra el ciclo de la auditoría y no se puede deshacer.
+        </p>
+
+        <div className="mt-4">
+          <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--cal-muted-2)" }}>
+            Observación {esIncumplido ? "(obligatoria)" : "(opcional)"}
+          </label>
+          <textarea
+            className="mt-1.5 h-24 w-full resize-none rounded-lg border p-2.5 text-[13px]"
+            style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
+            value={observacion}
+            onChange={(e) => setObservacion(e.target.value)}
+            placeholder={esIncumplido ? "Explica por qué se considera incumplido…" : "Comentario opcional…"}
+          />
+        </div>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancelar}
+            disabled={cargando}
+            className="h-9 rounded-lg border px-4 text-[13px] font-semibold disabled:opacity-50"
+            style={{ borderColor: "var(--cal-border-input)", background: "var(--cal-surface)", color: "var(--cal-text)" }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirmar}
+            disabled={cargando || !observacionValida}
+            className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+            style={{ background: esIncumplido ? TONO_FG.error : TONO_FG.success }}
+          >
+            {cargando ? "Guardando…" : "Confirmar"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -607,10 +762,12 @@ function DetalleAuditoriaContenido({
   detalle,
   tabActiva,
   setTabActiva,
+  onVerificar,
 }: {
   detalle: DetalleAuditoriaCalidad;
   tabActiva: TabDetalle;
   setTabActiva: (t: TabDetalle) => void;
+  onVerificar: (resultado: ResultadoVerificacion) => void;
 }) {
   const TABS: { id: TabDetalle; label: string }[] = [
     { id: "auditoria", label: "Auditoría" },
@@ -663,15 +820,44 @@ function DetalleAuditoriaContenido({
 
       {tabActiva === "compromiso" &&
         (detalle.compromiso ? (
-          <dl className="space-y-3 text-sm">
-            <Dato label="Texto del compromiso" valor={detalle.compromiso.texto} multilinea />
-            <Dato label="Fecha de registro" valor={formatearFecha(detalle.compromiso.fechaRegistro)} />
-            <Dato label="Fecha prometida (original)" valor={formatearFecha(detalle.compromiso.fechaPrometidaOriginal)} />
-            <Dato label="Fecha prometida (vigente)" valor={formatearFecha(detalle.compromiso.fechaPrometida)} />
-            <Dato label="Cumplimiento" valor={detalle.compromiso.cumplimiento} />
-            <Dato label="Fecha de verificación" valor={formatearFecha(detalle.compromiso.fechaVerificacion)} />
-            <Dato label="Observación de Calidad" valor={detalle.compromiso.observacionVerificacion || "—"} multilinea />
-          </dl>
+          <div>
+            <dl className="space-y-3 text-sm">
+              <Dato label="Estado del compromiso" valor={detalle.compromiso.cumplimiento} />
+              <Dato label="Texto del compromiso" valor={detalle.compromiso.texto} multilinea />
+              <Dato label="Fecha de registro" valor={formatearFecha(detalle.compromiso.fechaRegistro)} />
+              <Dato label="Fecha prometida (vigente)" valor={formatearFecha(detalle.compromiso.fechaPrometida)} />
+              {detalle.compromiso.fechaPrometidaOriginal !== detalle.compromiso.fechaPrometida && (
+                <Dato label="Fecha prometida (original)" valor={formatearFecha(detalle.compromiso.fechaPrometidaOriginal)} />
+              )}
+              <Dato
+                label="Días restantes/vencidos"
+                valor={detalle.compromiso.diasRestantes === null ? "—" : String(detalle.compromiso.diasRestantes)}
+              />
+              <Dato label="Fecha de verificación" valor={formatearFecha(detalle.compromiso.fechaVerificacion)} />
+              <Dato label="Observación de Calidad" valor={detalle.compromiso.observacionVerificacion || "—"} multilinea />
+            </dl>
+
+            {detalle.estado === "EN_SEGUIMIENTO" && detalle.compromiso.cumplimiento === "PENDIENTE" && (
+              <div className="mt-5 flex gap-2 border-t pt-4" style={{ borderColor: "var(--cal-border)" }}>
+                <button
+                  type="button"
+                  onClick={() => onVerificar("CUMPLIDO")}
+                  className="h-9 flex-1 rounded-lg text-[13px] font-semibold text-white"
+                  style={{ background: TONO_FG.success }}
+                >
+                  Marcar CUMPLIDO
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onVerificar("INCUMPLIDO")}
+                  className="h-9 flex-1 rounded-lg text-[13px] font-semibold text-white"
+                  style={{ background: TONO_FG.error }}
+                >
+                  Marcar INCUMPLIDO
+                </button>
+              </div>
+            )}
+          </div>
         ) : (
           <p className="text-sm" style={{ color: "var(--cal-muted)" }}>
             Esta auditoría todavía no tiene un compromiso registrado.
