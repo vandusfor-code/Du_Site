@@ -275,7 +275,9 @@ export async function obtenerEventosNotificacionPorCiclo(
 // lista de ids ya acotada, que luego SÍ se pagina de verdad con .range().
 // ------------------------------------------------------------
 
-async function idsVencidosSinAcuse(): Promise<string[]> {
+// Exportada para que escalamiento-calidad.ts reutilice esta MISMA ruta A
+// (mismo corte histórico, mismo sumarDiasHabiles) en vez de reimplementarla.
+export async function idsVencidosSinAcuse(): Promise<string[]> {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("ciclo_auditoria")
@@ -296,7 +298,8 @@ async function idsVencidosSinAcuse(): Promise<string[]> {
   });
 }
 
-async function idsVencidosSinCompromiso(): Promise<string[]> {
+// Exportada por la misma razón — ruta B.
+export async function idsVencidosSinCompromiso(): Promise<string[]> {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("ciclo_auditoria")
@@ -315,7 +318,8 @@ async function idsVencidosSinCompromiso(): Promise<string[]> {
     .map((r) => (r as { id: string }).id);
 }
 
-async function idsCompromisoVencido(): Promise<string[]> {
+// Exportada por la misma razón — ruta C.
+export async function idsCompromisoVencido(): Promise<string[]> {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("ciclo_auditoria")
