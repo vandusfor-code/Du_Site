@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
+import { esAdmin } from "@/lib/auth-helpers";
 import {
   procesarTranscripciones,
   generarResumenCortes,
@@ -16,9 +17,16 @@ import {
   type AuditoriaManualInput,
 } from "@/lib/auditorias-admin";
 
+// Corregido: verificaba session.user.modulos.includes("admin") — el
+// módulo "admin" es asignable a cualquier usuario en Usuarios (es la
+// tarjeta "Auditorías" de Home) e independiente de la columna Rol. Eso
+// permitía que un usuario sin Rol=Admin invocara estas Server Actions
+// reales (ejecutar auditorías con IA, cargar CSVs, generar cortes) si
+// llegaba a obtener su referencia. La única fuente oficial del privilegio
+// administrativo es esAdmin() (columna Rol).
 async function requireAdminAction(): Promise<void> {
   const session = await auth();
-  if (!session?.user?.modulos.includes("admin")) {
+  if (!esAdmin(session)) {
     throw new Error("No autorizado");
   }
 }

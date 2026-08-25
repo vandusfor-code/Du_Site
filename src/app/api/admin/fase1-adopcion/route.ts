@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { esAdmin } from "@/lib/auth-helpers";
 import { adoptarAuditorias, diagnosticarBrechaAdopcion } from "@/lib/gestion-auditorias";
 import { verificarAdopcion } from "@/lib/verificacion-fase1";
 
@@ -11,10 +12,11 @@ import { verificarAdopcion } from "@/lib/verificacion-fase1";
 // mientras se valida la adopción del ciclo de gestión; no reemplaza ni
 // modifica nada de /admin ni de la plataforma del asesor.
 //
-// Misma verificación de autorización que ya usa admin/actions.ts
-// (session.user.modulos.includes("admin")) — no session.user.rol, para
-// ser consistentes con cómo están protegidos hoy los demás server actions
-// de auditorías (ver diagnóstico de Fase 0, sección de seguridad).
+// Autorización por columna Rol (esAdmin), la única fuente oficial del
+// privilegio administrativo — nunca por el módulo "admin" asignable
+// (corregido: antes usaba session.user.modulos.includes("admin"), lo que
+// permitía que cualquier usuario con ese módulo marcado en Usuarios,
+// aunque su Rol no fuera Admin, pudiera invocar esta ruta).
 // ============================================================
 
 // La primera corrida real inserta ~1000 filas nuevas; aunque ahora la
@@ -25,7 +27,7 @@ export const maxDuration = 300;
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.modulos.includes("admin")) {
+  if (!esAdmin(session)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

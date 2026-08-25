@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { esAdmin } from "@/lib/auth-helpers";
 import { dryRunPorEnviar } from "@/lib/dry-run-por-enviar";
 
 // ============================================================
@@ -17,7 +18,7 @@ export const maxDuration = 300;
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.modulos.includes("admin")) {
+  if (!esAdmin(session)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

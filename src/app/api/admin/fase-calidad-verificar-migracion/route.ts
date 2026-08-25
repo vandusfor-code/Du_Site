@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { esAdmin } from "@/lib/auth-helpers";
 import { verificarCompatibilidadMigracion } from "@/lib/verificacion-migracion-calidad";
 
 // ============================================================
@@ -12,7 +13,7 @@ import { verificarCompatibilidadMigracion } from "@/lib/verificacion-migracion-c
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.modulos.includes("admin")) {
+  if (!esAdmin(session)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

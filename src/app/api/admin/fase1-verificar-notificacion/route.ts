@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { esAdmin } from "@/lib/auth-helpers";
 import { verificarNotificacion } from "@/lib/notificacion-por-enviar";
 
 // ============================================================
@@ -10,7 +11,7 @@ import { verificarNotificacion } from "@/lib/notificacion-por-enviar";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.modulos.includes("admin")) {
+  if (!esAdmin(session)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
