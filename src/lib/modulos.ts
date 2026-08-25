@@ -1,4 +1,4 @@
-export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno" | "documentacion" | "pqrsf-comunicar" | "extensiones" | "calidad";
+export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno" | "documentacion" | "pqrsf-comunicar" | "extensiones" | "calidad" | "puntos-pago";
 
 export interface Modulo {
   id: ModuloId;
@@ -85,6 +85,13 @@ export const MODULOS: Modulo[] = [
     descripcion: "Seguimiento de auditorías y compromisos de mejora.",
     href: "/modulos/calidad",
     color: "#0d9488",
+  },
+  {
+    id: "puntos-pago",
+    nombre: "Puntos de pago",
+    descripcion: "Consulta los puntos de pago disponibles por ciudad o municipio.",
+    href: "/modulos/puntos-pago",
+    color: "#6952e8",
   },
 ];
 

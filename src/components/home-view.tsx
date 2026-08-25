@@ -87,6 +87,7 @@ const MODULO_TONE: Record<ModuloId, string> = {
   "pqrsf-comunicar": "violet",
   extensiones: "violet",
   calidad: "teal",
+  "puntos-pago": "violet",
 };
 
 const PENDIENTES_VISIBLES = 5;
