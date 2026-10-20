@@ -318,6 +318,7 @@ export default function AdminDashboard({
             />
           ) : tipoAuditoria === "chatgpt" ? (
             <AuditoriaChatGPTForm
+              funcionarios={funcionarios}
               evaluadorDefault={nombre}
               onGuardado={async (msg) => {
                 setBanner(msg);

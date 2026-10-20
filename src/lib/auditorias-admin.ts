@@ -1,6 +1,7 @@
 import "server-only";
 import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate, hoyEnBogota } from "@/lib/sheets";
 import { parseCsv } from "@/lib/csv-parse";
+import { resolverAsesor } from "@/lib/auditoria-chatgpt-contrato";
 
 // ============================================================
 // AUDITORÍA COFREM — puerto del Apps Script original a Next.js.
@@ -827,6 +828,28 @@ export async function guardarAuditoriaManual(input: AuditoriaManualInput): Promi
   await appendRows(id, "Consolidado!A:AA", [fila]);
 
   return { nota: nota + "%", tipoNota };
+}
+
+/* ===================== */
+/* AUDITORÍA CHATGPT (importación estructurada) */
+/* ===================== */
+
+// Guarda una auditoría importada desde ChatGPT. La IDENTIDAD del asesor es la
+// SELECCIÓN manual (input.asesor), nunca el nombre del JSON: aquí se revalida
+// server-side contra la hoja Funcionarios (fuente oficial) y el correo se
+// resuelve del registro, ignorando cualquier correo enviado por el navegador o
+// el JSON. Luego delega en guardarAuditoriaManual() para reutilizar la misma
+// deduplicación por ID, la regla oficial de nota y la escritura en Consolidado.
+// No modifica el comportamiento de Auditoría CO ni de Auditoría IA.
+export async function guardarAuditoriaChatGPT(input: AuditoriaManualInput): Promise<{ nota: string; tipoNota: string }> {
+  const lista = await obtenerFuncionariosParaSelector();
+  const oficial = resolverAsesor(input.asesor, lista);
+  if (!oficial) {
+    throw new Error(`El asesor seleccionado ("${input.asesor.trim() || "sin seleccionar"}") no existe en Funcionarios.`);
+  }
+  // Fuerza asesor y correo OFICIALES; el resto del input (fecha, idGestion,
+  // criterios, textos…) se valida/calcula igual que en el registro manual.
+  return guardarAuditoriaManual({ ...input, asesor: oficial.asesor, correo: oficial.correo });
 }
 
 /* ===================== */

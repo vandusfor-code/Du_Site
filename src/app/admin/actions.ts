@@ -9,6 +9,7 @@ import {
   obtenerDashboardAuditorias,
   obtenerFuncionariosParaSelector,
   guardarAuditoriaManual,
+  guardarAuditoriaChatGPT,
   type ResultadoProcesamiento,
   type ResultadoCargaCsv,
   type DashboardAuditorias,
@@ -68,4 +69,13 @@ export async function guardarAuditoriaManualAction(
 ): Promise<{ nota: string; tipoNota: string }> {
   await requireAdminAction();
   return guardarAuditoriaManual(input);
+}
+
+// Auditoría ChatGPT: valida admin, revalida el asesor seleccionado contra
+// Funcionarios y resuelve su correo oficial server-side (ver guardarAuditoriaChatGPT).
+export async function guardarAuditoriaChatGPTAction(
+  input: AuditoriaManualInput
+): Promise<{ nota: string; tipoNota: string }> {
+  await requireAdminAction();
+  return guardarAuditoriaChatGPT(input);
 }

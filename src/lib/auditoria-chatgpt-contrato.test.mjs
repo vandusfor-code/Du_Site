@@ -10,6 +10,7 @@ import {
   calcularNota,
   erroresDe,
   advertenciasDe,
+  resolverAsesor,
   FORMATO_AUDITORIA_CO,
 } from "./auditoria-chatgpt-contrato.ts";
 
@@ -186,4 +187,36 @@ test("15. Criterio como cadena simple (sin objeto) también se acepta", () => {
   const r = parseAuditoriaChatGPT(JSON.stringify(data));
   assert.equal(r.ok, true);
   assert.equal(r.datos.sonrisa, "No cumple");
+});
+
+test("16. El asesor del JSON es OPCIONAL (su ausencia no es error)", () => {
+  const data = JSON.parse(bloqueValido());
+  delete data.interaccion.asesor;
+  const r = parseAuditoriaChatGPT(JSON.stringify(data));
+  assert.equal(r.ok, true);
+  assert.equal(erroresDe(r).some((d) => d.campo === "asesor"), false);
+});
+
+// ── resolverAsesor: la selección manual es la fuente de verdad ──
+const LISTA = [
+  { asesor: "J.PEREZ123", correo: "jperez@ejemplo.com", canal: "Llamada" },
+  { asesor: "M.GOMEZ456", correo: "mgomez@ejemplo.com", canal: "Chat" },
+];
+
+test("17. resolverAsesor resuelve el correo OFICIAL del registro", () => {
+  assert.deepEqual(resolverAsesor("J.PEREZ123", LISTA), { asesor: "J.PEREZ123", correo: "jperez@ejemplo.com" });
+});
+
+test("18. resolverAsesor devuelve null si el asesor no existe o está vacío", () => {
+  assert.equal(resolverAsesor("NO.EXISTE999", LISTA), null);
+  assert.equal(resolverAsesor("", LISTA), null);
+});
+
+test("19. Precedencia: el asesor seleccionado prevalece sobre el nombre del JSON", () => {
+  // El JSON trae otro asesor, pero la identidad final es la selección manual:
+  // resolverAsesor ignora el JSON y devuelve el correo del seleccionado.
+  const oficial = resolverAsesor("M.GOMEZ456", LISTA);
+  assert.deepEqual(oficial, { asesor: "M.GOMEZ456", correo: "mgomez@ejemplo.com" });
+  // El correo NO proviene del JSON aunque éste incluyera uno distinto.
+  assert.notEqual(oficial.correo, "jperez@ejemplo.com");
 });

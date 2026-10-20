@@ -252,8 +252,9 @@ export function parseAuditoriaChatGPT(raw: string): ResultadoParseo {
   datos.tipoConsulta = leer("tipo_consulta", "tipoConsulta", "motivo");
   datos.grabacion = leer("grabacion", "grabación", "recording");
 
-  // Obligatorios: asesor, fecha, id_gestion.
-  if (!datos.asesor) diagnosticos.push({ severidad: "error", codigo: "obligatorio_ausente", campo: "asesor", mensaje: "Falta el asesor (obligatorio)." });
+  // Obligatorios: fecha, id_gestion. El ASESOR ya NO es obligatorio en el JSON:
+  // la identidad del asesor la fija el selector manual de la pantalla (fuente de
+  // verdad). El nombre del JSON, si viene, solo sirve para detectar discrepancias.
   if (!datos.idGestion) diagnosticos.push({ severidad: "error", codigo: "obligatorio_ausente", campo: "id_gestion", mensaje: "Falta el ID de gestión (obligatorio)." });
   if (!datos.fecha) {
     diagnosticos.push({ severidad: "error", codigo: "obligatorio_ausente", campo: "fecha", mensaje: "Falta la fecha (obligatoria)." });
@@ -352,4 +353,28 @@ export function erroresDe(r: ResultadoParseo): Diagnostico[] {
 }
 export function advertenciasDe(r: ResultadoParseo): Diagnostico[] {
   return r.diagnosticos.filter((d) => d.severidad === "advertencia");
+}
+
+// ============================================================
+// Resolución oficial del asesor seleccionado.
+// Fuente de verdad = la selección manual (el identificador oficial del asesor),
+// nunca el nombre del JSON. Devuelve el registro OFICIAL (asesor + correo) o null
+// si la selección no existe en la lista real de Funcionarios. El correo SIEMPRE
+// proviene del registro, no del JSON ni del navegador. Pura y testeable; la usan
+// tanto el componente (para mostrar) como el servidor (para validar y guardar).
+// ============================================================
+export interface AsesorOficial {
+  asesor: string;
+  correo: string;
+}
+
+export function resolverAsesor(
+  seleccion: string,
+  lista: { asesor: string; correo?: string }[]
+): AsesorOficial | null {
+  const clave = (seleccion ?? "").trim();
+  if (!clave) return null;
+  const registro = lista.find((f) => (f.asesor ?? "").trim() === clave);
+  if (!registro) return null;
+  return { asesor: registro.asesor.trim(), correo: (registro.correo ?? "").trim() };
 }
