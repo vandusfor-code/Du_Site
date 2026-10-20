@@ -6,7 +6,7 @@ import {
   UserRound, Search, SlidersHorizontal, ChevronRight, ChevronLeft,
   Download, Copy, CheckCircle2, FileSpreadsheet, X, AlertCircle, Loader2, Upload, type LucideIcon,
 } from "lucide-react";
-import { subirArchivoDocumentalAction, obtenerDashboardDocumentalAction } from "./actions";
+import { subirLoteDocumentalAction, finalizarImportacionDocumentalAction, obtenerDashboardDocumentalAction } from "./actions";
 import type { DashboardDocumental, RegistroDoc, ResultadoImportacionUI } from "./tipos";
 import s from "./documental.module.css";
 
@@ -43,6 +43,7 @@ export default function AuditoriaDocumental({
   const [erroresOnly, setErroresOnly] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [subiendo, setSubiendo] = useState(false);
+  const [progreso, setProgreso] = useState<{ procesados: number; total: number } | null>(null);
   const [resultado, setResultado] = useState<ResultadoImportacionUI | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const PAGE = 10;
@@ -50,13 +51,56 @@ export default function AuditoriaDocumental({
   const registros = useMemo(() => data?.registros ?? [], [data]);
   const resumen = data?.resumen;
 
+  // Procesa el archivo en lotes (reanudable por dedup): repite la acción con el
+  // mismo archivo + audId hasta terminar, para no exceder el límite de tiempo.
   async function subir(file: File) {
     setSubiendo(true);
     setError(null);
     setResultado(null);
+    setProgreso(null);
     try {
-      const r = await subirArchivoDocumentalAction(construirFormData(file));
-      setResultado(r);
+      let audId = "";
+      let encontrados = 0, nuevosTotal = 0, duplicados = 0;
+      let procesados = 0, conErrores = 0, sinNovedades = 0, sumaCalidad = 0, calidadCount = 0;
+      const radicadores = new Set<string>();
+      let primera = true, restantes = 1, guard = 0;
+
+      while (restantes > 0 && guard < 500) {
+        guard++;
+        const fd = construirFormData(file);
+        fd.append("audId", audId);
+        const r = await subirLoteDocumentalAction(fd);
+        audId = r.audId;
+        if (primera) {
+          encontrados = r.encontrados;
+          nuevosTotal = r.pendientesAntes;
+          duplicados = r.encontrados - r.pendientesAntes;
+          primera = false;
+        }
+        procesados += r.procesados;
+        conErrores += r.conErrores;
+        sinNovedades += r.sinNovedades;
+        sumaCalidad += r.sumaCalidad;
+        calidadCount += r.calidadCount;
+        r.radicadores.forEach((x) => radicadores.add(x));
+        restantes = r.restantes;
+        setProgreso({ procesados, total: nuevosTotal });
+        if (r.procesados === 0 && restantes > 0) break; // seguridad anti-bucle
+      }
+
+      const promedioCalidad = calidadCount > 0 ? Math.round(sumaCalidad / calidadCount) : 0;
+      const asesoras = radicadores.size;
+      const estado = restantes === 0 ? "Completado" : "Incompleto";
+
+      await finalizarImportacionDocumentalAction(audId, file.name, {
+        encontrados, nuevos: nuevosTotal, duplicados, procesados,
+        conErrores, sinNovedades, promedioCalidad, asesoras, estado,
+      });
+
+      setResultado({
+        audId, archivo: file.name, encontrados, nuevos: nuevosTotal, duplicados, procesados,
+        conErrores, sinNovedades, requierenRevision: conErrores, promedioCalidad, asesoras, camposNoGuardados: [],
+      });
       const nuevo = await obtenerDashboardDocumentalAction();
       setData(nuevo);
       setPagina(1);
@@ -64,6 +108,7 @@ export default function AuditoriaDocumental({
       setError(e instanceof Error ? e.message : "Error al procesar el archivo.");
     } finally {
       setSubiendo(false);
+      setProgreso(null);
       if (inputRef.current) inputRef.current.value = "";
     }
   }
@@ -206,7 +251,6 @@ function iniciales(nombre: string): string {
 
 function Drawer({ row, tab, setTab, onClose }: { row: RegistroDoc; tab: Tab; setTab: (t: Tab) => void; onClose: () => void }) {
   const c = row.calidad;
-  const donutBg = `conic-gradient(#22c55e ${row.puntaje}%, #eef0f4 ${row.puntaje}% 100%)`;
   const esPeople = row.origen === "PEOPLE";
   const criterios: [string, number][] = [
     ["Ortografía", c.ortografia], ["Redacción", c.redaccion], ["Claridad", c.claridad], ["Coherencia", c.coherencia], ["Correspondencia", row.correspondencia],
@@ -247,13 +291,9 @@ function Drawer({ row, tab, setTab, onClose }: { row: RegistroDoc; tab: Tab; set
               </div>
             )}
             <h4>Resumen de calidad</h4>
-            <div className={s.quality}>
-              <div className={s.donut} style={{ background: donutBg }}>
-                <div className={s.donutC}><b>{row.puntaje}%</b><small>Calidad general</small></div>
-              </div>
-              <div className={s.qbars}>
-                {criterios.map(([n, v]) => <p key={n}><span>{n}</span><i><b style={{ width: `${v}%` }} /></i><strong>{v}%</strong></p>)}
-              </div>
+            <div className={s.qbars}>
+              <p className={s.qGeneral}><span>Calidad general</span><i><b style={{ width: `${row.puntaje}%` }} /></i><strong>{row.puntaje}%</strong></p>
+              {criterios.map(([n, v]) => <p key={n}><span>{n}</span><i><b style={{ width: `${v}%` }} /></i><strong>{v}%</strong></p>)}
             </div>
 
             <h4>Errores detectados <span className={s.errCount}>{row.errores}</span></h4>

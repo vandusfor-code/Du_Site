@@ -1,12 +1,24 @@
 "use server";
 
 import { auth } from "@/auth";
-import { procesarArchivoPqrsf, obtenerDashboardDocumental } from "@/lib/documental";
-import type { ResultadoImportacionUI, DashboardDocumental } from "./tipos";
+import { esAdmin } from "@/lib/auth-helpers";
+import {
+  procesarLoteDocumental,
+  registrarHistorialDocumental,
+  obtenerDashboardDocumental,
+  type LoteResultado,
+  type HistorialStats,
+} from "@/lib/documental";
+import type { DashboardDocumental } from "./tipos";
 
+// Corregido: verificaba el módulo asignable "admin", independiente de la
+// columna Rol — ver mismo comentario en src/app/admin/actions.ts. Mismo
+// patrón de dos chequeos que requireAdmin() en auth-helpers.ts, necesario
+// para que TypeScript pueda angostar session a no-nulo después.
 async function requireAdminAction() {
   const session = await auth();
-  if (!session?.user?.modulos.includes("admin")) throw new Error("No autorizado");
+  if (!session?.user) throw new Error("No autorizado");
+  if (!esAdmin(session)) throw new Error("No autorizado");
   return session;
 }
 
@@ -18,17 +30,25 @@ function decodificar(buffer: ArrayBuffer): string {
   return new TextDecoder("windows-1252", { fatal: false }).decode(buffer);
 }
 
-export async function subirArchivoDocumentalAction(formData: FormData): Promise<ResultadoImportacionUI> {
-  const session = await requireAdminAction();
+// Procesa UN lote de registros nuevos. El cliente la llama repetidamente (con el
+// mismo archivo + audId) hasta `completado`, para no exceder el límite de tiempo.
+export async function subirLoteDocumentalAction(formData: FormData): Promise<LoteResultado> {
+  await requireAdminAction();
   const archivo = formData.get("archivo");
   if (!(archivo instanceof File)) throw new Error("No se recibió ningún archivo.");
+  const audId = String(formData.get("audId") ?? "");
   const contenido = decodificar(await archivo.arrayBuffer());
-  const r = await procesarArchivoPqrsf(contenido, archivo.name, session.user.nombre);
-  return {
-    audId: r.audId, archivo: r.archivo, encontrados: r.encontrados, nuevos: r.nuevos, duplicados: r.duplicados,
-    procesados: r.procesados, conErrores: r.conErrores, sinNovedades: r.sinNovedades, requierenRevision: r.requierenRevision,
-    promedioCalidad: r.promedioCalidad, asesoras: r.asesoras, camposNoGuardados: r.camposNoGuardados,
-  };
+  return procesarLoteDocumental(contenido, audId);
+}
+
+// Registra una fila de historial de importación con las estadísticas acumuladas.
+export async function finalizarImportacionDocumentalAction(
+  audId: string,
+  archivo: string,
+  stats: HistorialStats
+): Promise<void> {
+  const session = await requireAdminAction();
+  await registrarHistorialDocumental(audId, archivo, session.user.nombre, stats);
 }
 
 export async function obtenerDashboardDocumentalAction(): Promise<DashboardDocumental> {

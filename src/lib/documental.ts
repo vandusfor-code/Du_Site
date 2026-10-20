@@ -32,7 +32,6 @@ function apiKey(): string {
 const TAB_REGISTROS = "Audtoria_documental"; // pestaña real (nombre tal cual en la hoja)
 const TAB_HISTORIAL = "Historial_importaciones";
 const MODELO = "gemini-2.5-flash";
-const TOPE_REGISTROS = 120; // máximo por carga (protección de tiempo/costo)
 const CONCURRENCIA = 6; // análisis IA en paralelo por lote (para caber en el límite de tiempo)
 
 // Columnas que deben venir en el archivo para poder auditar.
@@ -212,23 +211,36 @@ function valoresRegistro(fila: Record<string, string>, a: ResultadoAnalisis, aud
   return new Map(pares.map(([k, v]) => [norm(k), v]));
 }
 
-export interface ResultadoImportacion {
+// Tamaño de lote por llamada. Cada registro = 1 análisis IA; se procesan varios
+// concurrentemente. Con este tope, cada invocación cabe holgadamente en el
+// límite de tiempo de la función (60 s en Hobby), y archivos grandes (cientos de
+// PQR) se completan en varias llamadas guiadas por el cliente.
+const LOTE_POR_LLAMADA = 40;
+
+export interface LoteResultado {
   audId: string;
-  archivo: string;
-  encontrados: number;
-  nuevos: number;
-  duplicados: number;
-  procesados: number;
+  encontrados: number; // filas totales del archivo
+  pendientesAntes: number; // nuevos (no guardados) al iniciar esta llamada
+  procesados: number; // guardados en esta llamada
   conErrores: number;
   sinNovedades: number;
-  requierenRevision: number;
-  promedioCalidad: number;
-  asesoras: number;
-  columnasFaltantes: string[];
-  camposNoGuardados: string[];
+  sumaCalidad: number;
+  calidadCount: number;
+  radicadores: string[];
+  restantes: number; // nuevos que aún faltan por procesar
+  completado: boolean;
 }
 
-export async function procesarArchivoPqrsf(contenido: string, nombreArchivo: string, usuario: string): Promise<ResultadoImportacion> {
+const HEADERS_HISTORIAL = [
+  "ID auditoría", "Fecha/hora carga", "Archivo", "Usuario", "Registros encontrados", "Nuevos",
+  "Duplicados", "Procesados", "Con errores", "Sin novedades", "Requieren revisión",
+  "Promedio calidad", "Asesoras", "Estado",
+];
+
+// Procesa UN lote de registros nuevos (dedup por Radicado contra la hoja) y los
+// guarda de inmediato. Es reanudable: al volver a llamarla con el mismo archivo,
+// los ya guardados cuentan como existentes y avanza con los siguientes.
+export async function procesarLoteDocumental(contenido: string, audIdPrevio: string): Promise<LoteResultado> {
   const parseado = parseArchivoPqrsf(contenido);
 
   // Validación de columnas críticas.
@@ -239,18 +251,11 @@ export async function procesarArchivoPqrsf(contenido: string, nombreArchivo: str
   }
 
   const id = sheetId();
-  await asegurarHoja(id, TAB_HISTORIAL, [
-    "ID auditoría", "Fecha/hora carga", "Archivo", "Usuario", "Registros encontrados", "Nuevos",
-    "Duplicados", "Procesados", "Con errores", "Sin novedades", "Requieren revisión",
-    "Promedio calidad", "Asesoras", "Estado",
-  ]);
-
-  // Asegura la pestaña de registros y sus encabezados base (si está vacía).
+  await asegurarHoja(id, TAB_HISTORIAL, HEADERS_HISTORIAL);
   await asegurarHoja(id, TAB_REGISTROS, ["Radicado"]);
+
   const registrosExistentes = await readRange(id, `${TAB_REGISTROS}!A:BZ`);
   let headersHoja: string[] = (registrosExistentes[0] ?? []).map((h) => String(h ?? "")).filter((h) => h.trim() !== "");
-
-  // Garantiza que existan las columnas de resultado IA/auditoría.
   const faltantesExtra = COLUMNAS_EXTRA.filter((c) => !headersHoja.some((h) => norm(h) === norm(c)));
   if (faltantesExtra.length > 0) {
     headersHoja = [...headersHoja, ...faltantesExtra];
@@ -267,37 +272,38 @@ export async function procesarArchivoPqrsf(contenido: string, nombreArchivo: str
     }
   }
 
-  const fechaCarga = new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" });
-  const audId = `AUD-${fechaCarga.slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-6)}`;
-
-  // Filas nuevas (dedupe por Radicado) con tope de seguridad.
-  const nuevasFilas = parseado.filas.filter((f) => {
+  // Nuevos: no están en la hoja y sin repetir dentro del archivo.
+  const vistas = new Set<string>();
+  const nuevas = parseado.filas.filter((f) => {
     const rad = col(f, "Radicado");
-    return rad && !radicadosExistentes.has(rad);
+    if (!rad || radicadosExistentes.has(rad) || vistas.has(rad)) return false;
+    vistas.add(rad);
+    return true;
   });
-  const duplicados = parseado.filas.length - nuevasFilas.length;
-  const aProcesar = nuevasFilas.slice(0, TOPE_REGISTROS);
+  const pendientesAntes = nuevas.length;
 
-  let conErrores = 0, sinNovedades = 0, sumaCalidad = 0, calidadCount = 0;
-  const asesorasSet = new Set<string>();
-  const camposNoGuardados = new Set<string>();
-  const filasParaHoja: string[][] = [];
+  const fechaCarga = new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" });
+  const audId = audIdPrevio || `AUD-${fechaCarga.slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-6)}`;
 
-  // Análisis IA en lotes concurrentes (mantiene el orden de aProcesar).
+  const aProcesar = nuevas.slice(0, LOTE_POR_LLAMADA);
+
+  // Análisis IA en lotes concurrentes (mantiene el orden).
   const analisis: ResultadoAnalisis[] = [];
   for (let i = 0; i < aProcesar.length; i += CONCURRENCIA) {
     const lote = aProcesar.slice(i, i + CONCURRENCIA);
-    const res = await Promise.all(lote.map((f) => analizar(f)));
-    analisis.push(...res);
+    analisis.push(...await Promise.all(lote.map((f) => analizar(f))));
   }
 
+  let conErrores = 0, sinNovedades = 0, sumaCalidad = 0, calidadCount = 0;
+  const radicadores: string[] = [];
+  const filasParaHoja: string[][] = [];
   for (let i = 0; i < aProcesar.length; i++) {
     const fila = aProcesar[i];
     const a = analisis[i];
     if (a.cantidadErrores > 0 || a.estadoCorrespondencia === "NO_CORRESPONDE") conErrores++;
     else sinNovedades++;
     if (a.general > 0) { sumaCalidad += a.general; calidadCount++; }
-    const rad = col(fila, "Radicador"); if (rad) asesorasSet.add(rad);
+    const rad = col(fila, "Radicador"); if (rad) radicadores.push(rad);
 
     const valores = valoresRegistro(fila, a, audId, fechaCarga);
     filasParaHoja.push(headersHojaNorm.map((h) => valores.get(h) ?? ""));
@@ -307,21 +313,35 @@ export async function procesarArchivoPqrsf(contenido: string, nombreArchivo: str
     await appendRows(id, `${TAB_REGISTROS}!A:BZ`, filasParaHoja);
   }
 
-  const promedioCalidad = calidadCount > 0 ? Math.round(sumaCalidad / calidadCount) : 0;
-
-  await appendRows(id, `${TAB_HISTORIAL}!A:N`, [[
-    audId, fechaCarga, nombreArchivo, usuario, String(parseado.filas.length), String(nuevasFilas.length),
-    String(duplicados), String(aProcesar.length), String(conErrores), String(sinNovedades), String(conErrores),
-    String(promedioCalidad), String(asesorasSet.size), headersHoja.length > 0 ? "Completado" : "Sin encabezados en la hoja",
-  ]]);
-
+  const restantes = Math.max(0, pendientesAntes - aProcesar.length);
   return {
-    audId, archivo: nombreArchivo,
-    encontrados: parseado.filas.length, nuevos: nuevasFilas.length, duplicados,
-    procesados: aProcesar.length, conErrores, sinNovedades, requierenRevision: conErrores,
-    promedioCalidad, asesoras: asesorasSet.size,
-    columnasFaltantes: [], camposNoGuardados: Array.from(camposNoGuardados),
+    audId,
+    encontrados: parseado.filas.length,
+    pendientesAntes,
+    procesados: aProcesar.length,
+    conErrores, sinNovedades, sumaCalidad, calidadCount,
+    radicadores,
+    restantes,
+    completado: restantes === 0,
   };
+}
+
+export interface HistorialStats {
+  encontrados: number; nuevos: number; duplicados: number; procesados: number;
+  conErrores: number; sinNovedades: number; promedioCalidad: number; asesoras: number; estado: string;
+}
+
+// Escribe UNA fila de historial por importación (la llama el cliente al terminar
+// todos los lotes, con las estadísticas acumuladas).
+export async function registrarHistorialDocumental(audId: string, archivo: string, usuario: string, st: HistorialStats): Promise<void> {
+  const id = sheetId();
+  const fechaCarga = new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" });
+  await asegurarHoja(id, TAB_HISTORIAL, HEADERS_HISTORIAL);
+  await appendRows(id, `${TAB_HISTORIAL}!A:N`, [[
+    audId, fechaCarga, archivo, usuario, String(st.encontrados), String(st.nuevos),
+    String(st.duplicados), String(st.procesados), String(st.conErrores), String(st.sinNovedades),
+    String(st.conErrores), String(st.promedioCalidad), String(st.asesoras), st.estado,
+  ]]);
 }
 
 /* ── Lecturas para la UI ── */
