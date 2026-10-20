@@ -141,7 +141,23 @@
 .formField input:focus, .formField select:focus, .formField textarea:focus { outline: 2px solid rgba(112, 68, 237, .2); border-color: #7044ed; }
 .notaPreview { display: flex; align-items: center; gap: 10px; height: 37px; }
 .notaPreview b { font-size: 16px; }
-.formActions { display: flex; justify-content: flex-end; }
+.formActions { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* ── Auditoría ChatGPT (importación estructurada) ── */
+.gptHint { font-size: 12.5px; color: #667189; line-height: 1.55; margin: 0 0 14px; }
+.gptHint code { font-family: ui-monospace, monospace; font-size: 11.5px; background: #f1f0fb; color: #5b4ee6; padding: 1px 6px; border-radius: 6px; }
+.gptTextarea {
+  width: 100%; border: 1px solid #e0e3eb; border-radius: 10px; padding: 12px 14px; font-size: 12.5px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #202238; background: #fbfbfe; resize: vertical; min-height: 220px; line-height: 1.5;
+}
+.gptTextarea:focus { outline: 2px solid rgba(112, 68, 237, .2); border-color: #7044ed; }
+.gptTextarea:disabled { opacity: .6; }
+.gptSuccess { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; padding: 28px 16px; color: #158a55; }
+.gptSuccess p { margin: 0; font-size: 13.5px; color: #202238; font-weight: 600; }
+.gptWarn { background: #fff8ec; border: 1px solid #ffe2b0; color: #9a6a12; border-radius: 9px; padding: 10px 14px; font-size: 12px; margin-bottom: 14px; }
+.gptWarn b, .bannerError b { display: inline-flex; align-items: center; gap: 6px; }
+.gptDiagList { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-weight: 500; }
+.gptEvidence { color: #8a93a8; font-size: 11px; font-style: italic; line-height: 1.4; }
 
 /* ── Modal detalle ── */
 .overlay { position: fixed; inset: 0; z-index: 50; background: rgba(15, 18, 40, .45); backdrop-filter: blur(3px); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 32px 16px; }

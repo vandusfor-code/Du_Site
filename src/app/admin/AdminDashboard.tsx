@@ -16,6 +16,7 @@ import {
 } from "./actions";
 import AdminSidebar from "./AdminSidebar";
 import AuditoriaManualForm from "./AuditoriaManualForm";
+import AuditoriaChatGPTForm from "./AuditoriaChatGPTForm";
 import styles from "./auditorias.module.css";
 
 /* Formateo es-CO: 1021 → "1.021", 91.4 → "91,4" */
@@ -70,7 +71,7 @@ export default function AdminDashboard({
   const [data, setData] = useState(dashboardInicial);
   const [error, setError] = useState(errorInicial);
   const [banner, setBanner] = useState<{ tipo: "ok" | "error"; msg: string } | null>(null);
-  const [tipoAuditoria, setTipoAuditoria] = useState<"ia" | "co">("ia");
+  const [tipoAuditoria, setTipoAuditoria] = useState<"ia" | "co" | "chatgpt">("ia");
 
   const [filtros, setFiltros] = useState<DashboardFiltros>({});
   const [cargando, setCargando] = useState(false);
@@ -216,11 +217,12 @@ export default function AdminDashboard({
               <select
                 className={styles.selectButton}
                 value={tipoAuditoria}
-                onChange={(e) => setTipoAuditoria(e.target.value as "ia" | "co")}
+                onChange={(e) => setTipoAuditoria(e.target.value as "ia" | "co" | "chatgpt")}
                 title="Tipo de auditoría"
               >
                 <option value="ia">Auditoría IA</option>
                 <option value="co">Auditoría CO</option>
+                <option value="chatgpt">Auditoría ChatGPT</option>
               </select>
               {tipoAuditoria === "ia" && (
                 <>
@@ -303,11 +305,19 @@ export default function AdminDashboard({
 
         {/* ── Paneles analíticos ── */}
         <div className={styles.analyticsGrid}>
-          {/* Estado (IA) o formulario de registro manual (CO) */}
+          {/* Estado (IA) · registro manual (CO) · importación estructurada (ChatGPT) */}
           {tipoAuditoria === "co" ? (
             <AuditoriaManualForm
               funcionarios={funcionarios}
               canales={data?.canales ?? []}
+              evaluadorDefault={nombre}
+              onGuardado={async (msg) => {
+                setBanner(msg);
+                if (msg.tipo === "ok") await refrescar();
+              }}
+            />
+          ) : tipoAuditoria === "chatgpt" ? (
+            <AuditoriaChatGPTForm
               evaluadorDefault={nombre}
               onGuardado={async (msg) => {
                 setBanner(msg);
