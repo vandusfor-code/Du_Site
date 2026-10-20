@@ -153,16 +153,6 @@ function texto(v: unknown): string {
   return "";
 }
 
-// Fecha estricta "YYYY-MM-DD" con comprobación de valor real (no 2026-13-40).
-function fechaValida(s: string): boolean {
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return false;
-  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
-  if (mo < 1 || mo > 12 || d < 1 || d > 31) return false;
-  const dt = new Date(Date.UTC(y, mo - 1, d));
-  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
-}
-
 const DATOS_VACIOS: DatosImportados = {
   fecha: "", asesor: "", canal: "", tipoGestion: "", correo: "", idGestion: "", evaluador: "",
   saludo: "", empatia: "", sonrisa: "", claridad: "", encuesta: "", informacion: "", proceso: "", cierre: "",
@@ -252,15 +242,13 @@ export function parseAuditoriaChatGPT(raw: string): ResultadoParseo {
   datos.tipoConsulta = leer("tipo_consulta", "tipoConsulta", "motivo");
   datos.grabacion = leer("grabacion", "grabación", "recording");
 
-  // Obligatorios: fecha, id_gestion. El ASESOR ya NO es obligatorio en el JSON:
-  // la identidad del asesor la fija el selector manual de la pantalla (fuente de
-  // verdad). El nombre del JSON, si viene, solo sirve para detectar discrepancias.
-  if (!datos.idGestion) diagnosticos.push({ severidad: "error", codigo: "obligatorio_ausente", campo: "id_gestion", mensaje: "Falta el ID de gestión (obligatorio)." });
-  if (!datos.fecha) {
-    diagnosticos.push({ severidad: "error", codigo: "obligatorio_ausente", campo: "fecha", mensaje: "Falta la fecha (obligatoria)." });
-  } else if (!fechaValida(datos.fecha)) {
-    diagnosticos.push({ severidad: "error", codigo: "fecha_invalida", campo: "fecha", mensaje: `La fecha "${datos.fecha}" no es válida. Formato esperado: AAAA-MM-DD.` });
-  }
+  // Datos ADMINISTRATIVOS controlados por el formulario, NO por el JSON:
+  //  - asesor y correo  → selección manual + registro oficial de Funcionarios.
+  //  - id_gestion        → campo manual de Du Site (fuente de verdad).
+  //  - fecha             → fecha de registro en Du Site (por defecto hoy Bogotá).
+  // Por eso ninguno es obligatorio en el JSON ni bloquea aquí: sus valores (si
+  // vienen) solo se leen para detectar discrepancias y avisar. La validación real
+  // de id_gestion y fecha ocurre en el formulario y en el servidor.
 
   // Opcionales ausentes: solo informativo.
   if (!datos.canal) diagnosticos.push({ severidad: "advertencia", codigo: "opcional_ausente", campo: "canal", mensaje: "Canal ausente (opcional)." });

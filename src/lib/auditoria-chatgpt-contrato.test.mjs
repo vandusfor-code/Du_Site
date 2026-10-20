@@ -104,20 +104,20 @@ test("6. Valor de cumplimiento inválido → error valor_no_permitido", () => {
   assert.ok(erroresDe(r).some((d) => d.codigo === "valor_no_permitido" && d.campo === "criterios.saludo"));
 });
 
-test("7. Campo obligatorio ausente (id_gestion) → error obligatorio_ausente", () => {
+test("7. id_gestion del JSON es OPCIONAL (lo controla el formulario)", () => {
   const data = JSON.parse(bloqueValido());
   delete data.interaccion.id_gestion;
   const r = parseAuditoriaChatGPT(JSON.stringify(data));
-  assert.equal(r.ok, false);
-  assert.ok(erroresDe(r).some((d) => d.codigo === "obligatorio_ausente" && d.campo === "id_gestion"));
+  assert.equal(r.ok, true); // no bloquea: el ID real lo escribe el usuario en Du Site
+  assert.equal(erroresDe(r).some((d) => d.campo === "id_gestion"), false);
 });
 
-test("8. Fecha inválida → error fecha_invalida", () => {
-  const r = parseAuditoriaChatGPT(bloqueValido({ interaccion: {
-    asesor: "X", canal: "Chat", fecha: "2026-13-40", id_gestion: "T-8",
-  } }));
-  // Faltan criterios/otros, pero debe incluir fecha_invalida.
-  assert.ok(erroresDe(r).some((d) => d.codigo === "fecha_invalida"));
+test("8. Fecha del JSON NO bloquea (la fecha la fija Du Site)", () => {
+  const data = JSON.parse(bloqueValido());
+  data.interaccion.fecha = "2026-13-40"; // valor absurdo en el JSON
+  const r = parseAuditoriaChatGPT(JSON.stringify(data));
+  assert.equal(r.ok, true); // el parser no valida la fecha del JSON; Du Site la controla
+  assert.equal(erroresDe(r).length, 0);
 });
 
 test("9. Nota propuesta inconsistente → advertencia (no bloquea), usa oficial", () => {

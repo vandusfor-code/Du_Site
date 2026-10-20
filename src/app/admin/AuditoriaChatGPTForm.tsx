@@ -20,23 +20,13 @@ import styles from "./auditorias.module.css";
 
 type Estado = "importar" | "validando" | "interpretada" | "guardado";
 
-function fechaValida(s: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(`${s}T00:00:00Z`).getTime());
+// Fecha de HOY en zona horaria de Colombia, en formato AAAA-MM-DD (en-CA → ISO).
+function hoyBogotaISO(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
 }
 
-// Validación de guardado sobre los datos EDITADOS. El asesor NO se edita aquí
-// (viene del selector como fuente de verdad), pero se verifica que esté fijado.
-function problemasDeGuardado(d: DatosImportados): string[] {
-  const out: string[] = [];
-  if (!d.asesor.trim()) out.push("Falta seleccionar el asesor.");
-  if (!d.idGestion.trim()) out.push("Falta el ID de gestión.");
-  if (!d.fecha.trim()) out.push("Falta la fecha.");
-  else if (!fechaValida(d.fecha)) out.push("La fecha no es válida (AAAA-MM-DD).");
-  for (const { id, label } of CRITERIOS) {
-    const v = (d as unknown as Record<string, string>)[id];
-    if (!(VALORES_CRITERIO as readonly string[]).includes(v)) out.push(`Criterio "${label}" sin valor válido.`);
-  }
-  return out;
+function fechaValida(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(`${s}T00:00:00Z`).getTime());
 }
 
 export default function AuditoriaChatGPTForm({
@@ -49,15 +39,19 @@ export default function AuditoriaChatGPTForm({
   onGuardado: (mensaje: { tipo: "ok" | "error"; msg: string }) => void;
 }) {
   const [estado, setEstado] = useState<Estado>("importar");
-  const [asesorSel, setAsesorSel] = useState(""); // identificador oficial — se conserva entre importaciones
-  const [raw, setRaw] = useState(""); // se conserva ante cualquier error
+  // Datos administrativos controlados por el formulario (fuente de verdad), que
+  // se conservan al volver a importar o ante errores de validación/guardado.
+  const [asesorSel, setAsesorSel] = useState("");
+  const [idGestionManual, setIdGestionManual] = useState("");
+  const [fechaSel, setFechaSel] = useState(hoyBogotaISO());
+
+  const [raw, setRaw] = useState("");
   const [resultado, setResultado] = useState<ResultadoParseo | null>(null);
   const [datos, setDatos] = useState<DatosImportados | null>(null);
-  const [avisoAsesor, setAvisoAsesor] = useState<string>(""); // discrepancia JSON vs selección
+  const [avisos, setAvisos] = useState<string[]>([]); // discrepancias JSON vs formulario
   const [guardando, setGuardando] = useState(false);
   const [guardadoMsg, setGuardadoMsg] = useState("");
 
-  // Lista oficial de asesores (deduplicada), tal como la usa Auditoría CO.
   const asesoresUnicos = useMemo(() => {
     const vistos = new Set<string>();
     return funcionarios.filter((x) => (x.asesor && !vistos.has(x.asesor) ? (vistos.add(x.asesor), true) : false));
@@ -75,27 +69,43 @@ export default function AuditoriaChatGPTForm({
       onGuardado({ tipo: "error", msg: "Selecciona primero el asesor." });
       return;
     }
+    if (!idGestionManual.trim()) {
+      onGuardado({ tipo: "error", msg: "Escribe el ID de gestión antes de interpretar." });
+      return;
+    }
     if (!raw.trim()) {
       onGuardado({ tipo: "error", msg: "Pega el bloque generado por ChatGPT antes de interpretar." });
       return;
     }
     setEstado("validando");
-    // La interpretación es local y síncrona; un microdelay solo da feedback visual.
     setTimeout(() => {
       const r = parseAuditoriaChatGPT(raw);
       const oficial = resolverAsesor(asesorSel, funcionarios);
-      // PRECEDENCIA: el asesor seleccionado es la fuente de verdad. El nombre del
-      // JSON nunca sobrescribe; el correo se resuelve del registro oficial.
+
+      // PRECEDENCIA: los datos administrativos del formulario mandan; el JSON nunca
+      // los sobrescribe. Solo se leen los valores del JSON para avisar si difieren.
       const jsonAsesor = r.datos?.asesor?.trim() ?? "";
+      const jsonId = r.datos?.idGestion?.trim() ?? "";
+      const jsonFecha = r.datos?.fecha?.trim() ?? "";
+
       if (r.datos && oficial) {
         r.datos.asesor = oficial.asesor;
         r.datos.correo = oficial.correo;
+        r.datos.idGestion = idGestionManual.trim();
+        r.datos.fecha = fechaSel;
       }
-      setAvisoAsesor(
-        jsonAsesor && oficial && jsonAsesor !== oficial.asesor
-          ? `El JSON traía el asesor "${jsonAsesor}", pero se conserva el seleccionado manualmente: "${oficial.asesor}".`
-          : ""
-      );
+
+      const nuevosAvisos: string[] = [];
+      if (jsonAsesor && oficial && jsonAsesor !== oficial.asesor) {
+        nuevosAvisos.push(`El JSON traía el asesor "${jsonAsesor}", pero se conserva el seleccionado: "${oficial.asesor}".`);
+      }
+      if (jsonId && jsonId !== idGestionManual.trim()) {
+        nuevosAvisos.push(`El JSON traía el ID "${jsonId}", pero se conserva el escrito en Du Site: "${idGestionManual.trim()}".`);
+      }
+      if (jsonFecha && jsonFecha !== fechaSel) {
+        nuevosAvisos.push(`El JSON traía la fecha "${jsonFecha}", pero se conserva la de registro: "${fechaSel}".`);
+      }
+      setAvisos(nuevosAvisos);
       setResultado(r);
       setDatos(r.datos);
       setEstado("interpretada");
@@ -106,7 +116,6 @@ export default function AuditoriaChatGPTForm({
     setDatos((prev) => (prev ? { ...prev, [key]: value } : prev));
   }
 
-  // Nota en vivo según la regla oficial, recalculada con los datos editados.
   const notaViva = useMemo(() => {
     if (!datos) return null;
     return calcularNota({
@@ -115,7 +124,19 @@ export default function AuditoriaChatGPTForm({
     });
   }, [datos]);
 
-  const problemas = datos ? problemasDeGuardado(datos) : ["Sin datos"];
+  // Validación de guardado: datos administrativos (del formulario) + criterios (del JSON).
+  const problemas: string[] = [];
+  if (!asesorSel.trim()) problemas.push("Falta seleccionar el asesor.");
+  if (!idGestionManual.trim()) problemas.push("Falta el ID de gestión.");
+  if (!fechaValida(fechaSel)) problemas.push("La fecha no es válida (AAAA-MM-DD).");
+  if (datos) {
+    for (const { id, label } of CRITERIOS) {
+      const v = (datos as unknown as Record<string, string>)[id];
+      if (!(VALORES_CRITERIO as readonly string[]).includes(v)) problemas.push(`Criterio "${label}" sin valor válido.`);
+    }
+  } else {
+    problemas.push("Sin datos interpretados.");
+  }
   const puedeGuardar = estado === "interpretada" && problemas.length === 0 && !guardando;
 
   async function guardar() {
@@ -123,12 +144,12 @@ export default function AuditoriaChatGPTForm({
     setGuardando(true);
     try {
       const input: AuditoriaManualInput = {
-        fecha: datos.fecha,
-        asesor: asesorSel, // fuente de verdad; el servidor lo revalida y resuelve el correo
+        fecha: fechaSel, // fecha de registro de Du Site (hoy Bogotá por defecto)
+        asesor: asesorSel, // fuente de verdad; el servidor revalida y resuelve el correo
         canal: datos.canal,
         tipoGestion: datos.tipoGestion,
         correo: asesorInfo?.correo ?? "",
-        idGestion: datos.idGestion,
+        idGestion: idGestionManual.trim(), // ID manual de Du Site (fuente de verdad)
         evaluador: datos.evaluador || evaluadorDefault,
         saludo: datos.saludo,
         empatia: datos.empatia,
@@ -146,28 +167,33 @@ export default function AuditoriaChatGPTForm({
         tipoConsulta: datos.tipoConsulta,
         puntajeTuteo: datos.puntajeTuteo || "Sin tuteo",
       };
-      // El servidor revalida admin, verifica que el asesor exista, resuelve su
-      // correo oficial, deduplica por ID y RECALCULA la nota oficial.
       const res = await guardarAuditoriaChatGPTAction(input);
       setGuardadoMsg(`Auditoría ChatGPT guardada para ${asesorSel} — Nota ${res.nota} (${res.tipoNota}).`);
       setEstado("guardado");
       onGuardado({ tipo: "ok", msg: `Auditoría ChatGPT guardada para ${asesorSel} — Nota ${res.nota} (${res.tipoNota}).` });
     } catch (e) {
-      // Conserva el bloque, la selección y los datos para no obligar a pegar de nuevo.
+      // Conserva bloque, asesor, ID y fecha para no obligar a reescribir.
       onGuardado({ tipo: "error", msg: e instanceof Error ? e.message : "No se pudo guardar la auditoría." });
     } finally {
       setGuardando(false);
     }
   }
 
-  // Vuelve a importar SIN perder la selección de asesor.
+  // Volver a importar SIN perder asesor, ID ni fecha.
   function volverAImportar() {
     setRaw("");
     setResultado(null);
     setDatos(null);
-    setAvisoAsesor("");
+    setAvisos([]);
     setGuardadoMsg("");
     setEstado("importar");
+  }
+
+  // Nueva auditoría tras guardar: conserva asesor y fecha; limpia el ID (cada
+  // interacción tiene uno distinto) para no chocar con la protección de duplicados.
+  function nuevaAuditoria() {
+    setIdGestionManual("");
+    volverAImportar();
   }
 
   // ── Estado D: Guardado ──
@@ -178,7 +204,7 @@ export default function AuditoriaChatGPTForm({
         <div className={styles.gptSuccess}>
           <CheckCircle2 size={34} />
           <p>{guardadoMsg || "Auditoría guardada correctamente."}</p>
-          <button className={styles.primary} onClick={volverAImportar}>
+          <button className={styles.primary} onClick={nuevaAuditoria}>
             <ClipboardList size={16} /> Importar otra auditoría
           </button>
         </div>
@@ -192,8 +218,9 @@ export default function AuditoriaChatGPTForm({
       <section className={`${styles.panel} ${styles.manualForm}`}>
         <h2><ClipboardList size={18} /> Auditoría ChatGPT</h2>
         <p className={styles.gptHint}>
-          Selecciona el asesor, pega el bloque generado por ChatGPT (formato <code>AUDITORIA_CO_V1</code>)
-          y registra el resultado. El sistema lo interpreta sin volver a evaluar ni llamar a ninguna IA.
+          Selecciona el asesor y escribe el ID de gestión, pega el bloque generado por ChatGPT
+          (formato <code>AUDITORIA_CO_V1</code>) y registra el resultado. El sistema lo interpreta
+          sin volver a evaluar ni llamar a ninguna IA.
         </p>
 
         {listaNoDisponible && (
@@ -203,15 +230,26 @@ export default function AuditoriaChatGPTForm({
           </div>
         )}
 
-        {/* 1) Seleccionar asesor (obligatorio) */}
-        <div className={styles.formField} style={{ marginBottom: 14, maxWidth: 420 }}>
-          <label>Asesor * (selección manual — fuente de verdad)</label>
-          <select value={asesorSel} onChange={(e) => setAsesorSel(e.target.value)} disabled={listaNoDisponible || estado === "validando"}>
-            <option value="">— Selecciona un asesor —</option>
-            {asesoresUnicos.map((a) => (
-              <option key={a.asesor} value={a.asesor}>{a.asesor}{a.correo ? ` — ${a.correo}` : ""}</option>
-            ))}
-          </select>
+        {/* 1) Asesor + ID de gestión en la misma fila (responsive) */}
+        <div className={styles.gptRow}>
+          <div className={styles.formField}>
+            <label>Asesor * (selección manual — fuente de verdad)</label>
+            <select value={asesorSel} onChange={(e) => setAsesorSel(e.target.value)} disabled={listaNoDisponible || estado === "validando"}>
+              <option value="">— Selecciona un asesor —</option>
+              {asesoresUnicos.map((a) => (
+                <option key={a.asesor} value={a.asesor}>{a.asesor}{a.correo ? ` — ${a.correo}` : ""}</option>
+              ))}
+            </select>
+          </div>
+          <div className={styles.formField}>
+            <label>ID Gestión * (identificador real de la interacción)</label>
+            <input
+              value={idGestionManual}
+              onChange={(e) => setIdGestionManual(e.target.value)}
+              placeholder="ID único de la gestión"
+              disabled={estado === "validando"}
+            />
+          </div>
         </div>
 
         {/* 2) Pegar JSON */}
@@ -221,7 +259,7 @@ export default function AuditoriaChatGPTForm({
             className={styles.gptTextarea}
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
-            rows={12}
+            rows={11}
             placeholder={"Pega aquí el bloque JSON de la auditoría…"}
             disabled={estado === "validando"}
             spellCheck={false}
@@ -230,7 +268,11 @@ export default function AuditoriaChatGPTForm({
 
         {/* 3) Interpretar */}
         <div className={styles.formActions}>
-          <button className={styles.primary} onClick={interpretar} disabled={estado === "validando" || listaNoDisponible || !asesorSel}>
+          <button
+            className={styles.primary}
+            onClick={interpretar}
+            disabled={estado === "validando" || listaNoDisponible || !asesorSel || !idGestionManual.trim()}
+          >
             {estado === "validando" ? <Loader2 size={16} className={styles.spin} /> : <ClipboardList size={16} />}
             {estado === "validando" ? "Validando…" : "Interpretar auditoría"}
           </button>
@@ -249,16 +291,21 @@ export default function AuditoriaChatGPTForm({
     <section className={`${styles.panel} ${styles.manualForm}`}>
       <h2><ClipboardList size={18} /> Auditoría ChatGPT — Revisión</h2>
 
-      {/* Asesor seleccionado — claramente visible, no editable aquí */}
+      {/* Datos administrativos (fuente de verdad) claramente visibles */}
       <div className={styles.gptAsesor}>
         <span>Asesor</span>
         <b>{asesorSel || "—"}</b>
         {asesorInfo?.correo && <small>{asesorInfo.correo}</small>}
+        <span style={{ marginLeft: "auto" }}>ID gestión</span>
+        <b>{idGestionManual || "—"}</b>
       </div>
 
-      {avisoAsesor && (
+      {avisos.length > 0 && (
         <div className={styles.gptWarn}>
-          <b><Info size={15} /> {avisoAsesor}</b>
+          <b><Info size={15} /> Se conservaron los datos de Du Site:</b>
+          <ul className={styles.gptDiagList}>
+            {avisos.map((a, i) => <li key={i}>{a}</li>)}
+          </ul>
         </div>
       )}
 
@@ -283,24 +330,24 @@ export default function AuditoriaChatGPTForm({
         <>
           <div className={styles.formGrid}>
             <div className={styles.formField}>
-              <label>Canal</label>
-              <input value={datos.canal} onChange={(e) => editar("canal", e.target.value)} />
+              <label>Fecha de registro *</label>
+              <input type="date" value={fechaSel} onChange={(e) => setFechaSel(e.target.value)} />
             </div>
             <div className={styles.formField}>
-              <label>Fecha *</label>
-              <input type="date" value={datos.fecha} onChange={(e) => editar("fecha", e.target.value)} />
-            </div>
-            <div className={styles.formField}>
-              <label>Tipo de gestión</label>
-              <input value={datos.tipoGestion} onChange={(e) => editar("tipoGestion", e.target.value)} />
+              <label>ID Gestión (de Du Site)</label>
+              <input value={idGestionManual} readOnly disabled title="Se define en la pantalla de importación" />
             </div>
             <div className={styles.formField}>
               <label>Correo corporativo (oficial)</label>
               <input value={asesorInfo?.correo ?? ""} readOnly disabled title="Resuelto del registro del asesor" />
             </div>
             <div className={styles.formField}>
-              <label>ID Gestión *</label>
-              <input value={datos.idGestion} onChange={(e) => editar("idGestion", e.target.value)} />
+              <label>Canal</label>
+              <input value={datos.canal} onChange={(e) => editar("canal", e.target.value)} />
+            </div>
+            <div className={styles.formField}>
+              <label>Tipo de gestión</label>
+              <input value={datos.tipoGestion} onChange={(e) => editar("tipoGestion", e.target.value)} />
             </div>
             <div className={styles.formField}>
               <label>Evaluador</label>

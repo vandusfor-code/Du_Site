@@ -22,11 +22,12 @@ Du Site **no** llama a la API de OpenAI.
   "version": 1,                    // opcional; si está, debe ser 1
 
   "interaccion": {
-    "asesor":             "string", // OPCIONAL — informativo. La identidad del asesor
-                                    //   la fija el SELECTOR manual de la pantalla (fuente
-                                    //   de verdad); este valor NO la determina.
-    "fecha":              "AAAA-MM-DD", // OBLIGATORIO (fecha real)
-    "id_gestion":         "string", // OBLIGATORIO (identificador único de la gestión)
+    // Los tres campos siguientes son INFORMATIVOS: los controla el formulario de
+    // Du Site (fuente de verdad), no el JSON. Si vienen y difieren, se muestra un
+    // aviso pero se conserva el valor de Du Site.
+    "asesor":             "string",     // OPCIONAL — identidad = selector manual + Funcionarios
+    "id_gestion":         "string",     // OPCIONAL — el ID real se escribe en Du Site
+    "fecha":              "AAAA-MM-DD", // OPCIONAL — la fecha de registro la fija Du Site (hoy Bogotá)
     "canal":              "string", // opcional (p. ej. "Llamada" | "Chat")
     "tipo_gestion":       "string", // opcional (por defecto "Consulta")
     "correo_corporativo": "string", // opcional
@@ -82,18 +83,24 @@ Du Site **no** llama a la API de OpenAI.
 `criterios` se **rechaza** como criterio desconocido.
 
 ### Obligatorio vs opcional
-- **Obligatorios:** `formato`, `interaccion.fecha`, `interaccion.id_gestion`, y los
-  **8 criterios** con un `resultado` válido.
-- **Opcionales:** todo lo demás, incluido `interaccion.asesor`. Su ausencia produce una
-  **advertencia** (no bloquea).
+- **Obligatorios en el JSON:** `formato` y los **8 criterios** con un `resultado` válido.
+- **Opcionales en el JSON:** todo lo demás, incluidos `interaccion.asesor`,
+  `interaccion.id_gestion` e `interaccion.fecha` (los controla el formulario).
 
-### Identidad del asesor (fuente de verdad)
-El asesor se elige en un **selector manual obligatorio** en la pantalla, poblado desde la
-hoja oficial **Funcionarios**. El nombre de `interaccion.asesor` **no** determina la
-identidad: si difiere del seleccionado se muestra una advertencia informativa y **prevalece
-la selección manual**. El **correo** del asesor se resuelve del registro oficial (nunca del
-JSON ni del navegador). El servidor revalida que el asesor seleccionado exista en Funcionarios
-antes de guardar.
+### Datos administrativos (fuente de verdad = formulario de Du Site)
+Estos datos NO los determina el JSON; el bloque solo aporta valores informativos que, si
+difieren, generan un aviso sin sobrescribir:
+- **Asesor:** selector manual obligatorio, poblado desde la hoja oficial **Funcionarios**.
+  El servidor revalida que exista antes de guardar.
+- **Correo:** se resuelve del registro oficial del asesor (nunca del JSON ni del navegador).
+- **ID de gestión:** campo manual obligatorio, capturado **antes** de interpretar el JSON.
+  Prevalece sobre `interaccion.id_gestion`. El servidor lo valida y mantiene la protección
+  contra duplicados por ID.
+- **Fecha:** fecha de registro, inicializada automáticamente al **día actual en
+  `America/Bogota`**, editable en la revisión. Prevalece sobre `interaccion.fecha`.
+
+El asesor, el ID y la fecha se **conservan** al pulsar «Volver a importar» y ante errores de
+validación/guardado.
 
 ---
 
