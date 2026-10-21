@@ -714,13 +714,15 @@ export async function obtenerEstadoAuditorias(): Promise<EstadoAuditorias> {
 /* ===================== */
 
 export interface FuncionarioOpcion {
-  asesor: string;
-  correo: string;
-  canal: string;
+  asesor: string; // Funcionarios!A — código
+  correo: string; // Funcionarios!B
+  canal: string; // Funcionarios!C
+  nombre: string; // Funcionarios!E (A..F: A código, B correo, C canal, D contraseña, E nombre, F fecha llamada)
 }
 
-// Lista de asesores (con correo/canal por defecto) para el selector del
-// formulario de Auditoría CO. Misma hoja "Funcionarios" que usa la IA.
+// Lista de asesores para el selector (Auditoría CO y Auditoría ChatGPT). Fuente
+// oficial: hoja "Funcionarios". Se leen SOLO A (código), B (correo), C (canal) y
+// E (nombre); la columna D (contraseña) jamás se lee ni se expone.
 export async function obtenerFuncionariosParaSelector(): Promise<FuncionarioOpcion[]> {
   const id = sheetId();
   const funcData = await readRange(id, "Funcionarios", { unformatted: true });
@@ -728,7 +730,7 @@ export async function obtenerFuncionariosParaSelector(): Promise<FuncionarioOpci
   for (let i = 1; i < funcData.length; i++) {
     const asesor = texto(funcData[i], 0);
     if (!asesor) continue;
-    out.push({ asesor, correo: texto(funcData[i], 1), canal: texto(funcData[i], 2) });
+    out.push({ asesor, correo: texto(funcData[i], 1), canal: texto(funcData[i], 2), nombre: texto(funcData[i], 4) });
   }
   return out;
 }
@@ -847,9 +849,10 @@ export async function guardarAuditoriaChatGPT(input: AuditoriaManualInput): Prom
   if (!oficial) {
     throw new Error(`El asesor seleccionado ("${input.asesor.trim() || "sin seleccionar"}") no existe en Funcionarios.`);
   }
-  // Fuerza asesor y correo OFICIALES; el resto del input (fecha, idGestion,
+  // Fuerza asesor, correo y canal OFICIALES (del registro de Funcionarios); el
+  // JSON/navegador nunca los determina. El resto del input (fecha, idGestion,
   // criterios, textos…) se valida/calcula igual que en el registro manual.
-  return guardarAuditoriaManual({ ...input, asesor: oficial.asesor, correo: oficial.correo });
+  return guardarAuditoriaManual({ ...input, asesor: oficial.asesor, correo: oficial.correo, canal: oficial.canal });
 }
 
 /* ===================== */

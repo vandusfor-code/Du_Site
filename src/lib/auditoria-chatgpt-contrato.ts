@@ -352,17 +352,109 @@ export function advertenciasDe(r: ResultadoParseo): Diagnostico[] {
 // tanto el componente (para mostrar) como el servidor (para validar y guardar).
 // ============================================================
 export interface AsesorOficial {
-  asesor: string;
-  correo: string;
+  asesor: string; // código oficial (Funcionarios!A)
+  nombre: string; // nombre oficial (Funcionarios!E)
+  correo: string; // correo oficial (Funcionarios!B)
+  canal: string; // canal oficial (Funcionarios!C)
 }
 
 export function resolverAsesor(
   seleccion: string,
-  lista: { asesor: string; correo?: string }[]
+  lista: { asesor: string; nombre?: string; correo?: string; canal?: string }[]
 ): AsesorOficial | null {
   const clave = (seleccion ?? "").trim();
   if (!clave) return null;
   const registro = lista.find((f) => (f.asesor ?? "").trim() === clave);
   if (!registro) return null;
-  return { asesor: registro.asesor.trim(), correo: (registro.correo ?? "").trim() };
+  return {
+    asesor: registro.asesor.trim(),
+    nombre: (registro.nombre ?? "").trim(),
+    correo: (registro.correo ?? "").trim(),
+    canal: (registro.canal ?? "").trim(),
+  };
+}
+
+// ============================================================
+// Prompt universal copiable (ChatGPT → AUDITORIA_CO_V1).
+// Función central basada en las constantes del contrato: una sola fuente evita
+// que el texto y el esquema se desincronicen entre componentes.
+//
+// Las definiciones sustantivas de cada criterio provienen del auditor con IA ya
+// en producción (promptCriterios en src/lib/auditorias-admin.ts): son las reglas
+// de calidad "oficiales" documentadas en el proyecto. NO se inventan reglas nuevas.
+// La nota/clasificación que proponga ChatGPT es informativa; la nota oficial la
+// calcula Du Site (hasta 2 incumplimientos de los 6 criterios que puntúan = 100 %
+// OK; ≥3 = PENC). Información y Proceso no afectan la nota.
+// ============================================================
+export function construirPromptUniversal(): string {
+  const criteriosDef: Record<CriterioId, string> = {
+    saludo: "Cumple si el AGENTE: (1) hace saludo temporal + nombre de la empresa + su propio nombre, y (2) pregunta el nombre del usuario, lo saluda y se ofrece a ayudar.",
+    empatia: "Cumple si el AGENTE muestra sensibilidad ante la situación del usuario.",
+    sonrisa: "En llamada: Cumple si el AGENTE mantiene un tono positivo y amable durante toda la interacción. En chat: Cumple si mantiene amabilidad en la redacción.",
+    claridad: "Cumple si el AGENTE es directo y el usuario entiende sin tener que repreguntar.",
+    encuesta: "Cumple si el AGENTE invita a la encuesta. Marca \"No aplica\" SOLO si la interacción se cortó y no hubo oportunidad de invitarla.",
+    informacion: "Cumple si el AGENTE da una respuesta concreta a lo solicitado. (No afecta la nota oficial.)",
+    proceso: "Cumple si el AGENTE sigue un proceso lógico y ordenado. (No afecta la nota oficial.)",
+    cierre: "Cumple si el AGENTE hace las 3 cosas: pregunta si necesita algo más + se despide con su nombre + invita a la encuesta.",
+  };
+
+  const listaCriterios = CRITERIOS
+    .map(({ id, label }) => `- "${id}" (${label}): ${criteriosDef[id]}`)
+    .join("\n");
+
+  const ejemploCriterios = CRITERIOS
+    .map(({ id }) => `    "${id}": { "resultado": "Cumple", "evidencia": "cita breve de la transcripción" }`)
+    .join(",\n");
+
+  return `Eres un auditor experto en calidad de atención al usuario de COFREM (operación de People BPO). Tu tarea es analizar la transcripción de una interacción (llamada o chat) que te enviará el usuario y devolver ÚNICAMENTE un objeto JSON válido con el formato ${FORMATO_AUDITORIA_CO} (versión ${VERSION_AUDITORIA_CO}), listo para pegar en Du Site.
+
+════════ 1. REGLAS SOBRE LA TRANSCRIPCIÓN (IMPORTANTE) ════════
+Las transcripciones provienen de un sistema de voz a texto de AWS y pueden tener errores de reconocimiento, sobre todo en llamadas.
+- Interpreta los errores evidentes con el contexto cuando el sentido sea inequívoco (p. ej. "Cofrem" transcrito como "Cofren", "Cofre", etc. — NUNCA lo penalices).
+- NO penalices al asesor por palabras deformadas, fragmentos incompletos o errores que probablemente vengan de AWS.
+- NO inventes frases, acciones ni evidencias que no estén en la transcripción.
+- Distingue lo que realmente se puede atribuir al AGENTE de lo que es incierto.
+- Señala en los campos de texto cualquier ambigüedad que afecte materialmente la evaluación.
+- Ten en cuenta las diferencias entre llamada (tono de voz) y chat (redacción).
+- Evalúa SOLO lo que dice el AGENTE. Lo que diga el usuario/cliente no afecta la calificación del asesor.
+- No infieras hechos que la transcripción no permita comprobar.
+
+════════ 2. CRITERIOS DE EVALUACIÓN ════════
+Evalúa estos 8 criterios, usando EXACTAMENTE estas claves. Cada uno debe tener un "resultado" y una "evidencia" breve y concreta tomada de la transcripción:
+${listaCriterios}
+
+Valores permitidos para "resultado": ${VALORES_CRITERIO.map((v) => `"${v}"`).join(", ")}.
+Regla de evidencia: marca "Cumple" SOLO si hay evidencia textual explícita de que el AGENTE lo hizo. Ante la duda o ausencia de evidencia, marca "No cumple". NO uses "No aplica" por falta de evidencia: "No aplica" es solo para casos en que el criterio realmente no corresponde (p. ej. encuesta cuando la interacción se cortó).
+
+Puntaje de tuteo (campo "puntaje_tuteo"), valores permitidos: ${VALORES_TUTEO.map((v) => `"${v}"`).join(", ")}. Tuteo real = uso de "tú/te/ti/tu/tuyo" dirigido al usuario; "usted/su/le" NO es tuteo.
+
+════════ 3. DATOS ADMINISTRATIVOS — NO LOS INVENTES ════════
+NO inventes ni supongas estos datos; Du Site los resuelve de sus fuentes oficiales y puedes OMITIRLOS del JSON:
+- Código del asesor, nombre del asesor, correo corporativo y canal (los toma de su directorio oficial).
+- ID de gestión (lo escribe el usuario en Du Site).
+- Fecha de registro (la fija Du Site con la fecha actual de Colombia).
+Si incluyes alguno de estos campos, Du Site lo ignorará para la identidad/persistencia y conservará el oficial.
+
+════════ 4. NOTA Y CLASIFICACIÓN ════════
+Puedes incluir "nota_propuesta" y "clasificacion_propuesta" como valores INFORMATIVOS. La nota oficial la calcula Du Site con su propia regla; no presentes tu propuesta como resultado oficial ni inventes una fórmula.
+
+════════ 5. SALIDA (ESTRICTA) ════════
+Devuelve UN ÚNICO objeto JSON válido, sin texto antes ni después, sin explicaciones ni bloques Markdown. No agregues claves desconocidas ni cambies los nombres de las claves. Estructura:
+
+{
+  "formato": "${FORMATO_AUDITORIA_CO}",
+  "version": ${VERSION_AUDITORIA_CO},
+  "criterios": {
+${ejemploCriterios}
+  },
+  "puntaje_tuteo": "Sin tuteo",
+  "observacion": "qué pasó en la interacción, en tercera persona neutral",
+  "hallazgos": "qué hizo bien y qué falló, con ejemplos concretos",
+  "puntos_mejora": "recomendaciones accionables",
+  "nota_propuesta": 100,
+  "clasificacion_propuesta": "OK"
+}
+
+════════ 6. USO REPETIDO ════════
+Después de estas instrucciones, CADA transcripción que te envíe el usuario es una auditoría nueva: responde solo con el JSON correspondiente, sin volver a pedir las instrucciones. Pide información adicional únicamente cuando sea indispensable para evaluar y no haya forma segura de representar la incertidumbre dentro del contrato. El resultado debe poder copiarse directamente en la pantalla de importación de Du Site.`;
 }

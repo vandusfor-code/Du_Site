@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Loader2, Save, CheckCircle2, AlertTriangle, ClipboardList, Info } from "lucide-react";
+import { Loader2, Save, CheckCircle2, AlertTriangle, ClipboardList, Info, Copy } from "lucide-react";
 import type { AuditoriaManualInput, FuncionarioOpcion } from "@/lib/auditorias-admin";
 import { guardarAuditoriaChatGPTAction } from "./actions";
 import {
@@ -10,6 +10,7 @@ import {
   erroresDe,
   advertenciasDe,
   resolverAsesor,
+  construirPromptUniversal,
   CRITERIOS,
   VALORES_CRITERIO,
   VALORES_TUTEO,
@@ -51,6 +52,32 @@ export default function AuditoriaChatGPTForm({
   const [avisos, setAvisos] = useState<string[]>([]); // discrepancias JSON vs formulario
   const [guardando, setGuardando] = useState(false);
   const [guardadoMsg, setGuardadoMsg] = useState("");
+  const [copiado, setCopiado] = useState<"ok" | "error" | null>(null);
+
+  // Copia el prompt universal al portapapeles. NO altera el JSON, el asesor, el
+  // ID ni la fecha. Usa la API de portapapeles con respaldo (execCommand).
+  async function copiarPrompt() {
+    const texto = construirPromptUniversal();
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(texto);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = texto;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (!ok) throw new Error("execCommand falló");
+      }
+      setCopiado("ok");
+    } catch {
+      setCopiado("error");
+    }
+    setTimeout(() => setCopiado(null), 2500);
+  }
 
   const asesoresUnicos = useMemo(() => {
     const vistos = new Set<string>();
@@ -87,10 +114,14 @@ export default function AuditoriaChatGPTForm({
       const jsonAsesor = r.datos?.asesor?.trim() ?? "";
       const jsonId = r.datos?.idGestion?.trim() ?? "";
       const jsonFecha = r.datos?.fecha?.trim() ?? "";
+      const jsonCanal = r.datos?.canal?.trim() ?? "";
 
       if (r.datos && oficial) {
+        // Datos administrativos oficiales (del registro de Funcionarios y del
+        // formulario). El JSON no los determina.
         r.datos.asesor = oficial.asesor;
         r.datos.correo = oficial.correo;
+        r.datos.canal = oficial.canal;
         r.datos.idGestion = idGestionManual.trim();
         r.datos.fecha = fechaSel;
       }
@@ -104,6 +135,9 @@ export default function AuditoriaChatGPTForm({
       }
       if (jsonFecha && jsonFecha !== fechaSel) {
         nuevosAvisos.push(`El JSON traía la fecha "${jsonFecha}", pero se conserva la de registro: "${fechaSel}".`);
+      }
+      if (jsonCanal && oficial && jsonCanal.toLowerCase() !== oficial.canal.toLowerCase()) {
+        nuevosAvisos.push(`El JSON traía el canal "${jsonCanal}", pero se usa el oficial del asesor: "${oficial.canal || "—"}".`);
       }
       setAvisos(nuevosAvisos);
       setResultado(r);
@@ -145,8 +179,8 @@ export default function AuditoriaChatGPTForm({
     try {
       const input: AuditoriaManualInput = {
         fecha: fechaSel, // fecha de registro de Du Site (hoy Bogotá por defecto)
-        asesor: asesorSel, // fuente de verdad; el servidor revalida y resuelve el correo
-        canal: datos.canal,
+        asesor: asesorSel, // fuente de verdad; el servidor revalida y resuelve correo/canal
+        canal: asesorInfo?.canal ?? "", // canal OFICIAL del registro (no del JSON)
         tipoGestion: datos.tipoGestion,
         correo: asesorInfo?.correo ?? "",
         idGestion: idGestionManual.trim(), // ID manual de Du Site (fuente de verdad)
@@ -237,7 +271,7 @@ export default function AuditoriaChatGPTForm({
             <select value={asesorSel} onChange={(e) => setAsesorSel(e.target.value)} disabled={listaNoDisponible || estado === "validando"}>
               <option value="">— Selecciona un asesor —</option>
               {asesoresUnicos.map((a) => (
-                <option key={a.asesor} value={a.asesor}>{a.asesor}{a.correo ? ` — ${a.correo}` : ""}</option>
+                <option key={a.asesor} value={a.asesor}>{a.asesor}{a.nombre ? ` — ${a.nombre}` : a.correo ? ` — ${a.correo}` : ""}</option>
               ))}
             </select>
           </div>
@@ -254,7 +288,13 @@ export default function AuditoriaChatGPTForm({
 
         {/* 2) Pegar JSON */}
         <div className={styles.formField}>
-          <label>Bloque AUDITORIA_CO_V1</label>
+          <div className={styles.gptTextareaHead}>
+            <label>Bloque AUDITORIA_CO_V1</label>
+            <button type="button" className={styles.gptCopyBtn} onClick={copiarPrompt}>
+              {copiado === "ok" ? <CheckCircle2 size={14} /> : copiado === "error" ? <AlertTriangle size={14} /> : <Copy size={14} />}
+              {copiado === "ok" ? "¡Prompt copiado!" : copiado === "error" ? "No se pudo copiar" : "Copiar prompt universal"}
+            </button>
+          </div>
           <textarea
             className={styles.gptTextarea}
             value={raw}
@@ -291,11 +331,13 @@ export default function AuditoriaChatGPTForm({
     <section className={`${styles.panel} ${styles.manualForm}`}>
       <h2><ClipboardList size={18} /> Auditoría ChatGPT — Revisión</h2>
 
-      {/* Datos administrativos (fuente de verdad) claramente visibles */}
+      {/* Datos administrativos oficiales (fuente de verdad) claramente visibles */}
       <div className={styles.gptAsesor}>
         <span>Asesor</span>
         <b>{asesorSel || "—"}</b>
-        {asesorInfo?.correo && <small>{asesorInfo.correo}</small>}
+        {asesorInfo?.nombre && <small>{asesorInfo.nombre}</small>}
+        <span>Canal</span>
+        <b>{asesorInfo?.canal || "—"}</b>
         <span style={{ marginLeft: "auto" }}>ID gestión</span>
         <b>{idGestionManual || "—"}</b>
       </div>
@@ -342,8 +384,8 @@ export default function AuditoriaChatGPTForm({
               <input value={asesorInfo?.correo ?? ""} readOnly disabled title="Resuelto del registro del asesor" />
             </div>
             <div className={styles.formField}>
-              <label>Canal</label>
-              <input value={datos.canal} onChange={(e) => editar("canal", e.target.value)} />
+              <label>Canal (oficial)</label>
+              <input value={asesorInfo?.canal ?? ""} readOnly disabled title="Resuelto del registro del asesor (no del JSON)" />
             </div>
             <div className={styles.formField}>
               <label>Tipo de gestión</label>

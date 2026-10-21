@@ -8,9 +8,24 @@ Du Site **no** llama a la API de OpenAI.
 - **Versión:** `1`
 - **Parser (fuente):** [`src/lib/auditoria-chatgpt-contrato.ts`](../src/lib/auditoria-chatgpt-contrato.ts)
 - **Pruebas:** [`src/lib/auditoria-chatgpt-contrato.test.mjs`](../src/lib/auditoria-chatgpt-contrato.test.mjs)
-- **Persistencia:** reutiliza `guardarAuditoriaManualAction` → `guardarAuditoriaManual`
-  (misma hoja `Consolidado`, mismas columnas, misma regla de nota). No crea columnas,
-  pestañas ni bases de datos nuevas.
+- **Persistencia:** `guardarAuditoriaChatGPTAction` → `guardarAuditoriaChatGPT` (valida/
+  resuelve el asesor oficial) → `guardarAuditoriaManual` (misma hoja `Consolidado`, mismas
+  columnas, misma regla de nota, misma deduplicación por ID). No crea columnas, pestañas ni
+  bases de datos nuevas.
+- **Prompt universal:** `construirPromptUniversal()` en el mismo módulo del contrato (única
+  fuente, derivada de sus constantes). El botón «Copiar prompt universal» de la pantalla de
+  importación copia ese texto.
+
+---
+
+## 0. Directorio oficial de asesores (hoja `Funcionarios`)
+
+Fuente oficial de la identidad del asesor. Columnas: **A** código, **B** correo, **C** canal,
+**D** contraseña, **E** nombre, **F** fecha de llamada. Auditoría ChatGPT lee **solo A, B, C y E**
+(`obtenerFuncionariosParaSelector`); la **columna D (contraseña) jamás se lee, se envía al
+navegador ni se registra**. La columna **F (FECHA DE LLAMADA) no es** la fecha de registro de
+la auditoría. El código, nombre, correo y canal del registro oficial **nunca** se sobrescriben
+con valores del JSON ni del navegador; si el asesor no existe, el guardado se rechaza.
 
 ---
 
@@ -87,20 +102,21 @@ Du Site **no** llama a la API de OpenAI.
 - **Opcionales en el JSON:** todo lo demás, incluidos `interaccion.asesor`,
   `interaccion.id_gestion` e `interaccion.fecha` (los controla el formulario).
 
-### Datos administrativos (fuente de verdad = formulario de Du Site)
-Estos datos NO los determina el JSON; el bloque solo aporta valores informativos que, si
-difieren, generan un aviso sin sobrescribir:
-- **Asesor:** selector manual obligatorio, poblado desde la hoja oficial **Funcionarios**.
+### Datos administrativos (fuente de verdad = Du Site, no el JSON)
+El JSON solo aporta valores informativos; si difieren, se muestra un aviso sin sobrescribir:
+- **Asesor (código) y nombre:** del selector manual obligatorio, poblado desde `Funcionarios`.
   El servidor revalida que exista antes de guardar.
-- **Correo:** se resuelve del registro oficial del asesor (nunca del JSON ni del navegador).
+- **Correo y canal:** se resuelven del registro oficial del asesor (`Funcionarios` B y C),
+  nunca del JSON ni del navegador. En la revisión se muestran como **solo lectura**.
 - **ID de gestión:** campo manual obligatorio, capturado **antes** de interpretar el JSON.
   Prevalece sobre `interaccion.id_gestion`. El servidor lo valida y mantiene la protección
   contra duplicados por ID.
-- **Fecha:** fecha de registro, inicializada automáticamente al **día actual en
-  `America/Bogota`**, editable en la revisión. Prevalece sobre `interaccion.fecha`.
+- **Fecha de registro:** inicializada automáticamente al **día actual en `America/Bogota`**,
+  editable en la revisión. Prevalece sobre `interaccion.fecha`. No es la `FECHA DE LLAMADA`
+  del directorio.
 
-El asesor, el ID y la fecha se **conservan** al pulsar «Volver a importar» y ante errores de
-validación/guardado.
+Asesor, ID y fecha se **conservan** al pulsar «Volver a importar» y ante errores de
+validación/guardado. Tras un guardado correcto se limpia solo el ID (cada interacción es única).
 
 ---
 
@@ -209,14 +225,28 @@ conservan.
 
 ---
 
-## 7. Prompt sugerido para ChatGPT
+## 7. Prompt universal (botón «Copiar prompt universal»)
 
-> Evalúa la siguiente transcripción como auditor de calidad de Cofrem (People BPO) y
-> devuelve **únicamente** un bloque JSON con el formato `AUDITORIA_CO_V1` descrito abajo.
-> Usa exactamente las claves de criterio `saludo, empatia, sonrisa, claridad, encuesta,
-> informacion, proceso, cierre` y los valores `Cumple | No cumple | No aplica`. No agregues
-> texto fuera del JSON.
-> *(Adjuntar este esquema y la transcripción.)*
+El prompt completo y autónomo lo genera `construirPromptUniversal()` en
+[`src/lib/auditoria-chatgpt-contrato.ts`](../src/lib/auditoria-chatgpt-contrato.ts) a partir de
+las constantes del contrato (formato, versión, claves de criterio y valores permitidos), para
+que **texto y esquema no se desincronicen**. El botón de la pantalla de importación lo copia al
+portapapeles sin alterar el JSON pegado ni la selección de asesor/ID/fecha.
+
+El prompt instruye a ChatGPT para: actuar como auditor de calidad de COFREM; manejar errores de
+transcripción de **AWS** (interpretar por contexto, no penalizar deformaciones, no inventar
+evidencias); evaluar los 8 criterios con las claves y valores exactos; **no inventar** datos
+administrativos (código, nombre, correo, canal, ID, fecha — los resuelve Du Site); y devolver un
+único JSON `AUDITORIA_CO_V1` sin texto adicional. La nota/clasificación son informativas.
+
+### Origen de las definiciones de criterio y limitación
+Las definiciones sustantivas de cada criterio (qué significa "Cumple" en Saludo, Empatía, etc.)
+se tomaron del **auditor con IA ya en producción** (`promptCriterios` en
+[`src/lib/auditorias-admin.ts`](../src/lib/auditorias-admin.ts)); son las reglas de calidad
+documentadas y respaldadas por el proyecto hoy. **Limitación:** no se localizó un documento de
+rúbrica oficial de COFREM independiente del código. Si existe uno distinto, debe confirmarse y, de
+diferir, actualizar tanto el auditor con IA como este prompt. Hasta esa confirmación, estas
+definiciones son las vigentes en el repositorio, no una rúbrica externa verificada.
 
 ---
 

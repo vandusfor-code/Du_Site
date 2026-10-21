@@ -11,7 +11,11 @@ import {
   erroresDe,
   advertenciasDe,
   resolverAsesor,
+  construirPromptUniversal,
   FORMATO_AUDITORIA_CO,
+  VERSION_AUDITORIA_CO,
+  CRITERIOS,
+  VALORES_CRITERIO,
 } from "./auditoria-chatgpt-contrato.ts";
 
 // ── Fábrica de un bloque válido de ejemplo (ficticio) ──
@@ -199,12 +203,14 @@ test("16. El asesor del JSON es OPCIONAL (su ausencia no es error)", () => {
 
 // ── resolverAsesor: la selección manual es la fuente de verdad ──
 const LISTA = [
-  { asesor: "J.PEREZ123", correo: "jperez@ejemplo.com", canal: "Llamada" },
-  { asesor: "M.GOMEZ456", correo: "mgomez@ejemplo.com", canal: "Chat" },
+  { asesor: "J.PEREZ123", correo: "jperez@ejemplo.com", canal: "Llamada", nombre: "Juan Pérez" },
+  { asesor: "M.GOMEZ456", correo: "mgomez@ejemplo.com", canal: "Chat", nombre: "María Gómez" },
 ];
 
-test("17. resolverAsesor resuelve el correo OFICIAL del registro", () => {
-  assert.deepEqual(resolverAsesor("J.PEREZ123", LISTA), { asesor: "J.PEREZ123", correo: "jperez@ejemplo.com" });
+test("17. resolverAsesor resuelve código, nombre, correo y canal OFICIALES", () => {
+  assert.deepEqual(resolverAsesor("J.PEREZ123", LISTA), {
+    asesor: "J.PEREZ123", nombre: "Juan Pérez", correo: "jperez@ejemplo.com", canal: "Llamada",
+  });
 });
 
 test("18. resolverAsesor devuelve null si el asesor no existe o está vacío", () => {
@@ -212,11 +218,46 @@ test("18. resolverAsesor devuelve null si el asesor no existe o está vacío", (
   assert.equal(resolverAsesor("", LISTA), null);
 });
 
-test("19. Precedencia: el asesor seleccionado prevalece sobre el nombre del JSON", () => {
-  // El JSON trae otro asesor, pero la identidad final es la selección manual:
-  // resolverAsesor ignora el JSON y devuelve el correo del seleccionado.
+test("19. Precedencia: el seleccionado prevalece; correo/canal nunca vienen del JSON", () => {
   const oficial = resolverAsesor("M.GOMEZ456", LISTA);
-  assert.deepEqual(oficial, { asesor: "M.GOMEZ456", correo: "mgomez@ejemplo.com" });
-  // El correo NO proviene del JSON aunque éste incluyera uno distinto.
+  assert.deepEqual(oficial, { asesor: "M.GOMEZ456", nombre: "María Gómez", correo: "mgomez@ejemplo.com", canal: "Chat" });
   assert.notEqual(oficial.correo, "jperez@ejemplo.com");
+});
+
+test("20. Asesores de distintos canales se resuelven correctamente", () => {
+  assert.equal(resolverAsesor("J.PEREZ123", LISTA).canal, "Llamada");
+  assert.equal(resolverAsesor("M.GOMEZ456", LISTA).canal, "Chat");
+});
+
+test("21. resolverAsesor no inventa datos: registro incompleto deja campos vacíos", () => {
+  const lista = [{ asesor: "X.INCOMPLETO", correo: "", canal: "", nombre: "" }];
+  assert.deepEqual(resolverAsesor("X.INCOMPLETO", lista), { asesor: "X.INCOMPLETO", nombre: "", correo: "", canal: "" });
+});
+
+// ── Prompt universal ──
+test("22. El prompt universal incluye formato, versión y los 8 criterios", () => {
+  const p = construirPromptUniversal();
+  assert.ok(p.includes(FORMATO_AUDITORIA_CO));
+  assert.ok(p.includes(String(VERSION_AUDITORIA_CO)));
+  for (const { id } of CRITERIOS) assert.ok(p.includes(`"${id}"`), `falta criterio ${id}`);
+});
+
+test("23. El prompt incluye los valores permitidos y las precauciones de AWS", () => {
+  const p = construirPromptUniversal();
+  for (const v of VALORES_CRITERIO) assert.ok(p.includes(`"${v}"`), `falta valor ${v}`);
+  assert.ok(/AWS/.test(p));
+  assert.ok(/no inventes/i.test(p));
+});
+
+test("24. El prompt NO exige inventar datos administrativos", () => {
+  const p = construirPromptUniversal();
+  assert.ok(/NO inventes/i.test(p));
+  assert.ok(/ID de gestión/i.test(p) && /[Ff]echa de registro/.test(p));
+});
+
+test("25. El prompt NO contiene secretos ni datos sensibles", () => {
+  const p = construirPromptUniversal().toLowerCase();
+  for (const secreto of ["contraseña", "password", "token", "api_key", "api key", "private_key"]) {
+    assert.equal(p.includes(secreto), false, `el prompt no debe mencionar "${secreto}"`);
+  }
 });
