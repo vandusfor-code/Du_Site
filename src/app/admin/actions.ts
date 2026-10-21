@@ -17,6 +17,8 @@ import {
   type FuncionarioOpcion,
   type AuditoriaManualInput,
 } from "@/lib/auditorias-admin";
+import { obtenerEnvioAuditorias, enviarLoteAuditorias, type ResultadoEnvioLote } from "@/lib/envio-auditorias";
+import type { FiltrosEnvio, ResumenEnvio } from "@/lib/envio-auditorias-tipos";
 
 // Corregido: verificaba session.user.modulos.includes("admin") — el
 // módulo "admin" es asignable a cualquier usuario en Usuarios (es la
@@ -78,4 +80,18 @@ export async function guardarAuditoriaChatGPTAction(
 ): Promise<{ nota: string; tipoNota: string }> {
   await requireAdminAction();
   return guardarAuditoriaChatGPT(input);
+}
+
+// ── Envío de auditorías por asesora (sección de Auditoría ChatGPT) ──
+export async function obtenerEnvioAuditoriasAction(filtros: FiltrosEnvio): Promise<ResumenEnvio> {
+  await requireAdminAction();
+  return obtenerEnvioAuditorias(filtros);
+}
+
+// `asesora` vacío/indefinido = envía las pendientes de TODAS las asesoras de la
+// fecha (botón general); con código = solo esa asesora (botón por grupo).
+export async function enviarLoteAuditoriasAction(fecha: string, asesora?: string): Promise<ResultadoEnvioLote> {
+  await requireAdminAction();
+  if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) throw new Error("Fecha inválida.");
+  return enviarLoteAuditorias(fecha, asesora);
 }

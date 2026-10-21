@@ -159,6 +159,34 @@
 .gptDiagList { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-weight: 500; }
 .gptEvidence { color: #8a93a8; font-size: 11px; font-style: italic; line-height: 1.4; }
 .gptRow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+
+/* ── Sub-pestañas de la modalidad ChatGPT (Importar / Envío) ── */
+.subTabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.subTab, .subTabActive { border: 1px solid #e0e3eb; background: #fff; color: #667189; border-radius: 9px; padding: 8px 16px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; }
+.subTabActive { background: #efeaff; border-color: #d9d4fb; color: #5b4ee6; }
+
+/* ── Envío de auditorías ── */
+.envioTools { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.envioCheck { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: #4a5168; cursor: pointer; }
+.envioResumen { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; }
+.envioResumen > div { background: #f7f8fc; border: 1px solid #edeff4; border-radius: 10px; padding: 10px 12px; text-align: center; }
+.envioResumen b { display: block; font-size: 20px; color: #202238; }
+.envioResumen span { font-size: 10.5px; color: #8a93a8; text-transform: uppercase; letter-spacing: .3px; }
+.envioLista { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.envioGrupo { border: 1px solid #e8eaf1; border-radius: 11px; padding: 12px 14px; }
+.envioGrupoHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.envioGrupoHead > div { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.envioGrupoHead b { font-size: 13.5px; }
+.envioCodigo { font-family: ui-monospace, monospace; font-size: 11px; color: #8a93a8; }
+.envioGrupoMeta { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 12px; color: #667189; flex-wrap: wrap; }
+.envioBadges { display: inline-flex; align-items: center; gap: 10px; }
+.envioBadges b { font-weight: 700; }
+.envioPend { color: #c2410c; }
+.envioSent { color: #158a55; }
+.envioEstado { background: #eef0f4; border-radius: 20px; padding: 2px 10px; font-size: 11px; color: #4a5168; }
+.envioAlerta { color: #d93142; display: inline-flex; align-items: center; gap: 4px; }
+.envioResultado { margin-top: 16px; border: 1px solid #edeff4; border-radius: 11px; padding: 12px 14px; background: #fbfbfe; }
+.envioResultado h4 { margin: 0 0 8px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
 .gptTextareaHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .gptCopyBtn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d9d4fb; background: #f1f0fb; color: #5b4ee6; border-radius: 8px; padding: 5px 11px; font-size: 11.5px; font-weight: 700; font-family: inherit; cursor: pointer; }
 .gptCopyBtn:hover { background: #e7e4fb; }
@@ -213,4 +241,5 @@
   .tableTools { grid-template-columns: 1fr; }
   .metaGrid, .critGrid { grid-template-columns: repeat(2, 1fr); }
   .formGrid, .gptRow { grid-template-columns: 1fr; }
+  .envioResumen { grid-template-columns: repeat(3, 1fr); }
 }

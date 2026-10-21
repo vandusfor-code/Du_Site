@@ -17,6 +17,7 @@ import {
 import AdminSidebar from "./AdminSidebar";
 import AuditoriaManualForm from "./AuditoriaManualForm";
 import AuditoriaChatGPTForm from "./AuditoriaChatGPTForm";
+import EnvioAuditorias from "./EnvioAuditorias";
 import styles from "./auditorias.module.css";
 
 /* Formateo es-CO: 1021 → "1.021", 91.4 → "91,4" */
@@ -72,6 +73,7 @@ export default function AdminDashboard({
   const [error, setError] = useState(errorInicial);
   const [banner, setBanner] = useState<{ tipo: "ok" | "error"; msg: string } | null>(null);
   const [tipoAuditoria, setTipoAuditoria] = useState<"ia" | "co" | "chatgpt">("ia");
+  const [subVistaChatgpt, setSubVistaChatgpt] = useState<"importar" | "envio">("importar");
 
   const [filtros, setFiltros] = useState<DashboardFiltros>({});
   const [cargando, setCargando] = useState(false);
@@ -317,14 +319,28 @@ export default function AdminDashboard({
               }}
             />
           ) : tipoAuditoria === "chatgpt" ? (
-            <AuditoriaChatGPTForm
-              funcionarios={funcionarios}
-              evaluadorDefault={nombre}
-              onGuardado={async (msg) => {
-                setBanner(msg);
-                if (msg.tipo === "ok") await refrescar();
-              }}
-            />
+            <section className={`${styles.panel} ${styles.manualForm}`} style={{ padding: 0, border: "none", background: "transparent", boxShadow: "none" }}>
+              <div className={styles.subTabs}>
+                <button className={subVistaChatgpt === "importar" ? styles.subTabActive : styles.subTab} onClick={() => setSubVistaChatgpt("importar")}>
+                  Importar auditoría
+                </button>
+                <button className={subVistaChatgpt === "envio" ? styles.subTabActive : styles.subTab} onClick={() => setSubVistaChatgpt("envio")}>
+                  Envío de auditorías
+                </button>
+              </div>
+              {subVistaChatgpt === "importar" ? (
+                <AuditoriaChatGPTForm
+                  funcionarios={funcionarios}
+                  evaluadorDefault={nombre}
+                  onGuardado={async (msg) => {
+                    setBanner(msg);
+                    if (msg.tipo === "ok") await refrescar();
+                  }}
+                />
+              ) : (
+                <EnvioAuditorias funcionarios={funcionarios} onBanner={(msg) => setBanner(msg)} />
+              )}
+            </section>
           ) : (
             <section className={styles.panel}>
               <h2><TrendingUp size={18} />Estado de auditorías</h2>
