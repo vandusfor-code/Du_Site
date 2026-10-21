@@ -57,7 +57,8 @@ La migración 0003 ya creó los estados `ACUSADA` / `COMPROMISO_PENDIENTE` /
 compromiso. Transiciones implementadas (idempotentes, con `UPDATE` condicional):
 - **Acuse:** `NOTIFICADA → COMPROMISO_PENDIENTE` (si `requiere_compromiso`) o
   `→ ACUSADA` (si no). Registra `fecha_acuse` (hora del servidor) + evento
-  `acuse_registrado`. El acuse es **recepción**, no aceptación del resultado.
+  `auditoria_acusada` (catálogo oficial de `evento_ciclo`, origen `asesor`). El acuse
+  es **recepción**, no aceptación del resultado.
 - **Compromiso:** `COMPROMISO_PENDIENTE → EN_SEGUIMIENTO`, inserta la fila
   `compromiso` (`PENDIENTE`, `fecha_prometida` por días hábiles de
   `configuracion_ciclo`) + evento `compromiso_registrado`. **Firma individual por
@@ -76,14 +77,24 @@ modo que `idsVencidosSinAcuse` (que mira `NOTIFICADA` + 2 días hábiles desde l
 notificación) deja de marcar como vencidas **todas** las notificadas: solo las
 que de verdad no se acusaron a tiempo.
 
+## Portal de la asesora (conectado al ciclo)
+`MetricasDashboard.tsx` → sección «Auditorías Recibidas» ahora se gobierna por el
+**estado del ciclo** (Supabase), leído con `cargarEstadosCicloAction`:
+- `NOTIFICADA` → botón **«Confirmar recepción»** (`registrarAcuseAction`).
+- `ACUSADA` → "Recepción confirmada" (no requiere compromiso).
+- `COMPROMISO_PENDIENTE` → textarea + **«Confirmar compromiso»** (`firmarCompromisoAction`).
+- `EN_SEGUIMIENTO` / `CERRADA` → compromiso firmado (texto de Supabase).
+- Sin ciclo o `CREADA` (no notificada aún) → comportamiento previo basado en la hoja
+  `Compromisos` (no se pierde funcionalidad histórica).
+El panel de **Calidad** (`/modulos/calidad`) refleja estos estados con su semáforo
+(Pendiente de acuse / de firma / En seguimiento / Cumplido…), así el admin ve
+"firmó o no" por auditoría.
+
 ## Estado de verificación
 - **Verificado:** lógica pura de agrupación/transiciones (unit tests), type-check,
-  lint, y render de la UI de la sección (con datos de prueba; la acción de datos
-  real requiere credenciales).
-- **NO verificado en ejecución (código-only):** envío real por SMTP, escrituras y
-  transiciones en Supabase (acuse/compromiso), y el flujo extremo a extremo. No hay
-  credenciales de Supabase/SMTP en el entorno local ni se enviaron correos reales.
-- **Pendiente de UI:** conectar los botones de **acuse** y **compromiso** del portal
-  de asesoras (`MetricasDashboard.tsx`) a `registrarAcuseAction` /
-  `firmarCompromisoAction` y mostrar el estado del ciclo (hoy ese componente lee solo
-  la hoja). Las acciones de servidor ya están listas.
+  lint, y render de la sección de Envío (con datos de prueba).
+- **NO verificado en ejecución (código-only):** envío real por SMTP y TODAS las
+  escrituras/lecturas de Supabase (envío por lote, estados del portal, acuse,
+  compromiso) y el flujo extremo a extremo. No hay credenciales de Supabase/SMTP en
+  el entorno local ni se enviaron correos reales; requiere una prueba en entorno
+  seguro (ver sección de pruebas).

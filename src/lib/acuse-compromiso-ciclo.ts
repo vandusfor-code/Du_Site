@@ -24,7 +24,60 @@ import { estadoTrasAcuse, type EstadoCicloEnvio } from "./envio-auditorias-tipos
 // docs/envio-auditorias.md.
 // ============================================================
 
-const DIAS_HABILES_COMPROMISO_POR_DEFECTO = 5;
+// Respaldo si configuracion_ciclo no responde; el valor real (2) vive en esa
+// tabla y es el que se usa normalmente (migración 0003).
+const DIAS_HABILES_COMPROMISO_POR_DEFECTO = 2;
+
+// Estado del ciclo de cada auditoría de UNA asesora, para que su portal decida
+// qué acción ofrecer (acuse / firma / ya firmado). Solo lectura.
+export interface EstadoCicloAsesora {
+  idGestion: string;
+  estado: EstadoCicloEnvio;
+  requiereCompromiso: boolean;
+  fechaAcuse: string | null;
+  compromisoTexto: string | null;
+  compromisoFecha: string | null;
+  cumplimiento: string | null;
+}
+
+export async function obtenerEstadosCicloAsesora(asesorCodigoSesion: string): Promise<EstadoCicloAsesora[]> {
+  const supabase = getSupabase();
+  const codigo = (asesorCodigoSesion ?? "").trim().toUpperCase();
+  if (!codigo) return [];
+
+  const salida: EstadoCicloAsesora[] = [];
+  const TAMANO = 1000;
+  for (let desde = 0; ; desde += TAMANO) {
+    const { data, error } = await supabase
+      .from("ciclo_auditoria")
+      .select("id_gestion, estado, requiere_compromiso, fecha_acuse, compromiso(texto_compromiso, fecha_registro, cumplimiento)")
+      .eq("asesor_codigo", codigo)
+      .range(desde, desde + TAMANO - 1);
+    if (error) throw new Error(`Supabase (estados ciclo asesora): ${error.message}`);
+    const pagina = data ?? [];
+    for (const row of pagina) {
+      const r = row as {
+        id_gestion: string;
+        estado: EstadoCicloEnvio;
+        requiere_compromiso: boolean;
+        fecha_acuse: string | null;
+        compromiso: { texto_compromiso: string; fecha_registro: string; cumplimiento: string }[] | { texto_compromiso: string; fecha_registro: string; cumplimiento: string } | null;
+      };
+      const comp = Array.isArray(r.compromiso) ? (r.compromiso[0] ?? null) : r.compromiso;
+      salida.push({
+        idGestion: r.id_gestion,
+        estado: r.estado,
+        requiereCompromiso: r.requiere_compromiso,
+        fechaAcuse: r.fecha_acuse,
+        compromisoTexto: comp?.texto_compromiso ?? null,
+        compromisoFecha: comp?.fecha_registro ?? null,
+        cumplimiento: comp?.cumplimiento ?? null,
+      });
+    }
+    if (pagina.length < TAMANO) break;
+  }
+  return salida;
+}
 
 export interface ResultadoTransicion {
   aplicado: boolean; // false si la solicitud llegó tarde (ya estaba en el estado destino)
@@ -92,12 +145,12 @@ export async function registrarAcuse(idGestion: string, asesorCodigoSesion: stri
 
   const { error: errEvento } = await supabase.from("evento_ciclo").insert({
     ciclo_id: ciclo.id,
-    tipo_evento: "acuse_registrado",
-    origen: "asesora",
+    tipo_evento: "auditoria_acusada", // catálogo oficial (CHECK evento_ciclo, migración 0003)
+    origen: "asesor", // valor permitido por el CHECK de origen (no "asesora")
     actor: asesorCodigoSesion,
     detalle: { fecha_acuse: ahoraIso, estado_resultante: destino },
   });
-  if (errEvento) throw new Error(`Supabase (evento acuse_registrado): ${errEvento.message}`);
+  if (errEvento) throw new Error(`Supabase (evento auditoria_acusada): ${errEvento.message}`);
 
   return { aplicado: true, estado: destino };
 }
@@ -165,8 +218,8 @@ export async function registrarCompromisoCiclo(
 
   const { error: errEvento } = await supabase.from("evento_ciclo").insert({
     ciclo_id: ciclo.id,
-    tipo_evento: "compromiso_registrado",
-    origen: "asesora",
+    tipo_evento: "compromiso_registrado", // catálogo oficial (CHECK evento_ciclo, migración 0003)
+    origen: "asesor", // valor permitido por el CHECK de origen (no "asesora")
     actor: asesorCodigoSesion,
     detalle: { fecha_prometida: fechaPrometida, dias_habiles: dias },
   });

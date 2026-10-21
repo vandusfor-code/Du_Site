@@ -6,7 +6,13 @@ import {
   guardarCompromiso,
   type AuditoriaConEstado,
 } from "@/lib/metricas";
-import { registrarAcuse, registrarCompromisoCiclo, type ResultadoTransicion } from "@/lib/acuse-compromiso-ciclo";
+import {
+  registrarAcuse,
+  registrarCompromisoCiclo,
+  obtenerEstadosCicloAsesora,
+  type ResultadoTransicion,
+  type EstadoCicloAsesora,
+} from "@/lib/acuse-compromiso-ciclo";
 
 async function usuarioActual(): Promise<string> {
   const session = await auth();
@@ -18,6 +24,13 @@ async function usuarioActual(): Promise<string> {
 export async function cargarAuditoriasAction(): Promise<AuditoriaConEstado[]> {
   const usuario = await usuarioActual();
   return obtenerAuditoriasConEstado(usuario);
+}
+
+// Estado del ciclo (Supabase) de cada auditoría de la asesora autenticada, para
+// que el portal decida qué ofrecer: confirmar recepción / firmar / ya firmado.
+export async function cargarEstadosCicloAction(): Promise<EstadoCicloAsesora[]> {
+  const usuario = await usuarioActual();
+  return obtenerEstadosCicloAsesora(usuario);
 }
 
 export async function guardarCompromisoAction(

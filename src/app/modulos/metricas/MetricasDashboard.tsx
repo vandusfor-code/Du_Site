@@ -20,8 +20,15 @@ import {
   type ChartConfiguration,
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
-import { cargarAuditoriasAction, guardarCompromisoAction } from "./actions";
+import {
+  cargarAuditoriasAction,
+  guardarCompromisoAction,
+  cargarEstadosCicloAction,
+  registrarAcuseAction,
+  firmarCompromisoAction,
+} from "./actions";
 import type { AuditoriaConEstado, MetricasAsesor } from "@/lib/metricas";
+import type { EstadoCicloAsesora } from "@/lib/acuse-compromiso-ciclo";
 import { useModuleSound } from "@/lib/use-module-sound";
 import { useToast } from "@/lib/use-toast";
 import { ModuleTopbar, Toast } from "@/components/module-shell";
@@ -99,7 +106,10 @@ export default function MetricasDashboard({
   const resaltadoAplicadoRef = useRef(false);
   const [comentarios, setComentarios] = useState<Record<string, string>>({});
   const [guardandoId, setGuardandoId] = useState<string | null>(null);
+  const [acusandoId, setAcusandoId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
+  // Estado del ciclo (Supabase) por idGestion — gobierna acuse/firma.
+  const [ciclos, setCiclos] = useState<Record<string, EstadoCicloAsesora>>({});
   const [, startTransition] = useTransition();
   const { soundOn, toggleSound, playClick, playNotify } = useModuleSound();
   const { toast, showToast } = useToast();
@@ -123,8 +133,17 @@ export default function MetricasDashboard({
   useEffect(() => {
     if (seccion !== "auditorias" || auditorias !== null || cargandoRef.current) return;
     cargandoRef.current = true;
-    cargarAuditoriasAction()
-      .then(setAuditorias)
+    // Auditorías (Consolidado) + estados de ciclo (Supabase) en paralelo. El
+    // ciclo es best-effort: si Supabase falla, el listado sigue mostrándose.
+    Promise.allSettled([cargarAuditoriasAction(), cargarEstadosCicloAction()])
+      .then(([auds, cics]) => {
+        setAuditorias(auds.status === "fulfilled" ? auds.value : []);
+        if (cics.status === "fulfilled") {
+          const mapa: Record<string, EstadoCicloAsesora> = {};
+          for (const c of cics.value) mapa[c.idGestion] = c;
+          setCiclos(mapa);
+        }
+      })
       .finally(() => {
         cargandoRef.current = false;
       });
@@ -331,6 +350,180 @@ export default function MetricasDashboard({
       }
       setGuardandoId(null);
     });
+  }
+
+  // Recarga auditorías (Consolidado) + estados de ciclo (Supabase) tras una acción.
+  async function recargarAuditorias() {
+    const [auds, cics] = await Promise.allSettled([cargarAuditoriasAction(), cargarEstadosCicloAction()]);
+    if (auds.status === "fulfilled") setAuditorias(auds.value);
+    if (cics.status === "fulfilled") {
+      const mapa: Record<string, EstadoCicloAsesora> = {};
+      for (const c of cics.value) mapa[c.idGestion] = c;
+      setCiclos(mapa);
+    }
+  }
+
+  // Acuse de recibo (ciclo de Supabase): NOTIFICADA -> COMPROMISO_PENDIENTE | ACUSADA.
+  function confirmarAcuse(item: AuditoriaConEstado) {
+    setAcusandoId(item.idGestion);
+    startTransition(async () => {
+      try {
+        const r = await registrarAcuseAction(item.idGestion);
+        playNotify();
+        showToast(r.aplicado ? "Recepción confirmada" : "La recepción ya estaba registrada");
+        await recargarAuditorias();
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "No se pudo confirmar la recepción.");
+      }
+      setAcusandoId(null);
+    });
+  }
+
+  // Firma del compromiso en el ciclo (Supabase autoritativo + espejo en Sheets).
+  function firmarCompromisoCiclo(item: AuditoriaConEstado) {
+    const texto = (comentarios[item.idGestion] ?? "").trim();
+    if (!texto) {
+      setErrorId(item.idGestion);
+      setTimeout(() => setErrorId(null), 2500);
+      return;
+    }
+    setGuardandoId(item.idGestion);
+    startTransition(async () => {
+      try {
+        const r = await firmarCompromisoAction(item.idGestion, item.fecha, texto);
+        if (r.aplicado) {
+          playNotify();
+          showToast("Compromiso firmado correctamente");
+        } else {
+          showToast("El compromiso ya estaba registrado");
+        }
+        await recargarAuditorias();
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "No se pudo firmar el compromiso.");
+      }
+      setGuardandoId(null);
+    });
+  }
+
+  // ── Bloques de UI reutilizables para la tarjeta de auditoría ──
+  function bloqueTextarea(item: AuditoriaConEstado, onConfirmar: () => void, guardando: boolean) {
+    return (
+      <>
+        <div className="auc-evaluador">
+          <i className="ph ph-user-circle" style={{ fontSize: 13 }} /> Evaluador: {item.evaluador || "No registrado"}
+        </div>
+        <div className="auc-input-row">
+          <textarea
+            className={`auc-textarea ${errorId === item.idGestion ? "auc-textarea-error" : ""}`}
+            placeholder={errorId === item.idGestion ? "⚠ Debes escribir un compromiso antes de confirmar." : "Escribe tu compromiso de mejora... (máx. 300 caracteres)"}
+            maxLength={300}
+            value={comentarios[item.idGestion] ?? ""}
+            onChange={(e) => setComentarios((prev) => ({ ...prev, [item.idGestion]: e.target.value }))}
+          />
+          <div className="auc-input-footer">
+            <span className="auc-char-count">{(comentarios[item.idGestion] ?? "").length}/300</span>
+            <button className="btn-compromiso" disabled={guardando} onClick={onConfirmar}>
+              {guardando ? (
+                <><i className="ph ph-circle-notch" style={{ animation: "spin 0.7s linear infinite" }} /> Guardando...</>
+              ) : (
+                <><i className="ph ph-seal-check" /> Confirmar compromiso</>
+              )}
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  function bloqueFirmado(texto: string, fecha: string) {
+    return (
+      <div className="auc-compromiso-firmado">
+        <i className="ph ph-seal-check" style={{ fontSize: 20, color: "#5d7a0e", flexShrink: 0, marginTop: 2 }} />
+        <div>
+          <p style={{ fontSize: 11, fontWeight: 700, color: "#5d7a0e", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Mi compromiso</p>
+          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", lineHeight: 1.5 }}>&quot;{texto}&quot;</p>
+          {fecha && (
+            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+              <i className="ph ph-calendar-check" style={{ fontSize: 11 }} /> Firmado el {fecha}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function badgeAuditoria(item: AuditoriaConEstado) {
+    const estado = ciclos[item.idGestion]?.estado;
+    const porEstado: Record<string, { bg: string; color: string; icon: string; txt: string }> = {
+      NOTIFICADA: { bg: "#fef3c7", color: "#b45309", icon: "ph-bell", txt: "Pendiente de acuse" },
+      ACUSADA: { bg: "rgba(59,130,246,0.12)", color: "#1d4ed8", icon: "ph-check", txt: "Recibida" },
+      COMPROMISO_PENDIENTE: { bg: "#fef3c7", color: "#b45309", icon: "ph-pencil-simple", txt: "Pendiente de firma" },
+      EN_SEGUIMIENTO: { bg: "rgba(185,226,43,0.15)", color: "#5d7a0e", icon: "ph-check-circle", txt: "Firmada" },
+      CERRADA: { bg: "rgba(185,226,43,0.15)", color: "#5d7a0e", icon: "ph-seal-check", txt: "Cerrada" },
+    };
+    const b = estado ? porEstado[estado] : undefined;
+    if (b) {
+      return (
+        <span className="badge" style={{ background: b.bg, color: b.color, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <i className={`ph ${b.icon}`} style={{ fontSize: 12 }} /> {b.txt}
+        </span>
+      );
+    }
+    // Legacy (sin ciclo notificado): badge basado en la hoja Compromisos.
+    return item.comprometido ? (
+      <span className="badge" style={{ background: "rgba(185,226,43,0.15)", color: "#5d7a0e", display: "inline-flex", alignItems: "center", gap: 4 }}>
+        <i className="ph ph-check-circle" style={{ fontSize: 12 }} /> Firmada
+      </span>
+    ) : (
+      <span className="badge" style={{ background: "#fef3c7", color: "#b45309", display: "inline-flex", alignItems: "center", gap: 4 }}>
+        <i className="ph ph-clock" style={{ fontSize: 12 }} /> Pendiente
+      </span>
+    );
+  }
+
+  function cuerpoAuditoria(item: AuditoriaConEstado) {
+    const c = ciclos[item.idGestion];
+    const estado = c?.estado;
+    if (estado === "NOTIFICADA") {
+      return (
+        <div className="auc-input-row">
+          <p style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500, marginBottom: 10 }}>
+            Confirma que recibiste esta auditoría para habilitar el registro de tu compromiso.
+          </p>
+          <div className="auc-input-footer" style={{ justifyContent: "flex-end" }}>
+            <button className="btn-compromiso" disabled={acusandoId === item.idGestion} onClick={() => confirmarAcuse(item)}>
+              {acusandoId === item.idGestion ? (
+                <><i className="ph ph-circle-notch" style={{ animation: "spin 0.7s linear infinite" }} /> Confirmando...</>
+              ) : (
+                <><i className="ph ph-check-circle" /> Confirmar recepción</>
+              )}
+            </button>
+          </div>
+        </div>
+      );
+    }
+    if (estado === "ACUSADA") {
+      return (
+        <div className="auc-compromiso-firmado">
+          <i className="ph ph-check-circle" style={{ fontSize: 20, color: "#1d4ed8", flexShrink: 0, marginTop: 2 }} />
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>Recepción confirmada.</p>
+            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Esta auditoría no requiere compromiso de mejora.</p>
+          </div>
+        </div>
+      );
+    }
+    if (estado === "COMPROMISO_PENDIENTE") {
+      return bloqueTextarea(item, () => firmarCompromisoCiclo(item), guardandoId === item.idGestion);
+    }
+    if (estado === "EN_SEGUIMIENTO" || estado === "CERRADA") {
+      const fecha = c?.compromisoFecha ? new Date(c.compromisoFecha).toLocaleDateString("es-CO") : item.fechaCompromiso;
+      return bloqueFirmado(c?.compromisoTexto ?? item.comentario, fecha);
+    }
+    // Legacy (sin ciclo / no notificada todavía): comportamiento previo (Sheets).
+    return item.comprometido
+      ? bloqueFirmado(item.comentario, item.fechaCompromiso)
+      : bloqueTextarea(item, () => enviarCompromiso(item), guardandoId === item.idGestion);
   }
 
   return (
@@ -582,15 +775,7 @@ export default function MetricasDashboard({
                   <div className="auc-header">
                     <div className="auc-meta">
                       <span className="auc-fecha">{item.fecha}</span>
-                      {item.comprometido ? (
-                        <span className="badge" style={{ background: "rgba(185,226,43,0.15)", color: "#5d7a0e", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                          <i className="ph ph-check-circle" style={{ fontSize: 12 }} /> Firmada
-                        </span>
-                      ) : (
-                        <span className="badge" style={{ background: "#fef3c7", color: "#b45309", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                          <i className="ph ph-clock" style={{ fontSize: 12 }} /> Pendiente
-                        </span>
-                      )}
+                      {badgeAuditoria(item)}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       {item.grabacion && (
@@ -608,61 +793,7 @@ export default function MetricasDashboard({
                   </div>
                   <div className="auc-mejora">{item.puntosMejora || "Sin puntos de mejora registrados."}</div>
 
-                  {item.comprometido ? (
-                    <div className="auc-compromiso-firmado">
-                      <i className="ph ph-seal-check" style={{ fontSize: 20, color: "#5d7a0e", flexShrink: 0, marginTop: 2 }} />
-                      <div>
-                        <p style={{ fontSize: 11, fontWeight: 700, color: "#5d7a0e", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
-                          Mi compromiso
-                        </p>
-                        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", lineHeight: 1.5 }}>
-                          &quot;{item.comentario}&quot;
-                        </p>
-                        <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                          <i className="ph ph-calendar-check" style={{ fontSize: 11 }} /> Firmado el {item.fechaCompromiso}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="auc-evaluador">
-                        <i className="ph ph-user-circle" style={{ fontSize: 13 }} /> Evaluador: {item.evaluador || "No registrado"}
-                      </div>
-                      <div className="auc-input-row">
-                        <textarea
-                          className={`auc-textarea ${errorId === item.idGestion ? "auc-textarea-error" : ""}`}
-                          placeholder={
-                            errorId === item.idGestion
-                              ? "⚠ Debes escribir un compromiso antes de confirmar."
-                              : "Escribe tu compromiso de mejora... (máx. 300 caracteres)"
-                          }
-                          maxLength={300}
-                          value={comentarios[item.idGestion] ?? ""}
-                          onChange={(e) =>
-                            setComentarios((prev) => ({ ...prev, [item.idGestion]: e.target.value }))
-                          }
-                        />
-                        <div className="auc-input-footer">
-                          <span className="auc-char-count">{(comentarios[item.idGestion] ?? "").length}/300</span>
-                          <button
-                            className="btn-compromiso"
-                            disabled={guardandoId === item.idGestion}
-                            onClick={() => enviarCompromiso(item)}
-                          >
-                            {guardandoId === item.idGestion ? (
-                              <>
-                                <i className="ph ph-circle-notch" style={{ animation: "spin 0.7s linear infinite" }} /> Guardando...
-                              </>
-                            ) : (
-                              <>
-                                <i className="ph ph-seal-check" /> Confirmar compromiso
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                  {cuerpoAuditoria(item)}
                 </div>
               ))
             )}
