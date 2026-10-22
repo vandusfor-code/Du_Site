@@ -129,7 +129,10 @@ export function agruparAuditorias(
     const reg = directorio.get(codigo);
     const correoOficial = (reg?.correo ?? "").trim();
 
-    const pendienteEnvio = estadoCiclo === "CREADA";
+    // "Pendiente de envío" = aún no notificada. Incluye SIN_CICLO: una auditoría
+    // recién guardada todavía no tiene fila de ciclo; el ciclo se crea al enviar
+    // (adopción). Así aparece de inmediato tras guardarla, sin un paso manual.
+    const pendienteEnvio = estadoCiclo === "CREADA" || estadoCiclo === "SIN_CICLO";
     const enviada = ESTADOS_ENVIADA.has(estadoCiclo);
     const elegible = pendienteEnvio && !!correoOficial;
 

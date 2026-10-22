@@ -8,6 +8,7 @@ import {
 } from "./notificacion-por-enviar";
 import { enviarCorreoIndividual } from "./mailer";
 import { correoLoteAuditorias } from "./emailTemplates";
+import { adoptarAuditorias } from "./gestion-auditorias";
 import {
   agruparAuditorias,
   type AuditoriaFilaEnvio,
@@ -197,6 +198,17 @@ function enmascararCorreo(correo: string): string {
 // fecha. `asesora` restringe a una; vacío = todas las de la fecha. Recalcula
 // TODO server-side: nunca confía en ids enviados por el navegador.
 export async function enviarLoteAuditorias(fecha: string, asesora?: string): Promise<ResultadoEnvioLote> {
+  // Asegura que exista la fila de ciclo de cada auditoría (incl. las recién
+  // guardadas, que todavía no tienen ciclo). adoptarAuditorias() es idempotente
+  // (upsert ignoreDuplicates): crea en CREADA las elegibles y NO_ELEGIBLE las
+  // que no tienen correo/identidad, sin duplicar las ya existentes. Best-effort:
+  // si falla, igual se notifican las que ya estaban en CREADA.
+  try {
+    await adoptarAuditorias();
+  } catch (e) {
+    console.error("[envio-auditorias] adopción previa al envío falló:", e instanceof Error ? e.message : e);
+  }
+
   const filtros: FiltrosEnvio = { fecha, asesora, soloPendientes: true };
   const { filas, directorio, ciclos } = await leerBase(filtros);
 

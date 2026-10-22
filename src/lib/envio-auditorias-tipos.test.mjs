@@ -79,7 +79,7 @@ test("6. soloPendientes excluye grupos sin pendientes", () => {
   assert.equal(r.grupos.some((g) => g.asesorCodigo === "M.GOMEZ456"), false);
 });
 
-test("7. Auditoría sin ciclo (adopción no corrida) → SIN_CICLO, no elegible", () => {
+test("7. Auditoría recién guardada sin ciclo (SIN_CICLO) con correo → pendiente y elegible", () => {
   const r = agruparAuditorias(
     [{ idGestion: "Z1", asesorCodigo: "J.PEREZ123", fecha: "2026-10-20", canalConsolidado: "Llamada", resultado: "OK" }],
     new Map(),
@@ -88,7 +88,20 @@ test("7. Auditoría sin ciclo (adopción no corrida) → SIN_CICLO, no elegible"
   );
   const g = r.grupos[0];
   assert.equal(g.auditorias[0].estadoCiclo, "SIN_CICLO");
+  assert.equal(g.pendientes, 1);
+  assert.deepEqual(g.idsPendientesElegibles, ["Z1"]); // el envío creará su ciclo (adopción)
+});
+
+test("7b. SIN_CICLO sin correo oficial → pendiente pero NO elegible", () => {
+  const r = agruparAuditorias(
+    [{ idGestion: "Z2", asesorCodigo: "S.VACIO000", fecha: "2026-10-20", canalConsolidado: "Llamada", resultado: "OK" }],
+    new Map(),
+    DIRECTORIO,
+    { fecha: "2026-10-20" }
+  );
+  const g = r.grupos[0];
   assert.equal(g.idsPendientesElegibles.length, 0);
+  assert.equal(g.noElegibles, 1);
 });
 
 test("8. Transiciones válidas del ciclo", () => {
