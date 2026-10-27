@@ -218,6 +218,10 @@ export async function enviarLoteAuditorias(fecha: string, asesora?: string): Pro
 
   const supabase = getSupabase();
   const fechaLabel = fecha;
+  // Resultado (OK/PENC) por auditoría: determina si, al notificar, se marca que
+  // REQUIERE compromiso. Regla operativa: las PENC (con falla) piden compromiso
+  // de mejora; las OK solo requieren acuse de recibo.
+  const resultadoPorId = new Map(filas.map((f) => [f.idGestion, (f.resultado ?? "").toUpperCase()]));
   const resultados: ResultadoAsesoraLote[] = [];
   let asesorasNotificadas = 0;
   let auditoriasNotificadas = 0;
@@ -294,9 +298,15 @@ export async function enviarLoteAuditorias(fecha: string, asesora?: string): Pro
     // Correo aceptado: marca cada ciclo CREADA->NOTIFICADA (condicional) + evento.
     let marcadas = 0;
     for (const { idGestion, cicloId } of idsCoinciden) {
+      // PENC → además de NOTIFICADA, marca requiere_compromiso (+ fecha de
+      // detección, exigida por el CHECK chk_requiere_compromiso_coherente).
+      const esPenc = resultadoPorId.get(idGestion) === "PENC";
+      const patch = esPenc
+        ? { estado: "NOTIFICADA", requiere_compromiso: true, requiere_compromiso_detectado_en: new Date().toISOString() }
+        : { estado: "NOTIFICADA" };
       const { data: actualizado, error: errUpd } = await supabase
         .from("ciclo_auditoria")
-        .update({ estado: "NOTIFICADA" })
+        .update(patch)
         .eq("id", cicloId)
         .eq("estado", "CREADA")
         .select("id")
