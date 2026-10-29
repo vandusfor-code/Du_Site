@@ -395,6 +395,33 @@ export function correoLoteAuditorias(nombreAsesor: string, url: string, cantidad
 </html>`;
 }
 
+// Aviso de evaluaciones pendientes. Enlaza al portal (módulo Evaluaciones).
+export function correoEvaluacionesPendientes(url: string): string {
+  return `<!DOCTYPE html>
+<html>
+  <body style="margin:0; padding:0; background:#eef2f7; font-family: Arial, sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:30px 0;">
+      <tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 15px rgba(0,0,0,0.08);">
+          <tr><td style="background:#3f3a64; padding:25px; text-align:center; color:#ffffff;"><h2 style="margin:0;">Du Academy</h2></td></tr>
+          <tr><td style="background:#1677ff; height:6px;"></td></tr>
+          <tr><td style="padding:30px; color:#2d2d2d;">
+            <p style="font-size:16px;">Hola,</p>
+            <p style="font-size:15px; line-height:1.6;">Tienes evaluaciones de conocimiento <b>pendientes por presentar</b> en el portal.</p>
+            <p style="font-size:15px; line-height:1.6;">Ingresa con tu usuario, entra al módulo <b>Evaluaciones</b> y presenta las que tengas activas. Recuerda que cada una tiene una sola oportunidad.</p>
+            <div style="text-align:center; margin:35px 0;">
+              <a href="${url}" target="_blank" style="background:#3f3a64; color:#ffffff; padding:14px 32px; border-radius:8px; text-decoration:none; font-size:15px; font-weight:600; display:inline-block; box-shadow:0 4px 12px rgba(63,58,100,0.3);">PRESENTAR EVALUACIONES</a>
+            </div>
+            <p style="margin-top:30px; font-size:14px;">Formación y Calidad</p>
+          </td></tr>
+          <tr><td style="background:#f5f5f5; padding:12px; text-align:center; font-size:12px; color:#777;">Notificación automática · Du Academy</td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
+}
+
 export type MotivoEscalamientoCalidad = "SIN_ACUSE" | "SIN_COMPROMISO" | "COMPROMISO_VENCIDO";
 
 const ETIQUETA_MOTIVO_ESCALAMIENTO: Record<MotivoEscalamientoCalidad, string> = {

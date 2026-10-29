@@ -88,6 +88,7 @@ const MODULO_TONE: Record<ModuloId, string> = {
   extensiones: "violet",
   calidad: "teal",
   "puntos-pago": "violet",
+  evaluaciones: "teal",
 };
 
 const PENDIENTES_VISIBLES = 5;

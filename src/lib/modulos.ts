@@ -1,4 +1,4 @@
-export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno" | "documentacion" | "pqrsf-comunicar" | "extensiones" | "calidad" | "puntos-pago";
+export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno" | "documentacion" | "pqrsf-comunicar" | "extensiones" | "calidad" | "puntos-pago" | "evaluaciones";
 
 export interface Modulo {
   id: ModuloId;
@@ -92,6 +92,13 @@ export const MODULOS: Modulo[] = [
     descripcion: "Consulta los puntos de pago disponibles por ciudad o municipio.",
     href: "/modulos/puntos-pago",
     color: "#6952e8",
+  },
+  {
+    id: "evaluaciones",
+    nombre: "Evaluaciones",
+    descripcion: "Quizzes de conocimiento operativo: presenta los módulos asignados y revisa tus resultados.",
+    href: "/modulos/evaluaciones",
+    color: "#1677ff",
   },
 ];
 

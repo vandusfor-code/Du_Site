@@ -10,6 +10,7 @@ import {
   Phone,
   ClipboardCheck,
   MapPin,
+  ListChecks,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuloId } from "@/lib/modulos";
@@ -35,4 +36,5 @@ export const MODULO_VISUALS: Record<ModuloId, ModuloVisual> = {
   extensiones: { icon: Phone, accentBg: "#efeaff", accentFg: "#2f1b72" },
   calidad: { icon: ClipboardCheck, accentBg: "#ccfbf1", accentFg: "#0d9488" },
   "puntos-pago": { icon: MapPin, accentBg: "#efeaff", accentFg: "#5b4ee6" },
+  evaluaciones: { icon: ListChecks, accentBg: "#e7f1ff", accentFg: "#1677ff" },
 };
