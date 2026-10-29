@@ -1,6 +1,6 @@
 import "server-only";
 import { readRange, appendRows, updateRange, asegurarHoja } from "@/lib/sheets";
-import { parsearPreguntasTSV } from "@/lib/evaluaciones-tipos";
+import { parsearPreguntasTSV, calificar, type Letra } from "@/lib/evaluaciones-tipos";
 import { enviarCorreoMasivo } from "@/lib/mailer";
 import { correoEvaluacionesPendientes } from "@/lib/emailTemplates";
 
@@ -247,4 +247,189 @@ export async function avisarEvaluaciones(): Promise<{ enviados: number }> {
 
   await enviarCorreoMasivo(unicos, "Tienes evaluaciones de conocimiento pendientes", correoEvaluacionesPendientes(url));
   return { enviados: unicos.length };
+}
+
+// ============================================================
+// LADO ASESORA — presentar evaluaciones
+//
+// Seguridad: la RESPUESTA CORRECTA nunca se envía al navegador por adelantado.
+// El feedback por pregunta se resuelve en el servidor (verificarRespuesta) y la
+// nota final SIEMPRE se recalcula en el servidor (finalizar). Un intento por
+// asesora, controlado por EVAL_RESULTADOS.
+// ============================================================
+
+interface PreguntaConClave {
+  num: number;
+  id: string;
+  pregunta: string;
+  opciones: { letra: Letra; texto: string }[];
+  correcta: Letra;
+  explicacion: string;
+}
+
+async function leerPreguntasQuiz(quizId: string): Promise<PreguntaConClave[]> {
+  const data = await readRange(sheetId(), `${TAB_PREGUNTAS}!A2:J`);
+  const out: PreguntaConClave[] = [];
+  for (const r of data) {
+    if (texto(r, 0).trim() !== quizId) continue;
+    const opciones: { letra: Letra; texto: string }[] = [];
+    (["A", "B", "C", "D"] as Letra[]).forEach((l, i) => {
+      const t = texto(r, 4 + i).trim();
+      if (t) opciones.push({ letra: l, texto: t });
+    });
+    out.push({
+      num: parseInt(texto(r, 1), 10) || out.length + 1,
+      id: texto(r, 2).trim(),
+      pregunta: texto(r, 3),
+      opciones,
+      correcta: (texto(r, 8).trim().toUpperCase() as Letra),
+      explicacion: texto(r, 9),
+    });
+  }
+  out.sort((a, b) => a.num - b.num);
+  return out;
+}
+
+// Último resultado de una asesora en un quiz (o null).
+async function resultadoDe(usuario: string, quizId: string): Promise<{ fecha: string; porcentaje: number; resultado: string; aciertos: number; total: number; respuestas: Record<string, Letra>; falladas: string } | null> {
+  const data = await readRange(sheetId(), `${TAB_RESULTADOS}!A2:I`).catch(() => [] as unknown[][]);
+  const u = usuario.trim().toUpperCase();
+  for (let i = data.length - 1; i >= 0; i--) {
+    const r = data[i];
+    if (texto(r, 1).trim().toUpperCase() !== u || texto(r, 2).trim() !== quizId) continue;
+    let respuestas: Record<string, Letra> = {};
+    try { respuestas = JSON.parse(texto(r, 7) || "{}"); } catch { respuestas = {}; }
+    return {
+      fecha: texto(r, 0).trim(),
+      aciertos: parseInt(texto(r, 3), 10) || 0,
+      total: parseInt(texto(r, 4), 10) || 0,
+      porcentaje: parseInt(texto(r, 5), 10) || 0,
+      resultado: texto(r, 6).trim(),
+      respuestas,
+      falladas: texto(r, 8),
+    };
+  }
+  return null;
+}
+
+export interface PanelAsesora {
+  pendientes: { id: string; nombre: string; descripcion: string; numPreguntas: number; duracionMin: number }[];
+  realizados: { id: string; nombre: string; porcentaje: number; resultado: string; fecha: string }[];
+}
+
+export async function obtenerPanelAsesora(usuario: string): Promise<PanelAsesora> {
+  const quizzes = (await listarQuizzes()).filter((q) => q.activo);
+  const pendientes: PanelAsesora["pendientes"] = [];
+  const realizados: PanelAsesora["realizados"] = [];
+  for (const q of quizzes) {
+    const res = await resultadoDe(usuario, q.id);
+    if (res) {
+      realizados.push({ id: q.id, nombre: q.nombre, porcentaje: res.porcentaje, resultado: res.resultado, fecha: res.fecha });
+    } else {
+      pendientes.push({ id: q.id, nombre: q.nombre, descripcion: q.descripcion, numPreguntas: q.numPreguntas, duracionMin: q.duracionMin });
+    }
+  }
+  return { pendientes, realizados };
+}
+
+function mezclar<T>(arr: T[]): T[] {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+export interface QuizParaPresentar {
+  quiz: { id: string; nombre: string; duracionSegundos: number };
+  preguntas: { id: string; pregunta: string; opciones: { letra: Letra; texto: string }[] }[];
+}
+
+export async function iniciarQuizAsesora(usuario: string, quizId: string): Promise<{ ok: true; data: QuizParaPresentar } | { ok: false; error: string }> {
+  const quiz = (await listarQuizzes()).find((q) => q.id === quizId);
+  if (!quiz) return { ok: false, error: "Esta evaluación no existe." };
+  if (!quiz.activo) return { ok: false, error: "Esta evaluación no está disponible." };
+  if (await resultadoDe(usuario, quizId)) return { ok: false, error: "Ya presentaste esta evaluación." };
+
+  const preguntas = await leerPreguntasQuiz(quizId);
+  if (preguntas.length === 0) return { ok: false, error: "Esta evaluación no tiene preguntas." };
+
+  // Orden de preguntas aleatorio; las opciones se mantienen A–D (no se envía la correcta).
+  const publicas = mezclar(preguntas).map((p) => ({ id: p.id, pregunta: p.pregunta, opciones: p.opciones }));
+  return { ok: true, data: { quiz: { id: quiz.id, nombre: quiz.nombre, duracionSegundos: quiz.duracionMin * 60 }, preguntas: publicas } };
+}
+
+export async function verificarRespuestaAsesora(quizId: string, idPregunta: string, letra: Letra): Promise<{ ok: true; correcta: boolean; letraCorrecta: Letra } | { ok: false; error: string }> {
+  const preguntas = await leerPreguntasQuiz(quizId);
+  const p = preguntas.find((x) => x.id === idPregunta);
+  if (!p) return { ok: false, error: "Pregunta no válida." };
+  return { ok: true, correcta: letra === p.correcta, letraCorrecta: p.correcta };
+}
+
+export interface ResultadoPresentacion {
+  aciertos: number;
+  total: number;
+  porcentaje: number;
+  resultado: "APROBADO" | "NO APROBADO";
+  errores: number;
+}
+
+export async function finalizarQuizAsesora(usuario: string, quizId: string, respuestas: Record<string, Letra>): Promise<{ ok: true; data: ResultadoPresentacion } | { ok: false; error: string }> {
+  const quiz = (await listarQuizzes()).find((q) => q.id === quizId);
+  if (!quiz) return { ok: false, error: "Esta evaluación no existe." };
+
+  // Idempotente: si ya hay resultado, se devuelve ese (no se duplica).
+  const previo = await resultadoDe(usuario, quizId);
+  if (previo) {
+    return { ok: true, data: { aciertos: previo.aciertos, total: previo.total, porcentaje: previo.porcentaje, resultado: (previo.resultado === "APROBADO" ? "APROBADO" : "NO APROBADO"), errores: previo.total - previo.aciertos } };
+  }
+
+  const preguntas = await leerPreguntasQuiz(quizId);
+  if (preguntas.length === 0) return { ok: false, error: "Esta evaluación no tiene preguntas." };
+
+  // Califica en el servidor (nunca confía en la nota del cliente).
+  const respuestasPorNum: Record<number, Letra | ""> = {};
+  const correctasPorNum: { correcta: Letra }[] = [];
+  const respuestasPorId: Record<string, Letra> = {};
+  preguntas.forEach((p, idx) => {
+    const elegida = (respuestas[p.id] ?? "") as Letra | "";
+    respuestasPorNum[idx + 1] = elegida;
+    correctasPorNum.push({ correcta: p.correcta });
+    if (elegida) respuestasPorId[p.id] = elegida;
+  });
+  const cal = calificar(correctasPorNum, respuestasPorNum, quiz.umbral);
+
+  await appendRows(sheetId(), `${TAB_RESULTADOS}!A:I`, [[
+    ahoraBogota(), usuario, quizId, String(cal.aciertos), String(cal.total),
+    String(cal.porcentaje), cal.resultado, JSON.stringify(respuestasPorId),
+    cal.falladas.length ? cal.falladas.join(", ") : "Ninguna",
+  ]]);
+
+  return { ok: true, data: { aciertos: cal.aciertos, total: cal.total, porcentaje: cal.porcentaje, resultado: cal.resultado, errores: cal.total - cal.aciertos } };
+}
+
+export interface RevisionAsesora {
+  quiz: { id: string; nombre: string };
+  resumen: { fecha: string; porcentaje: number; aciertos: number; total: number; resultado: string };
+  preguntas: { numero: number; pregunta: string; opciones: { letra: Letra; texto: string }[]; elegida: Letra | ""; correcta: Letra; acierto: boolean; explicacion: string }[];
+}
+
+export async function obtenerRevisionAsesora(usuario: string, quizId: string): Promise<{ ok: true; data: RevisionAsesora } | { ok: false; error: string }> {
+  const quiz = (await listarQuizzes()).find((q) => q.id === quizId);
+  if (!quiz) return { ok: false, error: "Esta evaluación no existe." };
+  const res = await resultadoDe(usuario, quizId);
+  if (!res) return { ok: false, error: "Aún no has presentado esta evaluación." };
+
+  const preguntas = await leerPreguntasQuiz(quizId);
+  const items = preguntas.map((p, idx) => {
+    const elegida = (res.respuestas[p.id] ?? "") as Letra | "";
+    return { numero: idx + 1, pregunta: p.pregunta, opciones: p.opciones, elegida, correcta: p.correcta, acierto: elegida === p.correcta, explicacion: p.explicacion };
+  });
+
+  return {
+    ok: true,
+    data: {
+      quiz: { id: quiz.id, nombre: quiz.nombre },
+      resumen: { fecha: res.fecha, porcentaje: res.porcentaje, aciertos: res.aciertos, total: res.total, resultado: res.resultado },
+      preguntas: items,
+    },
+  };
 }
