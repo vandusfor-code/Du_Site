@@ -17,7 +17,7 @@ const NAV: ItemNav[] = [
   { icon: LayoutDashboard, label: "Resumen" },
   { icon: ClipboardCheck, label: "Auditorías", href: "/admin" },
   { icon: FileSearch, label: "Auditoría Documental", href: "/admin/documental" },
-  { icon: Users, label: "Asesores" },
+  { icon: Users, label: "Usuarios", href: "/admin/usuarios" },
   { icon: CircleGauge, label: "Criterios" },
   { icon: Send, label: "Cortes de envío" },
   { icon: FileBarChart, label: "Reportes" },

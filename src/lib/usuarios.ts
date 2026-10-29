@@ -6,12 +6,19 @@
 // googleapis solo se evalúa cuando alguien REALMENTE inicia sesión.
 
 // Rol oficial del usuario, leído de la columna F de la hoja "Usuarios".
-// "Admin" = coordinador/administrador; "Asesora" = usuaria estándar.
-// Cualquier valor desconocido o vacío se normaliza a "Asesora" (nunca Admin).
-export type Rol = "Admin" | "Asesora";
+// "Admin" = coordinador/administrador (acceso total); "Coordinadora" = opera el
+// panel de Evaluaciones (activar/avisar/calificaciones) pero NO es admin total;
+// "Asesora" = usuaria estándar. Cualquier valor desconocido o vacío se normaliza
+// a "Asesora" (nunca concede Admin ni Coordinadora por defecto).
+export type Rol = "Admin" | "Coordinadora" | "Asesora";
+
+export const ROLES: Rol[] = ["Admin", "Coordinadora", "Asesora"];
 
 export function normalizarRol(valor: unknown): Rol {
-  return (valor ?? "").toString().trim().toLowerCase() === "admin" ? "Admin" : "Asesora";
+  const v = (valor ?? "").toString().trim().toLowerCase();
+  if (v === "admin") return "Admin";
+  if (v === "coordinadora" || v === "coordinador" || v === "coordinacion" || v === "coordinación") return "Coordinadora";
+  return "Asesora";
 }
 
 export interface Usuario {

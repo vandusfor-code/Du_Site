@@ -24,6 +24,23 @@ export async function requireAdmin() {
   return session;
 }
 
+// Coordinación: opera el panel de Evaluaciones sin ser Admin total.
+export function esCoordinadora(session: Session | null): boolean {
+  return (session?.user?.rol ?? "").toString().trim().toLowerCase() === "coordinadora";
+}
+
+// Admin o Coordinadora: para pantallas de gestión de Evaluaciones.
+export function esAdminOCoordinadora(session: Session | null): boolean {
+  return esAdmin(session) || esCoordinadora(session);
+}
+
+export async function requireAdminOCoordinadora() {
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+  if (!esAdminOCoordinadora(session)) redirect("/");
+  return session;
+}
+
 // Aditivo — NO reemplaza requireModulo(), que siguen usando otras 13
 // páginas de módulo sin ningún cambio de comportamiento. Un Admin entra
 // aunque su lista de módulos no incluya `id`; no se le agrega el módulo
