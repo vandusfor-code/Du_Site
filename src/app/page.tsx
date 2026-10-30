@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { modulosPermitidos } from "@/lib/modulos";
+import { modulosPermitidos, MODULOS } from "@/lib/modulos";
 import { HomeView, type TareaPendiente, type HomeData } from "@/components/home-view";
 import { logoutAction } from "./logout/actions";
 import { obtenerAuditoriasYConteoAnterior, obtenerCronograma } from "@/lib/metricas";
@@ -70,6 +70,13 @@ export default async function Home() {
   // El href de Documentación es el mismo para todos: /modulos/documentacion decide
   // server-side (dashboard Admin vs. "Mis procedimientos" de la asesora).
   const modulos = modulosPermitidos(moduloIds);
+  // Evaluaciones es un módulo UNIVERSAL: toda persona autenticada ve su tarjeta en
+  // el inicio (asesoras presentan; Admin/Coordinadora gestionan), sin necesidad de
+  // asignarlo uno por uno en la hoja Usuarios.
+  if (usuario) {
+    const evalMod = MODULOS.find((m) => m.id === "evaluaciones");
+    if (evalMod && !modulos.some((m) => m.id === "evaluaciones")) modulos.push(evalMod);
+  }
 
   if (!usuario) {
     return (

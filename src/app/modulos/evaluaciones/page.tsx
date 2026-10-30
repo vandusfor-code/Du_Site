@@ -13,8 +13,9 @@ export default async function EvaluacionesPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
+  // Evaluaciones es UNIVERSAL: toda persona autenticada puede entrar. Admin y
+  // Coordinadora ven el panel de gestión; el resto presenta sus evaluaciones.
   const gestion = esAdminOCoordinadora(session);
-  if (!gestion && !session.user.modulos.includes("evaluaciones")) redirect("/");
 
   if (gestion) {
     let quizzes: QuizResumen[] = [];

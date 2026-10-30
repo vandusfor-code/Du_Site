@@ -174,11 +174,10 @@ export async function listarAsesorasActivas(): Promise<{ usuario: string; nombre
     if (!usuario) continue;
     const activo = texto(r, 4).trim().toUpperCase() !== "NO";
     const rol = texto(r, 5).trim().toLowerCase();
-    const modulos = texto(r, 3).toLowerCase();
-    // Asesoras activas (rol Asesora = ni admin ni coordinadora) con el módulo asignado.
+    // Evaluaciones es universal: toda asesora activa (rol Asesora = ni admin ni
+    // coordinadora) entra en resultados y avisos, sin exigir el módulo asignado.
     if (!activo) continue;
     if (rol === "admin" || rol === "coordinadora") continue;
-    if (!modulos.includes("evaluaciones")) continue;
     out.push({ usuario, nombre: texto(r, 2).trim() || usuario });
   }
   return out;

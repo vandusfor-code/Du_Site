@@ -61,10 +61,8 @@ async function requireUsuario(): Promise<string> {
   const session = await auth();
   const usuario = session?.user?.usuario;
   if (!usuario) throw new Error("No autenticado");
-  // Debe tener el módulo asignado, o ser Admin/Coordinadora (para probar).
-  if (!session!.user.modulos.includes("evaluaciones") && !esAdminOCoordinadora(session)) {
-    throw new Error("No autorizado");
-  }
+  // Evaluaciones es universal: basta estar autenticado (toda asesora puede
+  // presentar; Admin/Coordinadora también pueden probar).
   return usuario;
 }
 
