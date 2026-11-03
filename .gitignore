@@ -43,3 +43,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Archivo temporal de migracion a Render (NO commitear)
+render.env
