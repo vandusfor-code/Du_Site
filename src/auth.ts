@@ -31,6 +31,9 @@ declare module "@auth/core/jwt" {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // En Vercel el host se confía automáticamente; en cualquier otro host (Render,
+  // Node self-hosted) hay que declararlo o el login falla con "UntrustedHost".
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",

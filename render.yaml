@@ -1,0 +1,76 @@
+# Render Blueprint para Du Site — Next.js 16 corriendo como servidor Node (`next start`).
+# Crea un Web Service gratis con auto-deploy desde la rama main de GitHub.
+#
+# Las variables marcadas `sync: false` NO se guardan en el repo: Render las pide
+# en el panel al crear el servicio (así los secretos nunca quedan versionados).
+# Pega los MISMOS valores que tienes hoy en Vercel. Excepción: APP_URL debe ser
+# la URL que Render te asigne (p. ej. https://du-site.onrender.com).
+services:
+  - type: web
+    name: du-site
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /login
+    envVars:
+      # Node 22 LTS (Next 16 requiere >= 20.9).
+      - key: NODE_VERSION
+        value: 22.11.0
+      # ── Autenticación ──
+      - key: AUTH_SECRET
+        sync: false
+      # ── URL pública (para los enlaces de los correos). Ponla con la URL de Render. ──
+      - key: APP_URL
+        sync: false
+      # ── Cuenta de servicio de Google (Sheets) ──
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_PRIVATE_KEY
+        sync: false
+      # ── IDs de hojas de cálculo ──
+      - key: SHEET_ID_USUARIOS
+        sync: false
+      - key: SHEET_ID_METRICAS
+        sync: false
+      - key: SHEET_ID_RADICACIONES
+        sync: false
+      - key: SHEET_ID_LINEA_AMIGA
+        sync: false
+      - key: SHEET_ID_SUGERENCIAS_PQRSF
+        sync: false
+      - key: SHEET_ID_QUIZ
+        sync: false
+      - key: SHEET_ID_PQRSF_DATA
+        sync: false
+      - key: SHEET_ID_PQRSF_LISTADO
+        sync: false
+      - key: SHEET_ID_PQRSF_COMUNICAR
+        sync: false
+      - key: SHEET_ID_EXTENSIONES
+        sync: false
+      - key: SHEET_ID_AUDITORIAS_DOC
+        sync: false
+      # ── Supabase (ciclo de auditoría del módulo Calidad) ──
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # ── IA (PQRSF / Calidad) ──
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # ── Correo SMTP (notificaciones) ──
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
