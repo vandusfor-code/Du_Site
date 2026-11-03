@@ -1,5 +1,13 @@
 import "server-only";
-import { readRange, appendRow, updateRange, parseSheetDate, formatSheetDate, hoyEnBogota, serieDesdeFechas, type SerieItem } from "@/lib/sheets";
+import { readRange, appendRow, updateRange, asegurarHoja, parseSheetDate, formatSheetDate, hoyEnBogota, serieDesdeFechas, type SerieItem } from "@/lib/sheets";
+import {
+  diasHabilesTranscurridos,
+  evaluarSla,
+  diasRestantes,
+  normalizarEstadoSNC,
+  type SNCItem,
+  type EstadoSNC,
+} from "@/lib/radicaciones-snc-tipos";
 
 function sheetId(): string {
   const id = process.env.SHEET_ID_RADICACIONES;
@@ -426,6 +434,120 @@ export async function marcarSolucionado(rowId: number): Promise<void> {
     updateRange(id, `GESTIONES!E${rowId}`, [["No"]]),
     updateRange(id, `GESTIONES!G${rowId}`, [[""]]),
   ]);
+}
+
+/* ===================== */
+/* SALIDAS NO CONFORMES (SNC) — pestaña dedicada */
+/* ===================== */
+// La SNC ("la popular SNC") es distinta de "devuelto por errores": es una no
+// conformidad de calidad que la asesora registra con un MOTIVO, gestiona en un
+// plazo de 2 días hábiles y ella misma marca como solucionada. Vive en su propia
+// pestaña "SNC" para no mezclarse con el flujo normal de GESTIONES.
+
+const TAB_SNC = "SNC";
+const HEADERS_SNC = ["Fecha registro", "Asesora", "Radicado", "Motivo", "Estado", "Fecha solución", "Detalle corrección"];
+
+async function asegurarSNC(id: string): Promise<void> {
+  await asegurarHoja(id, TAB_SNC, HEADERS_SNC);
+}
+
+// Fecha de calendario (Bogotá) "yyyy-MM-dd" a partir de lo guardado en la col A.
+function ymdBogotaDe(valor: unknown): string {
+  const s = (valor ?? "").toString();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const d = parseSheetDate(valor);
+  if (!d) return "";
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+export interface ResultadoSNC {
+  success: boolean;
+  error?: string;
+}
+
+export interface SNCDeAsesora {
+  pendientes: SNCItem[];
+  solucionadas: SNCItem[];
+  hayVencidas: boolean;
+}
+
+export async function registrarSNC(asesora: string, radicado: string, motivo: string): Promise<ResultadoSNC> {
+  const rad = radicado.trim();
+  const mot = motivo.trim();
+  if (!rad) return { success: false, error: "El radicado es obligatorio." };
+  if (!mot) return { success: false, error: "El motivo es obligatorio." };
+  const id = sheetId();
+  await asegurarSNC(id);
+  await appendRow(id, `${TAB_SNC}!A:G`, [ahoraBogota(), asesora, rad, mot, "Pendiente", "", ""]);
+  return { success: true };
+}
+
+export async function obtenerSNCDeAsesora(asesora: string): Promise<SNCDeAsesora> {
+  const vacio: SNCDeAsesora = { pendientes: [], solucionadas: [], hayVencidas: false };
+  try {
+    const id = sheetId();
+    await asegurarSNC(id);
+    const data = await readRange(id, TAB_SNC, { unformatted: true });
+    const aNorm = normalize(asesora);
+    const hoy = hoyEnBogota();
+    const hoyYMD = `${hoy.anio}-${String(hoy.mes + 1).padStart(2, "0")}-${String(hoy.dia).padStart(2, "0")}`;
+
+    const pendientes: SNCItem[] = [];
+    const solucionadas: SNCItem[] = [];
+    let hayVencidas = false;
+
+    for (let i = 1; i < data.length; i++) {
+      if (normalize(data[i][1]) !== aNorm) continue;
+      const estado: EstadoSNC = normalizarEstadoSNC(data[i][4]);
+      const fechaRegistroYMD = ymdBogotaDe(data[i][0]);
+      const dias = estado === "Pendiente" ? diasHabilesTranscurridos(fechaRegistroYMD, hoyYMD) : 0;
+      const item: SNCItem = {
+        fila: i + 1,
+        fechaRegistro: formatSheetDate(data[i][0], "dd/MM/yyyy"),
+        fechaRegistroYMD,
+        asesora: texto(data[i], 1),
+        radicado: texto(data[i], 2),
+        motivo: texto(data[i], 3),
+        estado,
+        fechaSolucion: data[i][5] ? formatSheetDate(data[i][5], "dd/MM/yyyy") : "",
+        detalle: texto(data[i], 6),
+        diasHabiles: dias,
+        diasRestantes: diasRestantes(dias),
+        sla: evaluarSla(dias),
+      };
+      if (estado === "Pendiente") {
+        pendientes.push(item);
+        if (item.sla === "vencida") hayVencidas = true;
+      } else {
+        solucionadas.push(item);
+      }
+    }
+    // Pendientes: las más urgentes (más días hábiles) primero.
+    // Solucionadas: las más recientes primero.
+    pendientes.sort((a, b) => b.diasHabiles - a.diasHabiles);
+    solucionadas.reverse();
+    return { pendientes, solucionadas, hayVencidas };
+  } catch {
+    return vacio;
+  }
+}
+
+export async function marcarSNCSolucionada(fila: number, asesora: string, detalle: string): Promise<ResultadoSNC> {
+  const id = sheetId();
+  await asegurarSNC(id);
+  // Verificación de propiedad: la fila debe existir, ser de esta asesora y seguir pendiente.
+  const data = await readRange(id, TAB_SNC, { unformatted: true });
+  const idx = fila - 1;
+  if (idx < 1 || idx >= data.length) return { success: false, error: "SNC no encontrada." };
+  if (normalize(data[idx][1]) !== normalize(asesora)) return { success: false, error: "No autorizado." };
+  if (normalizarEstadoSNC(data[idx][4]) === "Solucionada") return { success: false, error: "Esta SNC ya estaba solucionada." };
+  await Promise.all([
+    updateRange(id, `${TAB_SNC}!E${fila}`, [["Solucionada"]]),
+    updateRange(id, `${TAB_SNC}!F${fila}`, [[ahoraBogota()]]),
+    updateRange(id, `${TAB_SNC}!G${fila}`, [[detalle.trim()]]),
+  ]);
+  return { success: true };
 }
 
 /* ===================== */

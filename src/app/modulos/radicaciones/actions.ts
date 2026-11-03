@@ -15,6 +15,9 @@ import {
   enviarMensajeChat,
   obtenerHorarioHoy,
   verificarHorarios,
+  registrarSNC,
+  obtenerSNCDeAsesora,
+  marcarSNCSolucionada,
   type Asesor,
   type DatosRadicacion,
   type ResultadoGuardarRadicacion,
@@ -25,6 +28,8 @@ import {
   type Notificacion,
   type MensajeChat,
   type HorarioHoy,
+  type ResultadoSNC,
+  type SNCDeAsesora,
 } from "@/lib/radicaciones";
 
 async function usuarioActual(): Promise<{ usuario: string; nombre: string }> {
@@ -100,4 +105,21 @@ export async function obtenerHorarioHoyAction(): Promise<HorarioHoy | null> {
 export async function verificarHorariosAction(): Promise<void> {
   const { nombre } = await usuarioActual();
   await verificarHorarios(nombre);
+}
+
+/* ── Salidas No Conformes (SNC) ── */
+
+export async function registrarSNCAction(radicado: string, motivo: string): Promise<ResultadoSNC> {
+  const { nombre } = await usuarioActual();
+  return registrarSNC(nombre, radicado, motivo);
+}
+
+export async function obtenerSNCAction(): Promise<SNCDeAsesora> {
+  const { nombre } = await usuarioActual();
+  return obtenerSNCDeAsesora(nombre);
+}
+
+export async function marcarSNCSolucionadaAction(fila: number, detalle: string): Promise<ResultadoSNC> {
+  const { nombre } = await usuarioActual();
+  return marcarSNCSolucionada(fila, nombre, detalle);
 }

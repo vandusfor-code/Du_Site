@@ -504,3 +504,70 @@
 @media (max-width: 680px) {
   .radic-scope .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ===================== */
+/* Salidas No Conformes (SNC) */
+/* ===================== */
+.radic-scope .snc-view { display: flex; flex-direction: column; gap: 24px; }
+.radic-scope .snc-view .section-header h3 { display: flex; align-items: center; gap: 9px; }
+.radic-scope .snc-view .section-header h3 svg { color: var(--primary-deep); }
+.radic-scope .snc-count {
+  background: var(--primary-deep); color: #fff; font-size: 12px; font-weight: 700;
+  min-width: 24px; height: 24px; padding: 0 8px; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+.radic-scope .snc-banner {
+  display: flex; align-items: center; gap: 14px;
+  background: #fff0f1; border: 1px solid rgba(239, 68, 68, 0.35);
+  border-left: 5px solid var(--error); border-radius: var(--radius-lg);
+  padding: 18px 22px; color: #7f1d1d;
+}
+.radic-scope .snc-banner svg { color: var(--error); flex-shrink: 0; }
+.radic-scope .snc-banner b { display: block; font-size: 15px; }
+.radic-scope .snc-banner span { font-size: 13px; color: #991b1b; }
+
+.radic-scope .snc-register-body { padding: 24px 32px; display: flex; flex-direction: column; gap: 16px; }
+.radic-scope .snc-register-body .btn-primary { align-self: flex-start; width: auto; padding: 12px 28px; }
+
+.radic-scope .snc-empty { padding: 40px 32px; text-align: center; color: var(--text-muted); font-size: 14px; }
+
+.radic-scope .snc-list { display: flex; flex-direction: column; }
+.radic-scope .snc-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 32px; border-bottom: 1px solid var(--border); border-left: 4px solid transparent;
+}
+.radic-scope .snc-item:last-child { border-bottom: 0; }
+.radic-scope .snc-item.sla-a_tiempo { border-left-color: #16a34a; }
+.radic-scope .snc-item.sla-vence_hoy { border-left-color: #d97706; background: #fffbeb; }
+.radic-scope .snc-item.sla-vencida { border-left-color: var(--error); background: #fff5f5; }
+
+.radic-scope .snc-item-main { min-width: 0; }
+.radic-scope .snc-item-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.radic-scope .snc-item-head b { font-size: 15px; color: var(--primary-deep); }
+.radic-scope .snc-motivo { margin: 6px 0 4px; font-size: 14px; color: var(--text-main); }
+.radic-scope .snc-meta { font-size: 12px; color: var(--text-muted); }
+
+.radic-scope .snc-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; white-space: nowrap;
+}
+.radic-scope .snc-badge.sla-a_tiempo { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
+.radic-scope .snc-badge.sla-vence_hoy { background: rgba(217, 119, 6, 0.14); color: #b45309; }
+.radic-scope .snc-badge.sla-vencida { background: rgba(239, 68, 68, 0.14); color: var(--error); }
+
+.radic-scope .snc-solve { width: auto; padding: 10px 18px; font-size: 13px; flex-shrink: 0; }
+
+.radic-scope .nav-badge.danger { background: var(--error); box-shadow: 0 0 10px rgba(239, 68, 68, 0.6); }
+
+.radic-scope .snc-modal { max-width: 440px; text-align: center; }
+.radic-scope .snc-modal .btn-cancel {
+  flex: 1; background: #fff; color: var(--text-main); border: 1px solid var(--border);
+  padding: 12px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600;
+}
+.radic-scope .snc-modal .btn-primary { flex: 1; }
+
+@media (max-width: 680px) {
+  .radic-scope .snc-item { flex-direction: column; align-items: stretch; }
+  .radic-scope .snc-solve { width: 100%; justify-content: center; }
+}
