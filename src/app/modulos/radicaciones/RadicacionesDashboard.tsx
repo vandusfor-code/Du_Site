@@ -19,7 +19,7 @@ import {
   verificarHorariosAction,
   registrarSNCAction,
   obtenerSNCAction,
-  marcarSNCSolucionadaAction,
+  cambiarEstadoSNCAction,
 } from "./actions";
 import type {
   Asesor,
@@ -31,7 +31,7 @@ import type {
   HorarioHoy,
   SNCDeAsesora,
 } from "@/lib/radicaciones";
-import type { SNCItem } from "@/lib/radicaciones-snc-tipos";
+import { TRANSICIONES, type SNCItem, type EstadoSNC } from "@/lib/radicaciones-snc-tipos";
 import { SoundToggleButton } from "@/components/module-shell";
 
 type Vista = "radicacion" | "snc" | "search" | "notifications" | "chat";
@@ -99,13 +99,15 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
   const [histPagina, setHistPagina] = useState(1);
   const [histFilasPorPagina, setHistFilasPorPagina] = useState(10);
 
-  const [sncData, setSncData] = useState<SNCDeAsesora>({ pendientes: [], solucionadas: [], hayVencidas: false });
+  const [sncData, setSncData] = useState<SNCDeAsesora>({ pendientes: [], terminadas: [], hayVencidas: false });
   const [sncRadicado, setSncRadicado] = useState("");
   const [sncMotivo, setSncMotivo] = useState("");
+  const [sncNoAplica, setSncNoAplica] = useState(false);
   const [guardandoSnc, setGuardandoSnc] = useState(false);
-  const [resolviendo, setResolviendo] = useState<SNCItem | null>(null);
-  const [detalleCorreccion, setDetalleCorreccion] = useState("");
-  const [cerrandoSnc, setCerrandoSnc] = useState(false);
+  const [cambiando, setCambiando] = useState<SNCItem | null>(null);
+  const [nuevoEstado, setNuevoEstado] = useState<EstadoSNC>("Enviada a corrección");
+  const [notaEstado, setNotaEstado] = useState("");
+  const [guardandoEstado, setGuardandoEstado] = useState(false);
 
   const [dbQuery, setDbQuery] = useState("");
   const [dbResult, setDbResult] = useState<BusquedaGeneralResultado | null | undefined>(undefined);
@@ -310,11 +312,12 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
     if (!sncMotivo.trim()) return mostrarToast("Describe el motivo de la SNC", true);
     setGuardandoSnc(true);
     try {
-      const res = await registrarSNCAction(sncRadicado, sncMotivo);
+      const res = await registrarSNCAction(sncRadicado, sncMotivo, sncNoAplica);
       if (res.success) {
-        mostrarToast("Salida no conforme registrada");
+        mostrarToast(sncNoAplica ? "Registrada como 'No corresponde'" : "Salida no conforme registrada");
         setSncRadicado("");
         setSncMotivo("");
+        setSncNoAplica(false);
         refreshSNC();
       } else {
         mostrarToast(res.error ?? "No se pudo registrar la SNC", true);
@@ -326,23 +329,33 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
     }
   }
 
-  async function confirmarResolver() {
-    if (!resolviendo) return;
-    setCerrandoSnc(true);
+  function abrirCambio(s: SNCItem) {
+    setCambiando(s);
+    // Sugerencia de avance: si ya está "Enviada a corrección", el siguiente paso es solucionar.
+    setNuevoEstado(s.estado === "Enviada a corrección" ? "Solucionada" : "Enviada a corrección");
+    setNotaEstado("");
+  }
+
+  const estadoRequiereNota = nuevoEstado === "Cancelada" || nuevoEstado === "No corresponde";
+
+  async function confirmarCambio() {
+    if (!cambiando) return;
+    if (estadoRequiereNota && !notaEstado.trim()) return mostrarToast("Indica el motivo", true);
+    setGuardandoEstado(true);
     try {
-      const res = await marcarSNCSolucionadaAction(resolviendo.fila, detalleCorreccion);
+      const res = await cambiarEstadoSNCAction(cambiando.fila, nuevoEstado, notaEstado);
       if (res.success) {
-        mostrarToast("SNC marcada como solucionada");
-        setResolviendo(null);
-        setDetalleCorreccion("");
+        mostrarToast(`SNC actualizada: ${nuevoEstado}`);
+        setCambiando(null);
+        setNotaEstado("");
         refreshSNC();
       } else {
-        mostrarToast(res.error ?? "No se pudo cerrar la SNC", true);
+        mostrarToast(res.error ?? "No se pudo actualizar", true);
       }
     } catch {
-      mostrarToast("No se pudo cerrar. Revisa tu conexión e intenta de nuevo.", true);
+      mostrarToast("No se pudo actualizar. Revisa tu conexión e intenta de nuevo.", true);
     } finally {
-      setCerrandoSnc(false);
+      setGuardandoEstado(false);
     }
   }
 
@@ -702,18 +715,22 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                     />
                   </div>
                   <div className="input-group">
-                    <label>Motivo de la salida no conforme</label>
+                    <label>{sncNoAplica ? "Motivo (por qué no corresponde)" : "Motivo de la salida no conforme"}</label>
                     <textarea
                       className="input-field"
                       style={{ minHeight: 70, resize: "none" }}
-                      placeholder="Describe el motivo de la SNC..."
+                      placeholder={sncNoAplica ? "Explica por qué no corresponde..." : "Describe el motivo de la SNC..."}
                       value={sncMotivo}
                       onChange={(e) => setSncMotivo(e.target.value)}
                     />
                   </div>
+                  <div className="checkbox-item" onClick={() => setSncNoAplica((v) => !v)}>
+                    <input type="checkbox" checked={sncNoAplica} onChange={() => setSncNoAplica((v) => !v)} />
+                    <span>No corresponde salida no conforme (no aplica el plazo de 2 días)</span>
+                  </div>
                   <button className="btn-primary" disabled={guardandoSnc} onClick={registrarSnc}>
                     <Send size={16} />
-                    <span>{guardandoSnc ? "Registrando..." : "Registrar SNC"}</span>
+                    <span>{guardandoSnc ? "Registrando..." : sncNoAplica ? "Registrar como “No corresponde”" : "Registrar SNC"}</span>
                   </button>
                 </div>
               </div>
@@ -732,6 +749,7 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                         <div className="snc-item-main">
                           <div className="snc-item-head">
                             <b>{s.radicado}</b>
+                            <span className="estado-pill progress">{s.estado}</span>
                             <span className={`snc-badge sla-${s.sla}`}>
                               {s.sla === "vencida" && <AlertTriangle size={13} />}
                               {slaLabel(s)}
@@ -740,11 +758,8 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                           <p className="snc-motivo">{s.motivo}</p>
                           <span className="snc-meta">Registrada: {s.fechaRegistro}</span>
                         </div>
-                        <button
-                          className="btn-primary snc-solve"
-                          onClick={() => { setResolviendo(s); setDetalleCorreccion(""); }}
-                        >
-                          <CheckCircle2 size={16} /> Solucionar
+                        <button className="btn-primary snc-solve" onClick={() => abrirCambio(s)}>
+                          <RotateCcw size={16} /> Actualizar estado
                         </button>
                       </div>
                     ))}
@@ -754,11 +769,11 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
 
               <div className="section-card">
                 <div className="section-header">
-                  <h3><CheckCircle2 size={18} /> Solucionadas</h3>
-                  <span className="snc-count">{sncData.solucionadas.length}</span>
+                  <h3><CheckCircle2 size={18} /> Historial de SNC</h3>
+                  <span className="snc-count">{sncData.terminadas.length}</span>
                 </div>
-                {sncData.solucionadas.length === 0 ? (
-                  <div className="snc-empty">Aún no has solucionado ninguna.</div>
+                {sncData.terminadas.length === 0 ? (
+                  <div className="snc-empty">Aún no tienes SNC cerradas.</div>
                 ) : (
                   <div className="hist-table-wrap">
                     <table className="hist-table">
@@ -766,17 +781,21 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
                         <tr>
                           <th>RADICADO</th>
                           <th>MOTIVO</th>
+                          <th>ESTADO</th>
+                          <th>NOTA</th>
                           <th>REGISTRADA</th>
-                          <th>SOLUCIONADA</th>
+                          <th>CERRADA</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {sncData.solucionadas.map((s) => (
+                        {sncData.terminadas.map((s) => (
                           <tr key={s.fila}>
                             <td><b>{s.radicado}</b></td>
                             <td>{s.motivo}</td>
+                            <td><span className={`estado-pill ${estadoClase(s.estado)}`}>{s.estado}</span></td>
+                            <td>{s.detalle || "—"}</td>
                             <td>{s.fechaRegistro}</td>
-                            <td>{s.fechaSolucion || "—"}</td>
+                            <td>{s.fechaEstado || "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -942,30 +961,36 @@ export default function RadicacionesDashboard({ nombre }: { nombre: string }) {
         </div>
       )}
 
-      {resolviendo && (
-        <div className="fullscreen-overlay" onClick={() => { if (!cerrandoSnc) setResolviendo(null); }}>
+      {cambiando && (
+        <div className="fullscreen-overlay" onClick={() => { if (!guardandoEstado) setCambiando(null); }}>
           <div className="alert-box snc-modal" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ marginBottom: 6, color: "var(--primary-deep)" }}>Solucionar SNC</h2>
+            <h2 style={{ marginBottom: 6, color: "var(--primary-deep)" }}>Actualizar SNC</h2>
             <p style={{ color: "var(--text-muted)", marginBottom: 20 }}>
-              Radicado <b>{resolviendo.radicado}</b>
+              Radicado <b>{cambiando.radicado}</b> · estado actual: <b>{cambiando.estado}</b>
             </p>
             <div className="input-group" style={{ textAlign: "left" }}>
-              <label>¿Qué hiciste para corregirla? (opcional)</label>
+              <label>Nuevo estado</label>
+              <select className="input-field" value={nuevoEstado} onChange={(e) => setNuevoEstado(e.target.value as EstadoSNC)}>
+                {TRANSICIONES.map((e) => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </div>
+            <div className="input-group" style={{ textAlign: "left" }}>
+              <label>{estadoRequiereNota ? "Motivo (obligatorio)" : "Nota / detalle (opcional)"}</label>
               <textarea
                 className="input-field"
-                style={{ minHeight: 90, resize: "none" }}
-                placeholder="Detalle de la corrección..."
-                value={detalleCorreccion}
-                onChange={(e) => setDetalleCorreccion(e.target.value)}
+                style={{ minHeight: 80, resize: "none" }}
+                placeholder={estadoRequiereNota ? "Explica el motivo..." : "Detalle del avance o la corrección..."}
+                value={notaEstado}
+                onChange={(e) => setNotaEstado(e.target.value)}
               />
             </div>
             <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-              <button className="btn-cancel" onClick={() => setResolviendo(null)} disabled={cerrandoSnc}>
+              <button className="btn-cancel" onClick={() => setCambiando(null)} disabled={guardandoEstado}>
                 Cancelar
               </button>
-              <button className="btn-primary" onClick={confirmarResolver} disabled={cerrandoSnc}>
+              <button className="btn-primary" onClick={confirmarCambio} disabled={guardandoEstado}>
                 <CheckCircle2 size={16} />
-                <span>{cerrandoSnc ? "Guardando..." : "Marcar solucionada"}</span>
+                <span>{guardandoEstado ? "Guardando..." : "Guardar estado"}</span>
               </button>
             </div>
           </div>
@@ -979,6 +1004,14 @@ function slaLabel(s: SNCItem): string {
   if (s.sla === "vencida") return `Vencida · ${s.diasHabiles} días háb.`;
   if (s.sla === "vence_hoy") return "Vence hoy";
   return `Quedan ${s.diasRestantes} día${s.diasRestantes === 1 ? "" : "s"} háb.`;
+}
+
+export function estadoClase(e: EstadoSNC): string {
+  if (e === "Solucionada") return "ok";
+  if (e === "Cancelada") return "cancel";
+  if (e === "No corresponde") return "neutral";
+  if (e === "Enviada a corrección") return "progress";
+  return "reg";
 }
 
 function computeWfm(shift: HorarioHoy | null, now: Date) {

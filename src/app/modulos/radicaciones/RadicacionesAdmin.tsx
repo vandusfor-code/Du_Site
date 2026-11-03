@@ -4,7 +4,7 @@ import "./radicaciones.css";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search, Send, Plus, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Users, ChevronLeft } from "lucide-react";
+import { Search, Send, Plus, Clock, AlertTriangle, CheckCircle2, ShieldAlert, Users, ChevronLeft, X } from "lucide-react";
 import {
   obtenerAsesoresAction,
   buscarGeneralAction,
@@ -12,9 +12,10 @@ import {
   registrarSNCAsignadaAction,
 } from "./actions";
 import type { Asesor, BusquedaGeneralResultado, SNCEquipo } from "@/lib/radicaciones";
-import type { SNCItem } from "@/lib/radicaciones-snc-tipos";
+import { esEstadoActivo, type SNCItem } from "@/lib/radicaciones-snc-tipos";
+import { estadoClase } from "./RadicacionesDashboard";
 
-type FiltroEstado = "todos" | "pendientes" | "vencidas" | "solucionadas";
+type FiltroEstado = "todos" | "pendientes" | "vencidas" | "solucionadas" | "canceladas" | "nocorresponde";
 
 function slaLabel(s: SNCItem): string {
   if (s.sla === "vencida") return `Vencida · ${s.diasHabiles} días háb.`;
@@ -25,7 +26,7 @@ function slaLabel(s: SNCItem): string {
 export default function RadicacionesAdmin({ nombre }: { nombre: string }) {
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
   const [asesores, setAsesores] = useState<Asesor[]>([]);
-  const [equipo, setEquipo] = useState<SNCEquipo>({ items: [], totalPendientes: 0, totalVencidas: 0, totalSolucionadas: 0 });
+  const [equipo, setEquipo] = useState<SNCEquipo>({ items: [], totalPendientes: 0, totalVencidas: 0, totalSolucionadas: 0, totalCanceladas: 0, totalNoCorresponde: 0 });
 
   // Registro
   const [radicado, setRadicado] = useState("");
@@ -100,9 +101,11 @@ export default function RadicacionesAdmin({ nombre }: { nombre: string }) {
     const q = filtroQuery.trim().toLowerCase();
     return equipo.items.filter((s) => {
       if (filtroAsesora !== "todas" && s.asesora !== filtroAsesora) return false;
-      if (filtroEstado === "pendientes" && s.estado !== "Pendiente") return false;
+      if (filtroEstado === "pendientes" && !esEstadoActivo(s.estado)) return false;
+      if (filtroEstado === "vencidas" && !(esEstadoActivo(s.estado) && s.sla === "vencida")) return false;
       if (filtroEstado === "solucionadas" && s.estado !== "Solucionada") return false;
-      if (filtroEstado === "vencidas" && !(s.estado === "Pendiente" && s.sla === "vencida")) return false;
+      if (filtroEstado === "canceladas" && s.estado !== "Cancelada") return false;
+      if (filtroEstado === "nocorresponde" && s.estado !== "No corresponde") return false;
       if (q && !`${s.radicado} ${s.motivo} ${s.asesora}`.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -134,6 +137,10 @@ export default function RadicacionesAdmin({ nombre }: { nombre: string }) {
           <div className="admin-kpi">
             <span className="admin-kpi-ic"><CheckCircle2 size={18} /></span>
             <div><b>{equipo.totalSolucionadas}</b><span>Solucionadas</span></div>
+          </div>
+          <div className="admin-kpi">
+            <span className="admin-kpi-ic"><X size={18} /></span>
+            <div><b>{equipo.totalNoCorresponde}</b><span>No corresponde</span></div>
           </div>
         </div>
 
@@ -210,9 +217,11 @@ export default function RadicacionesAdmin({ nombre }: { nombre: string }) {
             </label>
             <select className="hist-select" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value as FiltroEstado)}>
               <option value="todos">Estado · Todos</option>
-              <option value="pendientes">Pendientes</option>
+              <option value="pendientes">Pendientes (activas)</option>
               <option value="vencidas">Vencidas</option>
               <option value="solucionadas">Solucionadas</option>
+              <option value="canceladas">Canceladas</option>
+              <option value="nocorresponde">No corresponde</option>
             </select>
             <select className="hist-select" value={filtroAsesora} onChange={(e) => setFiltroAsesora(e.target.value)}>
               <option value="todas">Asesora · Todas</option>
@@ -229,7 +238,7 @@ export default function RadicacionesAdmin({ nombre }: { nombre: string }) {
                   <th>MOTIVO</th>
                   <th>ESTADO</th>
                   <th>REGISTRADA</th>
-                  <th>SOLUCIÓN</th>
+                  <th>CERRADA</th>
                   <th>ASIGNADA POR</th>
                 </tr>
               </thead>
@@ -243,12 +252,15 @@ export default function RadicacionesAdmin({ nombre }: { nombre: string }) {
                       <td>{s.radicado}</td>
                       <td>{s.motivo}</td>
                       <td>
-                        {s.estado === "Solucionada"
-                          ? <span className="status-pill success">Solucionada</span>
-                          : <span className={`snc-badge sla-${s.sla}`}>{s.sla === "vencida" && <AlertTriangle size={12} />}{slaLabel(s)}</span>}
+                        <span className={`estado-pill ${estadoClase(s.estado)}`}>{s.estado}</span>
+                        {esEstadoActivo(s.estado) && (
+                          <span className={`snc-badge sla-${s.sla}`} style={{ marginLeft: 6 }}>
+                            {s.sla === "vencida" && <AlertTriangle size={12} />}{slaLabel(s)}
+                          </span>
+                        )}
                       </td>
                       <td>{s.fechaRegistro}</td>
-                      <td>{s.fechaSolucion || "—"}</td>
+                      <td>{s.fechaEstado || "—"}</td>
                       <td>{s.registradoPor || "—"}</td>
                     </tr>
                   ))

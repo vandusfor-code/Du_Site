@@ -2,24 +2,47 @@
 // Sin "server-only" para poder importarla en el cliente Y ejecutarla con el
 // runner nativo de Node (node --test, solo sintaxis borrable).
 
-export type EstadoSNC = "Pendiente" | "Solucionada";
+// Ciclo de vida de una SNC:
+//   Registrada → Enviada a corrección → Solucionada
+//   (y en cualquier momento: Cancelada o No corresponde)
+export type EstadoSNC =
+  | "Registrada"
+  | "Enviada a corrección"
+  | "Solucionada"
+  | "Cancelada"
+  | "No corresponde";
+
+// Estados "activos": la SNC sigue abierta y cuenta el plazo de 2 días hábiles.
+export const ESTADOS_ACTIVOS: EstadoSNC[] = ["Registrada", "Enviada a corrección"];
+
+// Estados a los que la asesora puede mover una SNC activa (desde el panel).
+export const TRANSICIONES: EstadoSNC[] = [
+  "Enviada a corrección",
+  "Solucionada",
+  "Cancelada",
+  "No corresponde",
+];
+
+export function esEstadoActivo(estado: EstadoSNC): boolean {
+  return estado === "Registrada" || estado === "Enviada a corrección";
+}
 
 export type SlaSNC = "a_tiempo" | "vence_hoy" | "vencida";
 
 export interface SNCItem {
   fila: number; // fila real en la hoja (1-based), para actualizar
-  fechaRegistro: string; // "dd/MM/yyyy HH:mm" para mostrar
+  fechaRegistro: string; // "dd/MM/yyyy" para mostrar
   fechaRegistroYMD: string; // "yyyy-MM-dd" (Bogotá) para el cálculo de plazo
   asesora: string;
   radicado: string;
   motivo: string;
   estado: EstadoSNC;
-  fechaSolucion: string; // "dd/MM/yyyy HH:mm" o ""
-  detalle: string;
+  fechaEstado: string; // "dd/MM/yyyy" del último cambio de estado (o "")
+  detalle: string; // nota del último cambio (corrección, motivo de cancelación/no-corresponde…)
   registradoPor: string; // quién la creó (vacío = la propia asesora)
-  diasHabiles: number; // hábiles transcurridos desde el registro (solo pendientes)
+  diasHabiles: number; // hábiles transcurridos desde el registro (solo activas)
   diasRestantes: number; // 2 - diasHabiles, mínimo 0
-  sla: SlaSNC; // semáforo del plazo
+  sla: SlaSNC; // semáforo del plazo (solo relevante en activas)
 }
 
 // Plazo de gestión de una SNC, en días hábiles.
@@ -63,5 +86,10 @@ export function diasRestantes(diasHabiles: number): number {
 }
 
 export function normalizarEstadoSNC(valor: unknown): EstadoSNC {
-  return (valor ?? "").toString().trim().toLowerCase().startsWith("soluc") ? "Solucionada" : "Pendiente";
+  const v = (valor ?? "").toString().trim().toLowerCase();
+  if (v.startsWith("soluc")) return "Solucionada";
+  if (v.startsWith("cancel")) return "Cancelada";
+  if (v.startsWith("no apl") || v.startsWith("no corr")) return "No corresponde";
+  if (v.startsWith("envi") || v.includes("correc")) return "Enviada a corrección";
+  return "Registrada"; // incluye "pendiente"/"registrada"/vacío (compatibilidad)
 }

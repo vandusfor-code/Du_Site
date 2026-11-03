@@ -5,6 +5,7 @@ import {
   evaluarSla,
   diasRestantes,
   normalizarEstadoSNC,
+  esEstadoActivo,
   type SNCItem,
   type EstadoSNC,
 } from "@/lib/radicaciones-snc-tipos";
@@ -445,7 +446,7 @@ export async function marcarSolucionado(rowId: number): Promise<void> {
 // pestaña "SNC" para no mezclarse con el flujo normal de GESTIONES.
 
 const TAB_SNC = "SNC";
-const HEADERS_SNC = ["Fecha registro", "Asesora", "Radicado", "Motivo", "Estado", "Fecha solución", "Detalle corrección", "Registrada por"];
+const HEADERS_SNC = ["Fecha registro", "Asesora", "Radicado", "Motivo", "Estado", "Fecha cambio estado", "Detalle / nota", "Registrada por"];
 
 async function asegurarSNC(id: string): Promise<void> {
   await asegurarHoja(id, TAB_SNC, HEADERS_SNC);
@@ -467,8 +468,8 @@ export interface ResultadoSNC {
 }
 
 export interface SNCDeAsesora {
-  pendientes: SNCItem[];
-  solucionadas: SNCItem[];
+  pendientes: SNCItem[]; // activas: Registrada / Enviada a corrección
+  terminadas: SNCItem[]; // cerradas: Solucionada / Cancelada / No corresponde
   hayVencidas: boolean;
 }
 
@@ -476,7 +477,8 @@ export async function registrarSNC(
   asesora: string,
   radicado: string,
   motivo: string,
-  registradoPor = ""
+  registradoPor = "",
+  noCorresponde = false
 ): Promise<ResultadoSNC> {
   const rad = radicado.trim();
   const mot = motivo.trim();
@@ -486,7 +488,10 @@ export async function registrarSNC(
   if (!mot) return { success: false, error: "El motivo es obligatorio." };
   const id = sheetId();
   await asegurarSNC(id);
-  await appendRow(id, `${TAB_SNC}!A:H`, [ahoraBogota(), ase, rad, mot, "Pendiente", "", "", registradoPor.trim()]);
+  // Estado inicial "Registrada"; o directo "No corresponde" (no entra al plazo).
+  const estado: EstadoSNC = noCorresponde ? "No corresponde" : "Registrada";
+  const fechaCambio = noCorresponde ? ahoraBogota() : "";
+  await appendRow(id, `${TAB_SNC}!A:H`, [ahoraBogota(), ase, rad, mot, estado, fechaCambio, "", registradoPor.trim()]);
   return { success: true };
 }
 
@@ -494,7 +499,7 @@ export async function registrarSNC(
 function construirItemSNC(row: unknown[], fila: number, hoyYMD: string): SNCItem {
   const estado: EstadoSNC = normalizarEstadoSNC(row[4]);
   const fechaRegistroYMD = ymdBogotaDe(row[0]);
-  const dias = estado === "Pendiente" ? diasHabilesTranscurridos(fechaRegistroYMD, hoyYMD) : 0;
+  const dias = esEstadoActivo(estado) ? diasHabilesTranscurridos(fechaRegistroYMD, hoyYMD) : 0;
   return {
     fila,
     fechaRegistro: formatSheetDate(row[0], "dd/MM/yyyy"),
@@ -503,7 +508,7 @@ function construirItemSNC(row: unknown[], fila: number, hoyYMD: string): SNCItem
     radicado: texto(row, 2),
     motivo: texto(row, 3),
     estado,
-    fechaSolucion: row[5] ? formatSheetDate(row[5], "dd/MM/yyyy") : "",
+    fechaEstado: row[5] ? formatSheetDate(row[5], "dd/MM/yyyy") : "",
     detalle: texto(row, 6),
     registradoPor: texto(row, 7),
     diasHabiles: dias,
@@ -518,7 +523,7 @@ function hoyYMDBogota(): string {
 }
 
 export async function obtenerSNCDeAsesora(asesora: string): Promise<SNCDeAsesora> {
-  const vacio: SNCDeAsesora = { pendientes: [], solucionadas: [], hayVencidas: false };
+  const vacio: SNCDeAsesora = { pendientes: [], terminadas: [], hayVencidas: false };
   try {
     const id = sheetId();
     await asegurarSNC(id);
@@ -527,39 +532,70 @@ export async function obtenerSNCDeAsesora(asesora: string): Promise<SNCDeAsesora
     const hoyYMD = hoyYMDBogota();
 
     const pendientes: SNCItem[] = [];
-    const solucionadas: SNCItem[] = [];
+    const terminadas: SNCItem[] = [];
     let hayVencidas = false;
 
     for (let i = 1; i < data.length; i++) {
       if (normalize(data[i][1]) !== aNorm) continue;
       const item = construirItemSNC(data[i], i + 1, hoyYMD);
-      if (item.estado === "Pendiente") {
+      if (esEstadoActivo(item.estado)) {
         pendientes.push(item);
         if (item.sla === "vencida") hayVencidas = true;
       } else {
-        solucionadas.push(item);
+        terminadas.push(item);
       }
     }
-    // Pendientes: las más urgentes (más días hábiles) primero.
-    // Solucionadas: las más recientes primero.
+    // Pendientes: las más urgentes (más días hábiles) primero. Terminadas: recientes primero.
     pendientes.sort((a, b) => b.diasHabiles - a.diasHabiles);
-    solucionadas.reverse();
-    return { pendientes, solucionadas, hayVencidas };
+    terminadas.reverse();
+    return { pendientes, terminadas, hayVencidas };
   } catch {
     return vacio;
   }
 }
 
+// La asesora (dueña) avanza el estado de una SNC activa. Para "Cancelada" y
+// "No corresponde" se exige una nota/motivo. Queda registrado para Admin/Coord.
+const ESTADOS_DESTINO: EstadoSNC[] = ["Enviada a corrección", "Solucionada", "Cancelada", "No corresponde"];
+
+export async function cambiarEstadoSNC(
+  fila: number,
+  asesora: string,
+  nuevoEstado: EstadoSNC,
+  nota: string
+): Promise<ResultadoSNC> {
+  if (!ESTADOS_DESTINO.includes(nuevoEstado)) return { success: false, error: "Estado no válido." };
+  const notaTrim = nota.trim();
+  if ((nuevoEstado === "Cancelada" || nuevoEstado === "No corresponde") && !notaTrim) {
+    return { success: false, error: "Indica el motivo." };
+  }
+  const id = sheetId();
+  await asegurarSNC(id);
+  const data = await readRange(id, TAB_SNC, { unformatted: true });
+  const idx = fila - 1;
+  if (idx < 1 || idx >= data.length) return { success: false, error: "SNC no encontrada." };
+  if (normalize(data[idx][1]) !== normalize(asesora)) return { success: false, error: "No autorizado." };
+  if (!esEstadoActivo(normalizarEstadoSNC(data[idx][4]))) return { success: false, error: "Esta SNC ya está cerrada." };
+  await Promise.all([
+    updateRange(id, `${TAB_SNC}!E${fila}`, [[nuevoEstado]]),
+    updateRange(id, `${TAB_SNC}!F${fila}`, [[ahoraBogota()]]),
+    updateRange(id, `${TAB_SNC}!G${fila}`, [[notaTrim]]),
+  ]);
+  return { success: true };
+}
+
 // ── Vista de equipo (Admin/Coordinadora): todas las SNC de todas las asesoras ──
 export interface SNCEquipo {
-  items: SNCItem[]; // todas, ordenadas (pendientes urgentes primero)
-  totalPendientes: number;
+  items: SNCItem[]; // todas, ordenadas (activas urgentes primero)
+  totalPendientes: number; // activas
   totalVencidas: number;
   totalSolucionadas: number;
+  totalCanceladas: number;
+  totalNoCorresponde: number;
 }
 
 export async function obtenerSNCTodas(): Promise<SNCEquipo> {
-  const vacio: SNCEquipo = { items: [], totalPendientes: 0, totalVencidas: 0, totalSolucionadas: 0 };
+  const vacio: SNCEquipo = { items: [], totalPendientes: 0, totalVencidas: 0, totalSolucionadas: 0, totalCanceladas: 0, totalNoCorresponde: 0 };
   try {
     const id = sheetId();
     await asegurarSNC(id);
@@ -570,45 +606,36 @@ export async function obtenerSNCTodas(): Promise<SNCEquipo> {
     let totalPendientes = 0;
     let totalVencidas = 0;
     let totalSolucionadas = 0;
+    let totalCanceladas = 0;
+    let totalNoCorresponde = 0;
 
     for (let i = 1; i < data.length; i++) {
       if (!texto(data[i], 1).trim() && !texto(data[i], 2).trim()) continue; // fila vacía
       const item = construirItemSNC(data[i], i + 1, hoyYMD);
       items.push(item);
-      if (item.estado === "Pendiente") {
+      if (esEstadoActivo(item.estado)) {
         totalPendientes++;
         if (item.sla === "vencida") totalVencidas++;
-      } else {
+      } else if (item.estado === "Solucionada") {
         totalSolucionadas++;
+      } else if (item.estado === "Cancelada") {
+        totalCanceladas++;
+      } else {
+        totalNoCorresponde++;
       }
     }
-    // Pendientes primero (y dentro, las más urgentes), luego solucionadas recientes.
+    // Activas primero (y dentro, las más urgentes), luego el resto por recencia.
     items.sort((a, b) => {
-      if (a.estado !== b.estado) return a.estado === "Pendiente" ? -1 : 1;
-      if (a.estado === "Pendiente") return b.diasHabiles - a.diasHabiles;
+      const ap = esEstadoActivo(a.estado) ? 0 : 1;
+      const bp = esEstadoActivo(b.estado) ? 0 : 1;
+      if (ap !== bp) return ap - bp;
+      if (ap === 0) return b.diasHabiles - a.diasHabiles;
       return b.fila - a.fila;
     });
-    return { items, totalPendientes, totalVencidas, totalSolucionadas };
+    return { items, totalPendientes, totalVencidas, totalSolucionadas, totalCanceladas, totalNoCorresponde };
   } catch {
     return vacio;
   }
-}
-
-export async function marcarSNCSolucionada(fila: number, asesora: string, detalle: string): Promise<ResultadoSNC> {
-  const id = sheetId();
-  await asegurarSNC(id);
-  // Verificación de propiedad: la fila debe existir, ser de esta asesora y seguir pendiente.
-  const data = await readRange(id, TAB_SNC, { unformatted: true });
-  const idx = fila - 1;
-  if (idx < 1 || idx >= data.length) return { success: false, error: "SNC no encontrada." };
-  if (normalize(data[idx][1]) !== normalize(asesora)) return { success: false, error: "No autorizado." };
-  if (normalizarEstadoSNC(data[idx][4]) === "Solucionada") return { success: false, error: "Esta SNC ya estaba solucionada." };
-  await Promise.all([
-    updateRange(id, `${TAB_SNC}!E${fila}`, [["Solucionada"]]),
-    updateRange(id, `${TAB_SNC}!F${fila}`, [[ahoraBogota()]]),
-    updateRange(id, `${TAB_SNC}!G${fila}`, [[detalle.trim()]]),
-  ]);
-  return { success: true };
 }
 
 /* ===================== */

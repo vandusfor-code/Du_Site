@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { esAdminOCoordinadora } from "@/lib/auth-helpers";
+import type { EstadoSNC } from "@/lib/radicaciones-snc-tipos";
 import {
   obtenerAsesores,
   guardarRadicacion,
@@ -18,7 +19,7 @@ import {
   verificarHorarios,
   registrarSNC,
   obtenerSNCDeAsesora,
-  marcarSNCSolucionada,
+  cambiarEstadoSNC,
   obtenerSNCTodas,
   type Asesor,
   type DatosRadicacion,
@@ -112,9 +113,9 @@ export async function verificarHorariosAction(): Promise<void> {
 
 /* ── Salidas No Conformes (SNC) ── */
 
-export async function registrarSNCAction(radicado: string, motivo: string): Promise<ResultadoSNC> {
+export async function registrarSNCAction(radicado: string, motivo: string, noCorresponde = false): Promise<ResultadoSNC> {
   const { nombre } = await usuarioActual();
-  return registrarSNC(nombre, radicado, motivo);
+  return registrarSNC(nombre, radicado, motivo, "", noCorresponde);
 }
 
 export async function obtenerSNCAction(): Promise<SNCDeAsesora> {
@@ -122,9 +123,9 @@ export async function obtenerSNCAction(): Promise<SNCDeAsesora> {
   return obtenerSNCDeAsesora(nombre);
 }
 
-export async function marcarSNCSolucionadaAction(fila: number, detalle: string): Promise<ResultadoSNC> {
+export async function cambiarEstadoSNCAction(fila: number, nuevoEstado: EstadoSNC, nota: string): Promise<ResultadoSNC> {
   const { nombre } = await usuarioActual();
-  return marcarSNCSolucionada(fila, nombre, detalle);
+  return cambiarEstadoSNC(fila, nombre, nuevoEstado, nota);
 }
 
 /* ── Gestión de SNC (Admin / Coordinadora) ── */

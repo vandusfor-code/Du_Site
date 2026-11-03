@@ -48,10 +48,15 @@ test("días restantes nunca negativo", () => {
   assert.equal(diasRestantes(5), 0);
 });
 
-test("normalizar estado", () => {
+test("normalizar estado (5 estados + compatibilidad)", () => {
   assert.equal(normalizarEstadoSNC("Solucionada"), "Solucionada");
   assert.equal(normalizarEstadoSNC("solucionado"), "Solucionada");
-  assert.equal(normalizarEstadoSNC("Pendiente"), "Pendiente");
-  assert.equal(normalizarEstadoSNC(""), "Pendiente");
-  assert.equal(normalizarEstadoSNC(undefined), "Pendiente");
+  assert.equal(normalizarEstadoSNC("Cancelada"), "Cancelada");
+  assert.equal(normalizarEstadoSNC("Enviada a corrección"), "Enviada a corrección");
+  assert.equal(normalizarEstadoSNC("No aplica"), "No corresponde");
+  assert.equal(normalizarEstadoSNC("no corresponde"), "No corresponde");
+  assert.equal(normalizarEstadoSNC("Registrada"), "Registrada");
+  assert.equal(normalizarEstadoSNC("Pendiente"), "Registrada"); // compatibilidad con datos viejos
+  assert.equal(normalizarEstadoSNC(""), "Registrada");
+  assert.equal(normalizarEstadoSNC(undefined), "Registrada");
 });
