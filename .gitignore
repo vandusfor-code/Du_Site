@@ -46,3 +46,7 @@ next-env.d.ts
 
 # Archivo temporal de migracion a Render (NO commitear)
 render.env
+
+# Credencial de cuenta de servicio de Google (NUNCA commitear)
+duacademy-*.json
+.env.google
