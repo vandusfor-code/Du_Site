@@ -445,7 +445,7 @@ export async function marcarSolucionado(rowId: number): Promise<void> {
 // pestaña "SNC" para no mezclarse con el flujo normal de GESTIONES.
 
 const TAB_SNC = "SNC";
-const HEADERS_SNC = ["Fecha registro", "Asesora", "Radicado", "Motivo", "Estado", "Fecha solución", "Detalle corrección"];
+const HEADERS_SNC = ["Fecha registro", "Asesora", "Radicado", "Motivo", "Estado", "Fecha solución", "Detalle corrección", "Registrada por"];
 
 async function asegurarSNC(id: string): Promise<void> {
   await asegurarHoja(id, TAB_SNC, HEADERS_SNC);
@@ -472,15 +472,49 @@ export interface SNCDeAsesora {
   hayVencidas: boolean;
 }
 
-export async function registrarSNC(asesora: string, radicado: string, motivo: string): Promise<ResultadoSNC> {
+export async function registrarSNC(
+  asesora: string,
+  radicado: string,
+  motivo: string,
+  registradoPor = ""
+): Promise<ResultadoSNC> {
   const rad = radicado.trim();
   const mot = motivo.trim();
+  const ase = asesora.trim();
+  if (!ase) return { success: false, error: "Falta la asesora responsable." };
   if (!rad) return { success: false, error: "El radicado es obligatorio." };
   if (!mot) return { success: false, error: "El motivo es obligatorio." };
   const id = sheetId();
   await asegurarSNC(id);
-  await appendRow(id, `${TAB_SNC}!A:G`, [ahoraBogota(), asesora, rad, mot, "Pendiente", "", ""]);
+  await appendRow(id, `${TAB_SNC}!A:H`, [ahoraBogota(), ase, rad, mot, "Pendiente", "", "", registradoPor.trim()]);
   return { success: true };
+}
+
+// Construye un SNCItem a partir de una fila de la hoja (1-based real en `fila`).
+function construirItemSNC(row: unknown[], fila: number, hoyYMD: string): SNCItem {
+  const estado: EstadoSNC = normalizarEstadoSNC(row[4]);
+  const fechaRegistroYMD = ymdBogotaDe(row[0]);
+  const dias = estado === "Pendiente" ? diasHabilesTranscurridos(fechaRegistroYMD, hoyYMD) : 0;
+  return {
+    fila,
+    fechaRegistro: formatSheetDate(row[0], "dd/MM/yyyy"),
+    fechaRegistroYMD,
+    asesora: texto(row, 1),
+    radicado: texto(row, 2),
+    motivo: texto(row, 3),
+    estado,
+    fechaSolucion: row[5] ? formatSheetDate(row[5], "dd/MM/yyyy") : "",
+    detalle: texto(row, 6),
+    registradoPor: texto(row, 7),
+    diasHabiles: dias,
+    diasRestantes: diasRestantes(dias),
+    sla: evaluarSla(dias),
+  };
+}
+
+function hoyYMDBogota(): string {
+  const hoy = hoyEnBogota();
+  return `${hoy.anio}-${String(hoy.mes + 1).padStart(2, "0")}-${String(hoy.dia).padStart(2, "0")}`;
 }
 
 export async function obtenerSNCDeAsesora(asesora: string): Promise<SNCDeAsesora> {
@@ -490,8 +524,7 @@ export async function obtenerSNCDeAsesora(asesora: string): Promise<SNCDeAsesora
     await asegurarSNC(id);
     const data = await readRange(id, TAB_SNC, { unformatted: true });
     const aNorm = normalize(asesora);
-    const hoy = hoyEnBogota();
-    const hoyYMD = `${hoy.anio}-${String(hoy.mes + 1).padStart(2, "0")}-${String(hoy.dia).padStart(2, "0")}`;
+    const hoyYMD = hoyYMDBogota();
 
     const pendientes: SNCItem[] = [];
     const solucionadas: SNCItem[] = [];
@@ -499,24 +532,8 @@ export async function obtenerSNCDeAsesora(asesora: string): Promise<SNCDeAsesora
 
     for (let i = 1; i < data.length; i++) {
       if (normalize(data[i][1]) !== aNorm) continue;
-      const estado: EstadoSNC = normalizarEstadoSNC(data[i][4]);
-      const fechaRegistroYMD = ymdBogotaDe(data[i][0]);
-      const dias = estado === "Pendiente" ? diasHabilesTranscurridos(fechaRegistroYMD, hoyYMD) : 0;
-      const item: SNCItem = {
-        fila: i + 1,
-        fechaRegistro: formatSheetDate(data[i][0], "dd/MM/yyyy"),
-        fechaRegistroYMD,
-        asesora: texto(data[i], 1),
-        radicado: texto(data[i], 2),
-        motivo: texto(data[i], 3),
-        estado,
-        fechaSolucion: data[i][5] ? formatSheetDate(data[i][5], "dd/MM/yyyy") : "",
-        detalle: texto(data[i], 6),
-        diasHabiles: dias,
-        diasRestantes: diasRestantes(dias),
-        sla: evaluarSla(dias),
-      };
-      if (estado === "Pendiente") {
+      const item = construirItemSNC(data[i], i + 1, hoyYMD);
+      if (item.estado === "Pendiente") {
         pendientes.push(item);
         if (item.sla === "vencida") hayVencidas = true;
       } else {
@@ -528,6 +545,50 @@ export async function obtenerSNCDeAsesora(asesora: string): Promise<SNCDeAsesora
     pendientes.sort((a, b) => b.diasHabiles - a.diasHabiles);
     solucionadas.reverse();
     return { pendientes, solucionadas, hayVencidas };
+  } catch {
+    return vacio;
+  }
+}
+
+// ── Vista de equipo (Admin/Coordinadora): todas las SNC de todas las asesoras ──
+export interface SNCEquipo {
+  items: SNCItem[]; // todas, ordenadas (pendientes urgentes primero)
+  totalPendientes: number;
+  totalVencidas: number;
+  totalSolucionadas: number;
+}
+
+export async function obtenerSNCTodas(): Promise<SNCEquipo> {
+  const vacio: SNCEquipo = { items: [], totalPendientes: 0, totalVencidas: 0, totalSolucionadas: 0 };
+  try {
+    const id = sheetId();
+    await asegurarSNC(id);
+    const data = await readRange(id, TAB_SNC, { unformatted: true });
+    const hoyYMD = hoyYMDBogota();
+
+    const items: SNCItem[] = [];
+    let totalPendientes = 0;
+    let totalVencidas = 0;
+    let totalSolucionadas = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      if (!texto(data[i], 1).trim() && !texto(data[i], 2).trim()) continue; // fila vacía
+      const item = construirItemSNC(data[i], i + 1, hoyYMD);
+      items.push(item);
+      if (item.estado === "Pendiente") {
+        totalPendientes++;
+        if (item.sla === "vencida") totalVencidas++;
+      } else {
+        totalSolucionadas++;
+      }
+    }
+    // Pendientes primero (y dentro, las más urgentes), luego solucionadas recientes.
+    items.sort((a, b) => {
+      if (a.estado !== b.estado) return a.estado === "Pendiente" ? -1 : 1;
+      if (a.estado === "Pendiente") return b.diasHabiles - a.diasHabiles;
+      return b.fila - a.fila;
+    });
+    return { items, totalPendientes, totalVencidas, totalSolucionadas };
   } catch {
     return vacio;
   }

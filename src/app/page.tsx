@@ -77,6 +77,13 @@ export default async function Home() {
     const evalMod = MODULOS.find((m) => m.id === "evaluaciones");
     if (evalMod && !modulos.some((m) => m.id === "evaluaciones")) modulos.push(evalMod);
   }
+  // Radicaciones: Admin y Coordinadora gestionan las SNC del equipo desde este
+  // módulo (ven el panel de gestión), aunque no lo tengan asignado en Usuarios.
+  const rolHome = (session?.user?.rol ?? "").trim().toLowerCase();
+  if (rolHome === "admin" || rolHome === "coordinadora") {
+    const radMod = MODULOS.find((m) => m.id === "radicaciones");
+    if (radMod && !modulos.some((m) => m.id === "radicaciones")) modulos.push(radMod);
+  }
 
   if (!usuario) {
     return (

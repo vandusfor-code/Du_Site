@@ -16,6 +16,7 @@ export interface SNCItem {
   estado: EstadoSNC;
   fechaSolucion: string; // "dd/MM/yyyy HH:mm" o ""
   detalle: string;
+  registradoPor: string; // quién la creó (vacío = la propia asesora)
   diasHabiles: number; // hábiles transcurridos desde el registro (solo pendientes)
   diasRestantes: number; // 2 - diasHabiles, mínimo 0
   sla: SlaSNC; // semáforo del plazo

@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
+import { esAdminOCoordinadora } from "@/lib/auth-helpers";
 import {
   obtenerAsesores,
   guardarRadicacion,
@@ -18,6 +19,7 @@ import {
   registrarSNC,
   obtenerSNCDeAsesora,
   marcarSNCSolucionada,
+  obtenerSNCTodas,
   type Asesor,
   type DatosRadicacion,
   type ResultadoGuardarRadicacion,
@@ -30,6 +32,7 @@ import {
   type HorarioHoy,
   type ResultadoSNC,
   type SNCDeAsesora,
+  type SNCEquipo,
 } from "@/lib/radicaciones";
 
 async function usuarioActual(): Promise<{ usuario: string; nombre: string }> {
@@ -122,4 +125,24 @@ export async function obtenerSNCAction(): Promise<SNCDeAsesora> {
 export async function marcarSNCSolucionadaAction(fila: number, detalle: string): Promise<ResultadoSNC> {
   const { nombre } = await usuarioActual();
   return marcarSNCSolucionada(fila, nombre, detalle);
+}
+
+/* ── Gestión de SNC (Admin / Coordinadora) ── */
+
+async function gestionActual(): Promise<string> {
+  const session = await auth();
+  if (!session?.user) throw new Error("No autenticado");
+  if (!esAdminOCoordinadora(session)) throw new Error("No autorizado");
+  return session.user.nombre;
+}
+
+export async function obtenerSNCTodasAction(): Promise<SNCEquipo> {
+  await gestionActual();
+  return obtenerSNCTodas();
+}
+
+// Admin/Coordinadora registra una SNC y la asigna a la asesora responsable.
+export async function registrarSNCAsignadaAction(asesora: string, radicado: string, motivo: string): Promise<ResultadoSNC> {
+  const gestor = await gestionActual();
+  return registrarSNC(asesora, radicado, motivo, gestor);
 }
