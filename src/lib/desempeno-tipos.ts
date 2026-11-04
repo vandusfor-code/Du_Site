@@ -35,6 +35,30 @@ export interface FuncionarioDesempeno {
   valores: Partial<Record<CampoDesempeno, string>>;
 }
 
+// Campos que Du Site calcula solo (PEC/PENC de auditorías; conteos de Radicación).
+// Solo el Admin los puede sobreescribir; el Coordinador no.
+export const CAMPOS_AUTOMATICOS: CampoDesempeno[] = [
+  "pec", "penc", "radicadosPct", "snc", "sncRecibidos", "cantidadRadicados", "sncSolucionados", "correccion", "auditorias",
+];
+export function esCampoAutomatico(c: CampoDesempeno): boolean {
+  return CAMPOS_AUTOMATICOS.includes(c);
+}
+
+// Campos capturables en el panel por área (en orden). El "bono" nunca se edita
+// (lo calcula la fórmula de la hoja); identidad (usuario/funcionario/area) tampoco.
+export const CAMPOS_EDITABLES_POR_AREA: Record<Area, CampoDesempeno[]> = {
+  "Línea amiga / Chat": ["satisfaccion", "pec", "penc", "productividad", "adherencia", "pqrsfCreados", "pqrsfDevueltos", "auditorias"],
+  "G. Empleo": ["satisfaccion", "pec", "penc", "productividad", "adherencia"],
+  "Encuestas": ["calidadLlamada", "pec", "penc", "productividad", "adherencia", "precision", "errorRespuesta"],
+  "Radicación": ["productividad", "radicadosPct", "snc", "precision", "adherencia", "sncRecibidos", "cantidadRadicados", "correccion", "sncSolucionados"],
+  "G. Empleo Cofrem": ["pec", "penc", "auditorias"],
+};
+
+// Métricas que llevan "%": para el input mostramos/guardamos con %.
+export const CAMPOS_PORCENTAJE: CampoDesempeno[] = [
+  "satisfaccion", "calidadLlamada", "pec", "penc", "productividad", "adherencia", "precision", "radicadosPct", "snc",
+];
+
 export interface DesempenoFiltros {
   area?: string;
   busqueda?: string;

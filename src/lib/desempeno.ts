@@ -3,6 +3,7 @@ import { readRange, appendRows, updateRange, asegurarHoja } from "@/lib/sheets";
 import {
   AREAS_ORDEN,
   LABELS,
+  esCampoAutomatico,
   type Area,
   type CampoDesempeno,
   type FuncionarioDesempeno,
@@ -419,4 +420,74 @@ export async function cerrarMes(): Promise<ResultadoCierre> {
   if (nuevas.length > 0) await appendRows(id, `${TAB_HISTORICO}!A:${HIST_LAST_COL}`, nuevas);
 
   return { mes, mesLabel: mesLabel(mes), guardados: nuevas.length, actualizados: updates.length };
+}
+
+/* ===================== */
+/* EDICIÓN DE MÉTRICAS (panel Bonos) — escribe en TO, mes en curso */
+/* ===================== */
+
+function colLetter(idx: number): string {
+  let n = idx + 1;
+  let out = "";
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    out = String.fromCharCode(65 + m) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
+}
+
+export interface ResultadoGuardarMetricas {
+  ok: boolean;
+  error?: string;
+  guardados?: number;
+}
+
+// Localiza la fila (1-based, absoluta en la hoja) de un usuario en TO y el mapa
+// campo→índice de columna de su bloque. null si no está.
+async function localizarUsuarioTO(usuario: string): Promise<{ filaNum: number; mapaCol: Map<CampoDesempeno, number> } | null> {
+  const data = await readRange(sheetId(), `${TAB_TO}!A:Z`);
+  const uNorm = norm(usuario);
+  let mapaCol = new Map<CampoDesempeno, number>();
+  for (let i = 0; i < data.length; i++) {
+    const fila = data[i] ?? [];
+    if (norm(fila[0]) === "usuario") {
+      // Nueva cabecera de bloque: reconstruye el mapa de columnas.
+      mapaCol = new Map<CampoDesempeno, number>();
+      fila.forEach((h, idx) => {
+        const campo = encabezadoACampo(String(h));
+        if (campo) mapaCol.set(campo, idx);
+      });
+      continue;
+    }
+    if (norm(fila[0]) === uNorm && mapaCol.size > 0) {
+      return { filaNum: i + 1, mapaCol }; // i es 0-based en A:Z → fila real = i+1
+    }
+  }
+  return null;
+}
+
+// Guarda cambios de métricas de un asesor en la hoja TO (mes en curso). El
+// Coordinador no puede tocar los campos automáticos (PEC/PENC/conteos); el Admin sí.
+export async function guardarMetricasDesempeno(
+  usuario: string,
+  cambios: Partial<Record<CampoDesempeno, string>>,
+  puedeEditarAutomaticos: boolean
+): Promise<ResultadoGuardarMetricas> {
+  const id = sheetId();
+  const loc = await localizarUsuarioTO(usuario);
+  if (!loc) return { ok: false, error: "No se encontró al funcionario en la hoja del mes en curso." };
+
+  const entradas = Object.entries(cambios) as [CampoDesempeno, string][];
+  let guardados = 0;
+  for (const [campo, valor] of entradas) {
+    if (campo === "bono" || campo === "usuario" || campo === "funcionario" || campo === "area" || campo === "fecha") continue;
+    if (esCampoAutomatico(campo) && !puedeEditarAutomaticos) continue; // el coordinador no toca automáticos
+    const idx = loc.mapaCol.get(campo);
+    if (idx === undefined) continue; // esa área no tiene esa columna
+    const rango = `${TAB_TO}!${colLetter(idx)}${loc.filaNum}`;
+    await updateRange(id, rango, [[valor ?? ""]]);
+    guardados++;
+  }
+  return { ok: true, guardados };
 }

@@ -162,3 +162,19 @@
   .drawer { width: 100%; }
   .drawerBody { grid-template-columns: 1fr; }
 }
+
+/* ── Formulario editable del drawer (panel Bonos) ── */
+.drawerNote { margin: 12px 24px 0; padding: 9px 12px; border-radius: 9px; background: #fff7ed; color: #9a3412; font-size: 12px; font-weight: 600; }
+.drawerErr { margin: 12px 24px 0; padding: 9px 12px; border-radius: 9px; background: #fef2f2; color: #b91c1c; font-size: 12px; font-weight: 600; }
+.editItem { display: flex; flex-direction: column; gap: 5px; }
+.editItem label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: #8a93a8; display: flex; align-items: center; gap: 6px; }
+.editItem input { width: 100%; border: 1px solid #e0e3eb; border-radius: 9px; padding: 9px 11px; font-size: 14px; font-weight: 600; color: #1f2537; outline: none; }
+.editItem input:focus { border-color: #7044ed; box-shadow: 0 0 0 3px rgba(112, 68, 237, .12); }
+.editItem input:disabled { background: #f4f5f8; color: #8a93a8; cursor: not-allowed; }
+.editItem input.money { color: #0d9488; font-weight: 800; }
+.autoTag { font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; color: #6d28d9; background: #ede9fe; padding: 1px 6px; border-radius: 5px; }
+.drawerFoot { margin-top: auto; padding: 16px 24px; border-top: 1px solid #edeff4; display: flex; gap: 10px; justify-content: flex-end; }
+.cancelBtn { border: 1px solid #e0e3eb; background: #fff; color: #4a5162; padding: 10px 18px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; }
+.saveBtn { border: 0; background: #7044ed; color: #fff; padding: 10px 22px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.saveBtn:hover { background: #5b32d6; }
+.saveBtn:disabled, .cancelBtn:disabled { opacity: .6; cursor: not-allowed; }

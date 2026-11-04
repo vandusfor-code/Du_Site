@@ -5,11 +5,11 @@ import Link from "next/link";
 import {
   Users, BadgeCheck, AlertTriangle, DollarSign, Download, Search, SlidersHorizontal,
   Eye, Trophy, Target, BarChart3, Medal, ChevronDown, ClipboardCheck,
-  LogOut, Loader2, X, CalendarCheck,
+  LogOut, Loader2, X, CalendarCheck, Save,
 } from "lucide-react";
-import type { DashboardDesempeno, DesempenoFiltros, FilaTabla, CampoDesempeno } from "@/lib/desempeno-tipos";
-import { AREAS_ORDEN } from "@/lib/desempeno-tipos";
-import { obtenerDashboardDesempenoAction, cerrarMesAction } from "./actions";
+import type { DashboardDesempeno, DesempenoFiltros, FilaTabla, CampoDesempeno, Area } from "@/lib/desempeno-tipos";
+import { AREAS_ORDEN, CAMPOS_EDITABLES_POR_AREA, CAMPOS_PORCENTAJE, esCampoAutomatico } from "@/lib/desempeno-tipos";
+import { obtenerDashboardDesempenoAction, cerrarMesAction, guardarMetricasAction } from "./actions";
 import s from "./desempeno.module.css";
 
 const AREA_COLOR: Record<string, string> = {
@@ -54,10 +54,12 @@ function rangoPaginas(actual: number, total: number): (number | "…")[] {
 
 export default function DesempenoDashboard({
   nombre,
+  esAdmin,
   dashboardInicial,
   errorInicial,
 }: {
   nombre: string;
+  esAdmin: boolean;
   dashboardInicial: DashboardDesempeno | null;
   errorInicial: string | null;
 }) {
@@ -178,12 +180,12 @@ export default function DesempenoDashboard({
         </div>
         <nav className={s.nav}>
           <Link href="/admin" className={s.navItem}><ClipboardCheck size={19} /><span>Auditorías</span></Link>
-          <span className={s.navActive}><BarChart3 size={19} /><span>Desempeño</span></span>
+          <span className={s.navActive}><BarChart3 size={19} /><span>Bonos</span></span>
         </nav>
         <div className={s.sidebarBottom}>
           <div className={s.profile}>
             <div className={s.avatar}>{nombre.slice(0, 2).toUpperCase()}</div>
-            <div><strong>{nombre}</strong><small>Administrador</small></div>
+            <div><strong>{nombre}</strong><small>{esAdmin ? "Administrador" : "Coordinadora"}</small></div>
             <ChevronDown size={16} />
           </div>
           <Link href="/" className={s.collapse}><LogOut size={16} /><span>Volver al inicio</span></Link>
@@ -193,8 +195,8 @@ export default function DesempenoDashboard({
       <main className={s.main}>
         <header className={s.top}>
           <div>
-            <div className={s.title}><BarChart3 size={25} /><h1>Métricas de desempeño</h1></div>
-            <p>Monitorea indicadores, cumplimiento y bonificación del equipo · <b>{data?.mesActualLabel ?? "Mes en curso"}</b></p>
+            <div className={s.title}><BarChart3 size={25} /><h1>Bonos</h1></div>
+            <p>Captura métricas, cumplimiento y bonificación del equipo · <b>{data?.mesActualLabel ?? "Mes en curso"}</b></p>
           </div>
           <div className={s.filters}>
             <select className={s.select} value={mes} onChange={(e) => setMes(e.target.value)} title="Período">
@@ -385,18 +387,67 @@ export default function DesempenoDashboard({
         </section>
       </main>
 
-      {detalle && data && <DetalleDrawer f={detalle} labels={data.labels} onClose={() => setDetalle(null)} />}
+      {detalle && data && (
+        <EditarDrawer
+          f={detalle}
+          labels={data.labels}
+          esAdmin={esAdmin}
+          editable={!data.esHistorico}
+          onClose={() => setDetalle(null)}
+          onSaved={async () => { setDetalle(null); await recargar({ area, busqueda, mes }); }}
+        />
+      )}
     </div>
   );
 }
 
-function DetalleDrawer({ f, labels, onClose }: { f: FilaTabla; labels: Record<string, string>; onClose: () => void }) {
-  const orden: CampoDesempeno[] = [
-    "pec", "penc", "productividad", "adherencia", "bono", "satisfaccion", "calidadLlamada",
-    "precision", "errorRespuesta", "radicadosPct", "snc", "sncRecibidos", "cantidadRadicados",
-    "correccion", "sncSolucionados", "pqrsfCreados", "pqrsfDevueltos", "auditorias",
-  ];
-  const items = orden.filter((c) => f.valores[c] !== undefined);
+function EditarDrawer({
+  f, labels, esAdmin, editable, onClose, onSaved,
+}: {
+  f: FilaTabla;
+  labels: Record<string, string>;
+  esAdmin: boolean;
+  editable: boolean;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const campos = (CAMPOS_EDITABLES_POR_AREA[f.area as Area] ?? []) as CampoDesempeno[];
+  const [valores, setValores] = useState<Partial<Record<CampoDesempeno, string>>>(() => {
+    const init: Partial<Record<CampoDesempeno, string>> = {};
+    for (const c of campos) init[c] = f.valores[c] ?? "";
+    return init;
+  });
+  const [guardando, setGuardando] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  function campoBloqueado(c: CampoDesempeno): boolean {
+    if (!editable) return true; // mes histórico: solo lectura
+    if (esCampoAutomatico(c) && !esAdmin) return true; // coordinador no toca automáticos
+    return false;
+  }
+
+  async function guardar() {
+    setErr(null);
+    // Solo lo que cambió respecto al valor original.
+    const cambios: Partial<Record<CampoDesempeno, string>> = {};
+    for (const c of campos) {
+      const nuevo = (valores[c] ?? "").trim();
+      const original = (f.valores[c] ?? "").trim();
+      if (nuevo !== original && !campoBloqueado(c)) cambios[c] = nuevo;
+    }
+    if (Object.keys(cambios).length === 0) { onClose(); return; }
+    setGuardando(true);
+    try {
+      const r = await guardarMetricasAction(f.usuario, cambios);
+      if (r.ok) await onSaved();
+      else setErr(r.error ?? "No se pudo guardar");
+    } catch {
+      setErr("No se pudo guardar. Revisa la conexión e intenta de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   return (
     <div className={s.overlay} onClick={onClose}>
       <div className={s.drawer} onClick={(e) => e.stopPropagation()}>
@@ -408,14 +459,50 @@ function DetalleDrawer({ f, labels, onClose }: { f: FilaTabla; labels: Record<st
           </div>
           <button className={s.closeBtn} onClick={onClose} aria-label="Cerrar"><X size={16} /></button>
         </div>
+
+        {!editable && (
+          <div className={s.drawerNote}>Mes cerrado (histórico): solo lectura.</div>
+        )}
+        {err && <div className={s.drawerErr}>{err}</div>}
+
         <div className={s.drawerBody}>
-          {items.map((c) => (
-            <div className={s.detItem} key={c}>
-              <span>{labels[c] ?? c}</span>
-              <b>{f.valores[c]}</b>
+          {campos.map((c) => {
+            const bloq = campoBloqueado(c);
+            const auto = esCampoAutomatico(c);
+            const pct = CAMPOS_PORCENTAJE.includes(c);
+            return (
+              <div className={s.editItem} key={c}>
+                <label>
+                  {labels[c] ?? c}
+                  {auto && <span className={s.autoTag}>auto</span>}
+                </label>
+                <input
+                  type="text"
+                  value={valores[c] ?? ""}
+                  disabled={bloq}
+                  placeholder={pct ? "ej. 95%" : auto ? "automático" : "—"}
+                  onChange={(e) => setValores((v) => ({ ...v, [c]: e.target.value }))}
+                />
+              </div>
+            );
+          })}
+
+          {f.valores.bono !== undefined && (
+            <div className={s.editItem}>
+              <label>{labels.bono ?? "Bono Ganado"}<span className={s.autoTag}>calculado</span></label>
+              <input type="text" value={f.valores.bono ?? ""} disabled className={s.money} />
             </div>
-          ))}
+          )}
         </div>
+
+        {editable && (
+          <div className={s.drawerFoot}>
+            <button className={s.cancelBtn} onClick={onClose} disabled={guardando}>Cancelar</button>
+            <button className={s.saveBtn} onClick={guardar} disabled={guardando}>
+              {guardando ? <Loader2 size={15} className={s.spin} /> : <Save size={15} />} Guardar
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

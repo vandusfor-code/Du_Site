@@ -81,8 +81,10 @@ export default async function Home() {
   // módulo (ven el panel de gestión), aunque no lo tengan asignado en Usuarios.
   const rolHome = (session?.user?.rol ?? "").trim().toLowerCase();
   if (rolHome === "admin" || rolHome === "coordinadora") {
-    const radMod = MODULOS.find((m) => m.id === "radicaciones");
-    if (radMod && !modulos.some((m) => m.id === "radicaciones")) modulos.push(radMod);
+    for (const mid of ["radicaciones", "desempeno"] as const) {
+      const m = MODULOS.find((x) => x.id === mid);
+      if (m && !modulos.some((x) => x.id === mid)) modulos.push(m);
+    }
   }
 
   if (!usuario) {

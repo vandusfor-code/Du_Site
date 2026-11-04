@@ -53,8 +53,8 @@ export const MODULOS: Modulo[] = [
   },
   {
     id: "desempeno",
-    nombre: "Desempeño",
-    descripcion: "Rendimiento de funcionarios, productividad, adherencia, indicadores por área, ranking y bonificación.",
+    nombre: "Bonos",
+    descripcion: "Captura de métricas por área, indicadores, ranking y cálculo del bono del equipo. Solo Admin y Coordinación.",
     href: "/modulos/desempeno",
     color: "#7044ed",
   },

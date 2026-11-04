@@ -1,19 +1,32 @@
-import { requireModulo } from "@/lib/auth-helpers";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { esAdmin, esAdminOCoordinadora } from "@/lib/auth-helpers";
 import { obtenerDashboardDesempeno } from "@/lib/desempeno";
-import DesempenoDashboard from "./DesempenoDashboard";
+import BonosDashboard from "./DesempenoDashboard";
 
 export const maxDuration = 60;
 
-export default async function DesempenoPage() {
-  const session = await requireModulo("desempeno");
+// Panel "Bonos" (antes Desempeño): solo Admin y Coordinadora. El Coordinador
+// edita las métricas manuales; el Admin edita todo (incl. automáticas).
+export default async function BonosPage() {
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+  if (!esAdminOCoordinadora(session)) redirect("/");
 
   let dashboard: Awaited<ReturnType<typeof obtenerDashboardDesempeno>> | null = null;
   let error: string | null = null;
   try {
     dashboard = await obtenerDashboardDesempeno({});
   } catch (e) {
-    error = e instanceof Error ? e.message : "Error al cargar el módulo de Desempeño";
+    error = e instanceof Error ? e.message : "Error al cargar el módulo de Bonos";
   }
 
-  return <DesempenoDashboard nombre={session.user.nombre} dashboardInicial={dashboard} errorInicial={error} />;
+  return (
+    <BonosDashboard
+      nombre={session.user.nombre}
+      esAdmin={esAdmin(session)}
+      dashboardInicial={dashboard}
+      errorInicial={error}
+    />
+  );
 }
