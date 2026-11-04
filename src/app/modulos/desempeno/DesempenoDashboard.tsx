@@ -148,8 +148,8 @@ export default function DesempenoDashboard({
       setSnap({
         tipo: "ok",
         msg: r.actualizados > 0
-          ? `Automáticas (PEC/PENC/#auditorías) actualizadas desde las auditorías: ${r.actualizados} celdas.`
-          : "Automáticas al día — no hubo cambios con las auditorías de este mes.",
+          ? `Automáticas actualizadas (auditorías y radicaciones): ${r.actualizados} celdas.`
+          : "Automáticas al día — no hubo cambios este mes.",
       });
       await recargar({ area, busqueda, mes });
     } catch (e) {
@@ -240,7 +240,7 @@ export default function DesempenoDashboard({
                 <option key={m.value} value={m.value}>{m.label}</option>
               ))}
             </select>
-            <button onClick={sincronizar} disabled={sincronizando || data?.esHistorico} title="Traer PEC/PENC y #auditorías de este mes desde las auditorías">
+            <button onClick={sincronizar} disabled={sincronizando || data?.esHistorico} title="Traer automáticas del mes en curso: PEC/PENC/#auditorías desde las auditorías y radicados/SNC desde Radicaciones">
               {sincronizando ? <Loader2 size={15} className={s.spin} /> : <RefreshCw size={15} />} Sincronizar
             </button>
             <button onClick={() => setCierreOpen(true)} disabled={guardando || data?.esHistorico} title="Cerrar un mes: lo archiva y reinicia las métricas">

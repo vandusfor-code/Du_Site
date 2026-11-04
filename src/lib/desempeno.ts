@@ -530,6 +530,30 @@ async function calcularAutomaticasConsolidado(mesYM: string): Promise<Map<string
   return out;
 }
 
+function tokensNombre(s: string): string[] {
+  return norm(s).split(/\s+/).filter(Boolean);
+}
+
+// Cruza un nombre COMPLETO de TO (p. ej. "Joselyn del Carmen Mendoza Jiménez")
+// con el mapa de Radicación, cuyas claves son nombres CORTOS (p. ej. "Joselyn
+// Mendoza"): mismo primer nombre y todos los tokens del corto contenidos en el
+// completo. Si dos claves distintas calzan, se considera ambiguo y no asigna.
+function matchRad(nombreTO: string, rad: Map<string, MetricasRadMes>): MetricasRadMes | null {
+  const full = tokensNombre(nombreTO);
+  if (full.length === 0) return null;
+  const fullSet = new Set(full);
+  let encontrado: MetricasRadMes | null = null;
+  let ambiguo = false;
+  for (const [key, val] of rad) {
+    const kt = tokensNombre(key);
+    if (kt.length === 0 || kt[0] !== full[0]) continue; // mismo primer nombre
+    if (!kt.every((t) => fullSet.has(t))) continue; // apellidos del corto ⊆ completo
+    if (encontrado && encontrado !== val) ambiguo = true;
+    encontrado = val;
+  }
+  return ambiguo ? null : encontrado;
+}
+
 export interface ResultadoSincronizar { ok: boolean; actualizados: number; mesLabel: string }
 
 // Trae las automáticas del MES EN CURSO y las escribe en TO (solo las celdas que
@@ -584,10 +608,11 @@ export async function sincronizarAutomaticas(): Promise<ResultadoSincronizar> {
     const vals = auto.get(String(fila[0]).trim().toUpperCase());
     if (vals) for (const campo of camposCons) await escribir(mapaCol.get(campo as CampoDesempeno), fila, i + 1, vals[campo]);
 
-    // Radicación por nombre de funcionaria (solo bloques con esas columnas).
+    // Radicación: cruza por nombre de funcionaria (TO usa nombre completo,
+    // Radicaciones nombre corto). Solo escribe en bloques con esas columnas.
     const idxNombre = mapaCol.get("funcionario");
     const nombre = idxNombre !== undefined ? String(fila[idxNombre] ?? "").trim() : "";
-    const r = nombre ? rad.get(norm(nombre)) : undefined;
+    const r = nombre ? matchRad(nombre, rad) : null;
     if (r) for (const { campo, key } of camposRad) await escribir(mapaCol.get(campo), fila, i + 1, String(r[key]));
   }
   return { ok: true, actualizados, mesLabel: mesLabel(mes) };
