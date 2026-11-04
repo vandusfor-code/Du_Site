@@ -1,5 +1,6 @@
 import "server-only";
 import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate } from "@/lib/sheets";
+import { obtenerMetricasRadicacionMes, type MetricasRadMes } from "@/lib/radicaciones";
 import {
   AREAS_ORDEN,
   LABELS,
@@ -531,19 +532,41 @@ async function calcularAutomaticasConsolidado(mesYM: string): Promise<Map<string
 
 export interface ResultadoSincronizar { ok: boolean; actualizados: number; mesLabel: string }
 
-// Trae las automáticas del MES EN CURSO del Consolidado y las escribe en TO
-// (solo las celdas que cambian). El bono de la hoja se recalcula solo.
+// Trae las automáticas del MES EN CURSO y las escribe en TO (solo las celdas que
+// cambian). PEC/PENC/#auditorías salen de las auditorías (Consolidado), cruzadas
+// por CÓDIGO de asesor; los conteos de Radicación (radicados, SNC recibidas,
+// solucionadas y en corrección) salen del módulo de Radicaciones, cruzados por
+// NOMBRE de la funcionaria. El bono de la hoja se recalcula solo.
 export async function sincronizarAutomaticas(): Promise<ResultadoSincronizar> {
   const id = sheetId();
   const mes = mesActualBogota();
   const auto = await calcularAutomaticasConsolidado(mes);
-  if (auto.size === 0) return { ok: true, actualizados: 0, mesLabel: "Mes en curso" };
+  let rad: Map<string, MetricasRadMes> = new Map();
+  try {
+    rad = await obtenerMetricasRadicacionMes(mes);
+  } catch {
+    rad = new Map(); // si falla Radicaciones, igual sincroniza lo del Consolidado
+  }
+  if (auto.size === 0 && rad.size === 0) return { ok: true, actualizados: 0, mesLabel: mesLabel(mes) };
 
-  // Mapa usuario→{filaNum, mapaCol, valoresActuales} leyendo TO una vez.
+  // Leemos TO una sola vez y recorremos bloque por bloque.
   const data = await readRange(sheetId(), `${TAB_TO}!A:Z`);
   let mapaCol = new Map<CampoDesempeno, number>();
   let actualizados = 0;
-  const campos: (keyof AutoMetrica)[] = ["pec", "penc", "auditorias"];
+  const camposCons: (keyof AutoMetrica)[] = ["pec", "penc", "auditorias"];
+  const camposRad: { campo: CampoDesempeno; key: keyof MetricasRadMes }[] = [
+    { campo: "cantidadRadicados", key: "radicados" },
+    { campo: "sncRecibidos", key: "sncRecibidos" },
+    { campo: "sncSolucionados", key: "sncSolucionados" },
+    { campo: "correccion", key: "correccion" },
+  ];
+
+  const escribir = async (idx: number | undefined, fila: unknown[], filaReal: number, nuevo: string) => {
+    if (idx === undefined) return;
+    if (String(fila[idx] ?? "").trim() === nuevo) return; // sin cambios → no escribir
+    await updateRange(id, `${TAB_TO}!${colLetter(idx)}${filaReal}`, [[nuevo]]);
+    actualizados++;
+  };
 
   for (let i = 0; i < data.length; i++) {
     const fila = data[i] ?? [];
@@ -555,19 +578,17 @@ export async function sincronizarAutomaticas(): Promise<ResultadoSincronizar> {
       });
       continue;
     }
-    const code = String(fila[0] ?? "").trim().toUpperCase();
-    if (!code || mapaCol.size === 0) continue;
-    const vals = auto.get(code);
-    if (!vals) continue;
-    for (const campo of campos) {
-      const idx = mapaCol.get(campo as CampoDesempeno);
-      if (idx === undefined) continue;
-      const actual = String(fila[idx] ?? "").trim();
-      const nuevo = vals[campo];
-      if (actual === nuevo) continue; // sin cambios → no escribir
-      await updateRange(id, `${TAB_TO}!${colLetter(idx)}${i + 1}`, [[nuevo]]);
-      actualizados++;
-    }
+    if (!String(fila[0] ?? "").trim() || mapaCol.size === 0) continue;
+
+    // Auditorías (Consolidado) por código de asesor.
+    const vals = auto.get(String(fila[0]).trim().toUpperCase());
+    if (vals) for (const campo of camposCons) await escribir(mapaCol.get(campo as CampoDesempeno), fila, i + 1, vals[campo]);
+
+    // Radicación por nombre de funcionaria (solo bloques con esas columnas).
+    const idxNombre = mapaCol.get("funcionario");
+    const nombre = idxNombre !== undefined ? String(fila[idxNombre] ?? "").trim() : "";
+    const r = nombre ? rad.get(norm(nombre)) : undefined;
+    if (r) for (const { campo, key } of camposRad) await escribir(mapaCol.get(campo), fila, i + 1, String(r[key]));
   }
   return { ok: true, actualizados, mesLabel: mesLabel(mes) };
 }

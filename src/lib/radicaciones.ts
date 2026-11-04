@@ -639,6 +639,70 @@ export async function obtenerSNCTodas(): Promise<SNCEquipo> {
 }
 
 /* ===================== */
+/* MÉTRICAS PARA BONOS (automáticas de Radicación) */
+/* ===================== */
+// Conteos por asesora de un mes calendario, para alimentar el panel de Bonos
+// sin captura manual: radicados hechos, SNC recibidas, solucionadas y en
+// corrección. La clave del mapa es el nombre normalizado de la asesora (así se
+// cruza con la columna "Funcionaria" de la hoja de métricas).
+
+export interface MetricasRadMes {
+  radicados: number;
+  sncRecibidos: number;
+  sncSolucionados: number;
+  correccion: number;
+}
+
+export async function obtenerMetricasRadicacionMes(mesYM: string): Promise<Map<string, MetricasRadMes>> {
+  const out = new Map<string, MetricasRadMes>();
+  const [y, m] = mesYM.split("-").map(Number);
+  if (!y || !m) return out;
+  const id = sheetId();
+
+  const bump = (nombre: string, k: keyof MetricasRadMes, n = 1) => {
+    const key = normalize(nombre);
+    if (!key) return;
+    const cur = out.get(key) ?? { radicados: 0, sncRecibidos: 0, sncSolucionados: 0, correccion: 0 };
+    cur[k] += n;
+    out.set(key, cur);
+  };
+  const enMes = (valor: unknown): boolean => {
+    const d = parseSheetDate(valor);
+    return !!d && d.getUTCFullYear() === y && d.getUTCMonth() === m - 1;
+  };
+
+  // Radicados: GESTIONES col A=fecha, col C=funcionaria.
+  try {
+    const g = await readRange(id, "GESTIONES", { unformatted: true });
+    for (let i = 1; i < g.length; i++) {
+      if (!enMes(g[i][0])) continue;
+      bump(texto(g[i], 2).trim(), "radicados");
+    }
+  } catch {
+    // sin datos de gestiones → se queda en 0
+  }
+
+  // SNC: pestaña SNC col A=fecha registro, col B=asesora, col E=estado.
+  try {
+    await asegurarSNC(id);
+    const s = await readRange(id, TAB_SNC, { unformatted: true });
+    for (let i = 1; i < s.length; i++) {
+      if (!enMes(s[i][0])) continue;
+      const nombre = texto(s[i], 1).trim();
+      if (!nombre) continue;
+      bump(nombre, "sncRecibidos");
+      const estado = normalizarEstadoSNC(s[i][4]);
+      if (estado === "Solucionada") bump(nombre, "sncSolucionados");
+      else if (estado === "Enviada a corrección") bump(nombre, "correccion");
+    }
+  } catch {
+    // sin datos de SNC → se queda en 0
+  }
+
+  return out;
+}
+
+/* ===================== */
 /* NOTIFICACIONES */
 /* ===================== */
 
