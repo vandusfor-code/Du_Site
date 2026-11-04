@@ -410,9 +410,11 @@ export async function cerrarMes(mesObjetivo?: string): Promise<ResultadoCierre> 
   }
   if (nuevas.length > 0) await appendRows(id, `${TAB_HISTORICO}!A:${HIST_LAST_COL}`, nuevas);
 
-  // El reinicio de TO queda DESACTIVADO: la hoja se recalcula sola con fórmulas
-  // (vaciarlas las destruía). Cerrar mes ahora solo ARCHIVA al histórico.
-  if (APP_ESCRIBE_TO) await reiniciarMetricasTO();
+  // Reinicio INTELIGENTE del mes en curso: vacía solo las celdas con VALOR fijo
+  // (las que se capturan a mano) y DEJA INTACTAS las que tienen fórmula (PEC,
+  // PENC, conteos, bono…). Así el nuevo mes arranca con las manuales en 0 y las
+  // fórmulas siguen calculando. Es seguro aunque falle (no toca fórmulas).
+  await reiniciarMetricasTO();
 
   return { mes, mesLabel: mesLabel(mes), guardados: nuevas.length, actualizados: updates.length };
 }
