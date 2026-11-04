@@ -42,6 +42,11 @@ function sheetId(): string {
 const TAB_TO = "TO";
 const TAB_HISTORICO = "Historico_Desempeno";
 
+// La pestaña TO del libro de métricas está CALCULADA con fórmulas propias
+// (porcentajes, bono, etc.). La app NO debe escribir en ella o las borra. Este
+// interruptor deja todas las escrituras a TO desactivadas; la app solo lee.
+const APP_ESCRIBE_TO = false;
+
 function norm(s: unknown): string {
   return String(s ?? "")
     .trim()
@@ -405,9 +410,9 @@ export async function cerrarMes(mesObjetivo?: string): Promise<ResultadoCierre> 
   }
   if (nuevas.length > 0) await appendRows(id, `${TAB_HISTORICO}!A:${HIST_LAST_COL}`, nuevas);
 
-  // Reinicia las métricas del mes en curso (TO) para empezar el siguiente en 0.
-  // Preserva identidad y la fórmula del bono.
-  await reiniciarMetricasTO();
+  // El reinicio de TO queda DESACTIVADO: la hoja se recalcula sola con fórmulas
+  // (vaciarlas las destruía). Cerrar mes ahora solo ARCHIVA al histórico.
+  if (APP_ESCRIBE_TO) await reiniciarMetricasTO();
 
   return { mes, mesLabel: mesLabel(mes), guardados: nuevas.length, actualizados: updates.length };
 }
@@ -464,6 +469,11 @@ export async function guardarMetricasDesempeno(
   cambios: Partial<Record<CampoDesempeno, string>>,
   puedeEditarAutomaticos: boolean
 ): Promise<ResultadoGuardarMetricas> {
+  // Edición manual DESACTIVADA temporalmente: la hoja TO está formulada y una
+  // escritura puede pisar una fórmula. Se rehabilitará por columnas seguras.
+  if (!APP_ESCRIBE_TO) {
+    return { ok: false, error: "La edición desde la plataforma está pausada mientras se restauran las fórmulas de la hoja." };
+  }
   const id = sheetId();
   const loc = await localizarUsuarioTO(usuario);
   if (!loc) return { ok: false, error: "No se encontró al funcionario en la hoja del mes en curso." };
@@ -562,6 +572,10 @@ export interface ResultadoSincronizar { ok: boolean; actualizados: number; mesLa
 // solucionadas y en corrección) salen del módulo de Radicaciones, cruzados por
 // NOMBRE de la funcionaria. El bono de la hoja se recalcula solo.
 export async function sincronizarAutomaticas(): Promise<ResultadoSincronizar> {
+  // DESACTIVADO: la hoja TO se calcula con fórmulas propias. Escribir valores
+  // aquí las sobrescribía. Mientras se rehace el enfoque, la app solo LEE.
+  if (!APP_ESCRIBE_TO) return { ok: true, actualizados: 0, mesLabel: mesLabel(mesActualBogota()) };
+
   const id = sheetId();
   const mes = mesActualBogota();
   const auto = await calcularAutomaticasConsolidado(mes);
@@ -618,23 +632,40 @@ export async function sincronizarAutomaticas(): Promise<ResultadoSincronizar> {
   return { ok: true, actualizados, mesLabel: mesLabel(mes) };
 }
 
-// Limpia los valores de métricas en TO (reset del mes), preservando identidad y
-// la fórmula del bono. Usado al cerrar un mes para empezar el siguiente en 0.
+// Limpia TODOS los valores de métricas en TO (reset del mes) para empezar el
+// siguiente en 0, incluidos los bonos. Preserva la identidad (usuario,
+// funcionaria, área, fecha) y NUNCA destruye una fórmula: las celdas con fórmula
+// (empiezan con "=") se dejan intactas y recalculan solas a 0 al vaciar sus
+// insumos; solo se vacían las celdas con valor fijo. Se lee con render FORMULA
+// para distinguir una de otra.
 async function reiniciarMetricasTO(): Promise<void> {
   const id = sheetId();
-  const data = await readRange(sheetId(), `${TAB_TO}!A:Z`);
-  const NO_LIMPIAR = new Set<CampoDesempeno>(["usuario", "funcionario", "area", "fecha", "bono"]);
+  const data = await readRange(sheetId(), `${TAB_TO}!A:Z`, { formula: true });
+  const SOLO_IDENTIDAD = new Set<CampoDesempeno>(["usuario", "funcionario", "area", "fecha"]);
+  const esFormula = (v: unknown) => typeof v === "string" && v.trim().startsWith("=");
+
   let mapaCol = new Map<CampoDesempeno, number>();
-  let filaInicio = -1;
-  let filaFin = -1;
+  let filas: number[] = []; // filas de datos (1-based) del bloque actual
 
   const limpiarBloque = async () => {
-    if (filaInicio === -1 || mapaCol.size === 0) return;
+    if (filas.length === 0 || mapaCol.size === 0) return;
+    const inicio = filas[0];
+    const fin = filas[filas.length - 1];
     for (const [campo, idx] of mapaCol) {
-      if (NO_LIMPIAR.has(campo)) continue;
+      if (SOLO_IDENTIDAD.has(campo)) continue;
+      // Marca qué celdas de la columna son valores fijos (vaciables) vs fórmulas.
+      const vaciables = filas.filter((f) => !esFormula((data[f - 1] ?? [])[idx]) && String((data[f - 1] ?? [])[idx] ?? "").trim() !== "");
+      if (vaciables.length === 0) continue; // todas fórmula o vacías → no tocar
       const col = colLetter(idx);
-      const vacios = Array.from({ length: filaFin - filaInicio + 1 }, () => [""]);
-      await updateRange(id, `${TAB_TO}!${col}${filaInicio}:${col}${filaFin}`, vacios);
+      // Caso común: ninguna fórmula en la columna → un solo write del rango.
+      const hayFormula = filas.some((f) => esFormula((data[f - 1] ?? [])[idx]));
+      if (!hayFormula) {
+        const vacios = Array.from({ length: fin - inicio + 1 }, () => [""]);
+        await updateRange(id, `${TAB_TO}!${col}${inicio}:${col}${fin}`, vacios);
+      } else {
+        // Columna mixta: vacía celda por celda solo los valores fijos.
+        for (const f of vaciables) await updateRange(id, `${TAB_TO}!${col}${f}`, [[""]]);
+      }
     }
   };
 
@@ -644,13 +675,10 @@ async function reiniciarMetricasTO(): Promise<void> {
       await limpiarBloque();
       mapaCol = new Map<CampoDesempeno, number>();
       fila.forEach((h, idx) => { const c = encabezadoACampo(String(h)); if (c) mapaCol.set(c, idx); });
-      filaInicio = -1; filaFin = -1;
+      filas = [];
       continue;
     }
-    if (String(fila[0] ?? "").trim()) {
-      if (filaInicio === -1) filaInicio = i + 1;
-      filaFin = i + 1;
-    }
+    if (String(fila[0] ?? "").trim()) filas.push(i + 1);
   }
   await limpiarBloque();
 }

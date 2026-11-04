@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { esAdmin, esAdminOCoordinadora } from "@/lib/auth-helpers";
-import { obtenerDashboardDesempeno, sincronizarAutomaticas } from "@/lib/desempeno";
+import { obtenerDashboardDesempeno } from "@/lib/desempeno";
 import BonosDashboard from "./DesempenoDashboard";
 
 export const maxDuration = 60;
@@ -13,14 +13,9 @@ export default async function BonosPage() {
   if (!session?.user) redirect("/login");
   if (!esAdminOCoordinadora(session)) redirect("/");
 
-  // Al abrir, trae las automáticas (PEC/PENC/#auditorías) del mes en curso desde
-  // las auditorías del Consolidado (best-effort; no bloquea la vista si falla).
-  try {
-    await sincronizarAutomaticas();
-  } catch {
-    // silencioso: si falla el sync, igual se muestra lo que haya.
-  }
-
+  // IMPORTANTE: la hoja TO está calculada con fórmulas propias; la app NO debe
+  // escribir en ella. Solo lee para mostrar. (Antes se sincronizaba aquí y eso
+  // sobrescribía las fórmulas — desactivado.)
   let dashboard: Awaited<ReturnType<typeof obtenerDashboardDesempeno>> | null = null;
   let error: string | null = null;
   try {
