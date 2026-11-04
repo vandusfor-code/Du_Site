@@ -1,15 +1,28 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Users, BadgeCheck, AlertTriangle, DollarSign, Download, Search, SlidersHorizontal,
   Eye, Trophy, Target, BarChart3, Medal, ChevronDown, ClipboardCheck,
-  LogOut, Loader2, X, CalendarCheck, Save,
+  LogOut, Loader2, X, CalendarCheck, Save, RefreshCw,
 } from "lucide-react";
+
+const MESES_ES_UI = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+// Últimos 6 meses (YYYY-MM) con etiqueta, para el selector de "cerrar mes".
+function mesesRecientes(): { value: string; label: string }[] {
+  const out: { value: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = 1; i <= 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    out.push({ value: ym, label: `${MESES_ES_UI[d.getMonth()]} ${d.getFullYear()}` });
+  }
+  return out;
+}
 import type { DashboardDesempeno, DesempenoFiltros, FilaTabla, CampoDesempeno, Area } from "@/lib/desempeno-tipos";
 import { AREAS_ORDEN, CAMPOS_EDITABLES_POR_AREA, CAMPOS_PORCENTAJE, esCampoAutomatico } from "@/lib/desempeno-tipos";
-import { obtenerDashboardDesempenoAction, cerrarMesAction, guardarMetricasAction } from "./actions";
+import { obtenerDashboardDesempenoAction, cerrarMesAction, guardarMetricasAction, sincronizarAutomaticasAction } from "./actions";
 import s from "./desempeno.module.css";
 
 const AREA_COLOR: Record<string, string> = {
@@ -73,6 +86,10 @@ export default function DesempenoDashboard({
   const [detalle, setDetalle] = useState<FilaTabla | null>(null);
   const [snap, setSnap] = useState<{ tipo: "ok" | "error"; msg: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [cierreOpen, setCierreOpen] = useState(false);
+  const opcionesCierre = useMemo(() => mesesRecientes(), []);
+  const [mesCierre, setMesCierre] = useState(() => mesesRecientes()[0]?.value ?? "");
+  const [sincronizando, setSincronizando] = useState(false);
   const primera = useRef(true);
   const PAGE_SIZE = 10;
 
@@ -108,18 +125,37 @@ export default function DesempenoDashboard({
     };
   }, [area, busqueda, mes]);
 
-  async function cerrarMesActual() {
-    if (!confirm("¿Cerrar el mes? Se guardará el estado actual de la hoja TO en el histórico (podrás verlo luego en el selector de mes).")) return;
+  async function confirmarCierre() {
     setGuardando(true);
     setSnap(null);
     try {
-      const r = await cerrarMesAction();
-      setSnap({ tipo: "ok", msg: `Mes ${r.mesLabel} cerrado: ${r.guardados} guardados, ${r.actualizados} actualizados.` });
-      await recargar({ area, busqueda, mes });
+      const r = await cerrarMesAction(mesCierre);
+      setCierreOpen(false);
+      setSnap({ tipo: "ok", msg: `Mes ${r.mesLabel} cerrado y métricas reiniciadas (${r.guardados} nuevos, ${r.actualizados} actualizados).` });
+      await recargar({ area, busqueda, mes: "" });
     } catch (e) {
       setSnap({ tipo: "error", msg: e instanceof Error ? e.message : "Error al cerrar el mes" });
     } finally {
       setGuardando(false);
+    }
+  }
+
+  async function sincronizar() {
+    setSincronizando(true);
+    setSnap(null);
+    try {
+      const r = await sincronizarAutomaticasAction();
+      setSnap({
+        tipo: "ok",
+        msg: r.actualizados > 0
+          ? `Automáticas (PEC/PENC/#auditorías) actualizadas desde las auditorías: ${r.actualizados} celdas.`
+          : "Automáticas al día — no hubo cambios con las auditorías de este mes.",
+      });
+      await recargar({ area, busqueda, mes });
+    } catch (e) {
+      setSnap({ tipo: "error", msg: e instanceof Error ? e.message : "Error al sincronizar" });
+    } finally {
+      setSincronizando(false);
     }
   }
 
@@ -204,8 +240,11 @@ export default function DesempenoDashboard({
                 <option key={m.value} value={m.value}>{m.label}</option>
               ))}
             </select>
-            <button onClick={cerrarMesActual} disabled={guardando || data?.esHistorico} title="Guardar el mes en curso en el histórico">
-              {guardando ? <Loader2 size={15} className={s.spin} /> : <CalendarCheck size={15} />} Cerrar mes
+            <button onClick={sincronizar} disabled={sincronizando || data?.esHistorico} title="Traer PEC/PENC y #auditorías de este mes desde las auditorías">
+              {sincronizando ? <Loader2 size={15} className={s.spin} /> : <RefreshCw size={15} />} Sincronizar
+            </button>
+            <button onClick={() => setCierreOpen(true)} disabled={guardando || data?.esHistorico} title="Cerrar un mes: lo archiva y reinicia las métricas">
+              <CalendarCheck size={15} /> Cerrar mes
             </button>
             <button className={s.primary} onClick={exportar}><Download size={15} />Exportar</button>
           </div>
@@ -396,6 +435,25 @@ export default function DesempenoDashboard({
           onClose={() => setDetalle(null)}
           onSaved={async () => { setDetalle(null); await recargar({ area, busqueda, mes }); }}
         />
+      )}
+
+      {cierreOpen && (
+        <div className={s.overlay} onClick={() => { if (!guardando) setCierreOpen(false); }}>
+          <div className={s.cierreModal} onClick={(e) => e.stopPropagation()}>
+            <h3><CalendarCheck size={18} /> Cerrar mes</h3>
+            <p>Archiva el mes elegido en el histórico y <b>reinicia las métricas en 0</b> para empezar el siguiente. Las asesoras también verán el nuevo mes vacío.</p>
+            <label className={s.cierreLabel}>¿Qué mes estás cerrando?</label>
+            <select className={s.cierreSelect} value={mesCierre} onChange={(e) => setMesCierre(e.target.value)}>
+              {opcionesCierre.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+            <div className={s.cierreFoot}>
+              <button className={s.cancelBtn} onClick={() => setCierreOpen(false)} disabled={guardando}>Cancelar</button>
+              <button className={s.saveBtn} onClick={confirmarCierre} disabled={guardando}>
+                {guardando ? <Loader2 size={15} className={s.spin} /> : <CalendarCheck size={15} />} Cerrar y reiniciar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

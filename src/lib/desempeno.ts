@@ -1,5 +1,5 @@
 import "server-only";
-import { readRange, appendRows, updateRange, asegurarHoja } from "@/lib/sheets";
+import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate } from "@/lib/sheets";
 import {
   AREAS_ORDEN,
   LABELS,
@@ -161,16 +161,7 @@ function parseMoney(v: string | undefined): number | null {
 function fmtMoney(n: number): string {
   return "$" + n.toLocaleString("es-CO");
 }
-// dd/MM/yyyy o yyyy-MM-dd → "YYYY-MM"
-function fechaAMes(fecha: string): string | null {
-  const f = (fecha ?? "").trim();
-  let m = f.match(/^(\d{4})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}`;
-  m = f.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-  if (m) return `${m[3]}-${m[2]}`;
-  return null;
-}
-const MESES_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const MESES_ES =["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 function mesLabel(ym: string): string {
   const m = ym.match(/^(\d{4})-(\d{2})$/);
   if (!m) return ym;
@@ -373,7 +364,7 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
 // Guarda/actualiza el cierre de un mes en el histórico (upsert por mes+usuario+área).
 // El mes se toma de la columna Fecha de TO (lo que representan los datos); si no
 // se puede determinar, usa el mes calendario actual.
-export async function cerrarMes(): Promise<ResultadoCierre> {
+export async function cerrarMes(mesObjetivo?: string): Promise<ResultadoCierre> {
   const id = sheetId();
   await asegurarHoja(id, TAB_HISTORICO, HISTORICO_HEADERS);
 
@@ -381,15 +372,9 @@ export async function cerrarMes(): Promise<ResultadoCierre> {
   const funcs: FuncionarioDesempeno[] = [];
   for (const b of bloques) if (b.area) funcs.push(...b.funcionarios);
 
-  // Mes de los datos (moda de la columna Fecha), respaldo: mes actual.
-  const conteoMes = new Map<string, number>();
-  for (const f of funcs) {
-    const ym = fechaAMes(f.fecha);
-    if (ym) conteoMes.set(ym, (conteoMes.get(ym) ?? 0) + 1);
-  }
-  let mes = mesActualBogota();
-  let mejor = 0;
-  for (const [ym, c] of conteoMes) if (c > mejor) { mejor = c; mes = ym; }
+  // El mes que se cierra lo ELIGE el usuario (por defecto, el mes ANTERIOR: los
+  // meses se cierran a inicios del siguiente — octubre se cierra en noviembre).
+  const mes = /^\d{4}-\d{2}$/.test(mesObjetivo ?? "") ? (mesObjetivo as string) : mesAnteriorBogota();
 
   const existentes = await leerHistorico();
   const idx = Object.fromEntries(HISTORICO_HEADERS.map((h, i) => [h, i])) as Record<string, number>;
@@ -418,6 +403,10 @@ export async function cerrarMes(): Promise<ResultadoCierre> {
     await updateRange(id, `${TAB_HISTORICO}!A${u.fila}:${HIST_LAST_COL}${u.fila}`, [u.valores]);
   }
   if (nuevas.length > 0) await appendRows(id, `${TAB_HISTORICO}!A:${HIST_LAST_COL}`, nuevas);
+
+  // Reinicia las métricas del mes en curso (TO) para empezar el siguiente en 0.
+  // Preserva identidad y la fórmula del bono.
+  await reiniciarMetricasTO();
 
   return { mes, mesLabel: mesLabel(mes), guardados: nuevas.length, actualizados: updates.length };
 }
@@ -490,4 +479,132 @@ export async function guardarMetricasDesempeno(
     guardados++;
   }
   return { ok: true, guardados };
+}
+
+/* ===================== */
+/* AUTOMÁTICAS — PEC/PENC/#auditorías desde Consolidado (mes en curso) */
+/* ===================== */
+// Consolidado: col C(2)=asesor (código), col Q(16)=nota "%", col R(17)=Tipo Nota (OK/PENC).
+const CONS_COL_ASESOR = 2;
+const CONS_COL_NOTA = 16;
+const CONS_COL_TIPO = 17;
+
+function mesAnteriorBogota(): string {
+  const [y, m] = mesActualBogota().split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1, 1));
+  d.setUTCMonth(d.getUTCMonth() - 1);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function fechaConsolidadoAMes(valor: unknown): string | null {
+  const d = parseSheetDate(valor);
+  if (!d) return null;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+interface AutoMetrica { pec: string; penc: string; auditorias: string }
+
+// Calcula, por código de asesor, las automáticas del mes dado desde Consolidado.
+// PEC = promedio de la Nota%. PENC = % de auditorías conformes (Tipo Nota = OK).
+async function calcularAutomaticasConsolidado(mesYM: string): Promise<Map<string, AutoMetrica>> {
+  const data = await readRange(sheetId(), "Consolidado!A:R", { unformatted: true });
+  const acc = new Map<string, { suma: number; n: number; ok: number }>();
+  for (let i = 1; i < data.length; i++) {
+    const r = data[i] ?? [];
+    if (fechaConsolidadoAMes(r[0]) !== mesYM) continue;
+    const code = String(r[CONS_COL_ASESOR] ?? "").trim().toUpperCase();
+    if (!code) continue;
+    const nota = parseFloat(String(r[CONS_COL_NOTA] ?? "").replace("%", "").replace(",", ".")) || 0;
+    const esOK = String(r[CONS_COL_TIPO] ?? "").trim().toUpperCase() === "OK";
+    const a = acc.get(code) ?? { suma: 0, n: 0, ok: 0 };
+    a.suma += nota; a.n += 1; if (esOK) a.ok += 1;
+    acc.set(code, a);
+  }
+  const out = new Map<string, AutoMetrica>();
+  for (const [code, a] of acc) {
+    const pec = a.n > 0 ? Math.round((a.suma / a.n) * 10) / 10 : 0;
+    const penc = a.n > 0 ? Math.round((a.ok / a.n) * 1000) / 10 : 0;
+    out.set(code, { pec: `${pec}%`, penc: `${penc}%`, auditorias: String(a.n) });
+  }
+  return out;
+}
+
+export interface ResultadoSincronizar { ok: boolean; actualizados: number; mesLabel: string }
+
+// Trae las automáticas del MES EN CURSO del Consolidado y las escribe en TO
+// (solo las celdas que cambian). El bono de la hoja se recalcula solo.
+export async function sincronizarAutomaticas(): Promise<ResultadoSincronizar> {
+  const id = sheetId();
+  const mes = mesActualBogota();
+  const auto = await calcularAutomaticasConsolidado(mes);
+  if (auto.size === 0) return { ok: true, actualizados: 0, mesLabel: "Mes en curso" };
+
+  // Mapa usuario→{filaNum, mapaCol, valoresActuales} leyendo TO una vez.
+  const data = await readRange(sheetId(), `${TAB_TO}!A:Z`);
+  let mapaCol = new Map<CampoDesempeno, number>();
+  let actualizados = 0;
+  const campos: (keyof AutoMetrica)[] = ["pec", "penc", "auditorias"];
+
+  for (let i = 0; i < data.length; i++) {
+    const fila = data[i] ?? [];
+    if (norm(fila[0]) === "usuario") {
+      mapaCol = new Map<CampoDesempeno, number>();
+      fila.forEach((h, idx) => {
+        const c = encabezadoACampo(String(h));
+        if (c) mapaCol.set(c, idx);
+      });
+      continue;
+    }
+    const code = String(fila[0] ?? "").trim().toUpperCase();
+    if (!code || mapaCol.size === 0) continue;
+    const vals = auto.get(code);
+    if (!vals) continue;
+    for (const campo of campos) {
+      const idx = mapaCol.get(campo as CampoDesempeno);
+      if (idx === undefined) continue;
+      const actual = String(fila[idx] ?? "").trim();
+      const nuevo = vals[campo];
+      if (actual === nuevo) continue; // sin cambios → no escribir
+      await updateRange(id, `${TAB_TO}!${colLetter(idx)}${i + 1}`, [[nuevo]]);
+      actualizados++;
+    }
+  }
+  return { ok: true, actualizados, mesLabel: mesLabel(mes) };
+}
+
+// Limpia los valores de métricas en TO (reset del mes), preservando identidad y
+// la fórmula del bono. Usado al cerrar un mes para empezar el siguiente en 0.
+async function reiniciarMetricasTO(): Promise<void> {
+  const id = sheetId();
+  const data = await readRange(sheetId(), `${TAB_TO}!A:Z`);
+  const NO_LIMPIAR = new Set<CampoDesempeno>(["usuario", "funcionario", "area", "fecha", "bono"]);
+  let mapaCol = new Map<CampoDesempeno, number>();
+  let filaInicio = -1;
+  let filaFin = -1;
+
+  const limpiarBloque = async () => {
+    if (filaInicio === -1 || mapaCol.size === 0) return;
+    for (const [campo, idx] of mapaCol) {
+      if (NO_LIMPIAR.has(campo)) continue;
+      const col = colLetter(idx);
+      const vacios = Array.from({ length: filaFin - filaInicio + 1 }, () => [""]);
+      await updateRange(id, `${TAB_TO}!${col}${filaInicio}:${col}${filaFin}`, vacios);
+    }
+  };
+
+  for (let i = 0; i < data.length; i++) {
+    const fila = data[i] ?? [];
+    if (norm(fila[0]) === "usuario") {
+      await limpiarBloque();
+      mapaCol = new Map<CampoDesempeno, number>();
+      fila.forEach((h, idx) => { const c = encabezadoACampo(String(h)); if (c) mapaCol.set(c, idx); });
+      filaInicio = -1; filaFin = -1;
+      continue;
+    }
+    if (String(fila[0] ?? "").trim()) {
+      if (filaInicio === -1) filaInicio = i + 1;
+      filaFin = i + 1;
+    }
+  }
+  await limpiarBloque();
 }

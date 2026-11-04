@@ -178,3 +178,11 @@
 .saveBtn { border: 0; background: #7044ed; color: #fff; padding: 10px 22px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
 .saveBtn:hover { background: #5b32d6; }
 .saveBtn:disabled, .cancelBtn:disabled { opacity: .6; cursor: not-allowed; }
+
+/* ── Modal "Cerrar mes" ── */
+.overlay .cierreModal { margin: auto; width: 440px; max-width: 92%; background: #fff; border-radius: 16px; box-shadow: 0 30px 80px rgba(0,0,0,.3); padding: 24px; animation: despslide .25s cubic-bezier(0.16,1,0.3,1); }
+.cierreModal h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 8px; font-size: 18px; color: #2b234f; }
+.cierreModal p { margin: 0 0 16px; font-size: 13px; color: #667189; line-height: 1.5; }
+.cierreLabel { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: #8a93a8; margin-bottom: 6px; }
+.cierreSelect { width: 100%; border: 1px solid #e0e3eb; border-radius: 10px; padding: 11px 12px; font-size: 14px; font-weight: 600; color: #1f2537; background: #fff; }
+.cierreFoot { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }

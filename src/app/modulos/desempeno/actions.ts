@@ -6,11 +6,13 @@ import {
   obtenerDashboardDesempeno,
   cerrarMes,
   guardarMetricasDesempeno,
+  sincronizarAutomaticas,
   type DashboardDesempeno,
   type DesempenoFiltros,
   type ResultadoCierre,
   type CampoDesempeno,
   type ResultadoGuardarMetricas,
+  type ResultadoSincronizar,
 } from "@/lib/desempeno";
 
 async function requireGestion() {
@@ -25,9 +27,16 @@ export async function obtenerDashboardDesempenoAction(filtros: DesempenoFiltros)
   return obtenerDashboardDesempeno(filtros);
 }
 
-export async function cerrarMesAction(): Promise<ResultadoCierre> {
+export async function cerrarMesAction(mesObjetivo?: string): Promise<ResultadoCierre> {
   await requireGestion();
-  return cerrarMes();
+  return cerrarMes(mesObjetivo);
+}
+
+// Trae las automáticas (PEC/PENC/#auditorías) del mes en curso desde las
+// auditorías del Consolidado y las escribe en TO.
+export async function sincronizarAutomaticasAction(): Promise<ResultadoSincronizar> {
+  await requireGestion();
+  return sincronizarAutomaticas();
 }
 
 // Guarda las métricas editadas de un funcionario. El Coordinador no puede tocar
