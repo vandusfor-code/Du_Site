@@ -10,7 +10,7 @@ import { valuesAppend, getSpreadsheetMeta, batchUpdate, readRange, hoyEnBogota }
 // ============================================================
 
 const TAB = "PQRSF";
-const NUM_COLS = 14; // A..N
+const NUM_COLS = 15; // A..O (se agregó la columna M "SATISFACCIÓN" en el medio)
 const TEMPLATE_ROW_0 = 1; // fila 2 (0-based) como plantilla de formato/validación
 
 function sheetId(): string {
@@ -155,8 +155,9 @@ export async function importarPqrsfComunicar(buffer: Buffer): Promise<ResultadoI
   const hoy = hoyEnBogota();
   const recibidoSerial = serialDesdeYMD(hoy.anio, hoy.mes + 1, hoy.dia);
 
-  // Fila destino: A..N. Solo B,C,D,F,G,H,I con valor; el resto vacío (conservan
-  // desplegables/validación al copiar el formato de la plantilla).
+  // Fila destino: A..O. Solo B,C,D,F,G,H,I con valor; el resto vacío (conservan
+  // desplegables/validación al copiar el formato de la plantilla). Las columnas
+  // de seguimiento (J..O) las llena manualmente el equipo en el Sheet.
   const valores = nuevos.map((r) => [
     "", // A ASESOR ASIGNADO
     recibidoSerial, // B RECIBIDO PEOPLE
@@ -170,14 +171,15 @@ export async function importarPqrsfComunicar(buffer: Buffer): Promise<ResultadoI
     "", // J ESTADO
     "", // K CANAL CONTACTO
     "", // L EFECTIVIDAD
-    "", // M REQUIERE OTRA SOLUCIÓN
-    "", // N SE ENCONTRO PQRS
+    "", // M SATISFACCIÓN
+    "", // N REQUIERE OTRA SOLUCIÓN
+    "", // O SE ENCONTRO PQRS
   ]);
 
   // 6. Append de valores (RAW → sin coerción: fechas como serial, teléfono/radicado tal cual).
   let rangoNuevas: string | undefined;
   try {
-    const res = await valuesAppend(id, `${TAB}!A:N`, valores, {
+    const res = await valuesAppend(id, `${TAB}!A:O`, valores, {
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
     });
