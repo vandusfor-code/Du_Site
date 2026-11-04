@@ -50,3 +50,6 @@ render.env
 # Credencial de cuenta de servicio de Google (NUNCA commitear)
 duacademy-*.json
 .env.google
+
+# Credenciales Supabase pegadas en un bloc (NUNCA commitear)
+SUPABASE.txt
