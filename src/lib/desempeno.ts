@@ -1,11 +1,11 @@
 import "server-only";
 import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate } from "@/lib/sheets";
 import { obtenerMetricasRadicacionMes, type MetricasRadMes } from "@/lib/radicaciones";
-import { calcularBono } from "@/lib/desempeno-bono";
+import { calcularBono, camposPorOrigen } from "@/lib/desempeno-bono";
+import { obtenerMetricasManual, guardarMetricaManual } from "@/lib/bono-store";
 import {
   AREAS_ORDEN,
   LABELS,
-  esCampoAutomatico,
   type Area,
   type CampoDesempeno,
   type FuncionarioDesempeno,
@@ -302,6 +302,10 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
   const histData = await leerHistorico();
   const mesesHist = Array.from(new Set(histData.slice(1).map((r) => String(r[0] ?? "").trim()).filter(Boolean))).sort();
 
+  // Mes activo del libro (una sola lectura; se reutiliza abajo).
+  const mesActivoNombre = await leerMesActivo();
+  const mesKeyActivo = mesActivoAYM(mesActivoNombre);
+
   // Fuente: mes cerrado (histórico) o mes en curso (TO vivo).
   const esHistorico = fMes !== "" && mesesHist.includes(fMes);
   let todos: FuncionarioDesempeno[];
@@ -313,9 +317,14 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     desconocidos = bloques.desconocidos;
     todos = [];
     for (const b of bloques.bloques) if (b.area) todos.push(...b.funcionarios);
-    // Bono NATIVO: lo calcula Du Site con las reglas de "Tabla objetivos" a partir
-    // de las métricas (no se lee la columna Bono del Excel). Para el mes en curso.
+    // Métricas MANUALES capturadas en la plataforma (Supabase) MANDAN sobre lo
+    // que tenga el Excel. Luego el bono se calcula NATIVO con reglas de la app.
+    const manual = await obtenerMetricasManual(mesKeyActivo);
     for (const f of todos) {
+      for (const campo of camposPorOrigen(f.area).manual) {
+        const v = manual.get(`${f.usuario}||${campo}`);
+        if (v !== undefined && v !== "") f.valores[campo] = v;
+      }
       f.valores.bono = String(calcularBono(f.area, f.valores).total);
     }
   }
@@ -387,8 +396,7 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     ...mesesHist.slice().reverse().map((m) => ({ value: m, label: mesLabel(m) })),
   ];
 
-  // Mes activo del libro (para el cierre).
-  const mesActivoNombre = await leerMesActivo();
+  // Mes al que pasaría al cerrar.
   const mesActivoSiguiente = siguienteMesNombre(mesActivoNombre);
 
   return {
@@ -502,56 +510,27 @@ export interface ResultadoGuardarMetricas {
   guardados?: number;
 }
 
-// Localiza la fila (1-based, absoluta en la hoja) de un usuario en TO y el mapa
-// campo→índice de columna de su bloque. null si no está.
-async function localizarUsuarioTO(usuario: string): Promise<{ filaNum: number; mapaCol: Map<CampoDesempeno, number> } | null> {
-  const data = await readRange(sheetId(), `${TAB_TO}!A:Z`);
-  const uNorm = norm(usuario);
-  let mapaCol = new Map<CampoDesempeno, number>();
-  for (let i = 0; i < data.length; i++) {
-    const fila = data[i] ?? [];
-    if (norm(fila[0]) === "usuario") {
-      // Nueva cabecera de bloque: reconstruye el mapa de columnas.
-      mapaCol = new Map<CampoDesempeno, number>();
-      fila.forEach((h, idx) => {
-        const campo = encabezadoACampo(String(h));
-        if (campo) mapaCol.set(campo, idx);
-      });
-      continue;
-    }
-    if (norm(fila[0]) === uNorm && mapaCol.size > 0) {
-      return { filaNum: i + 1, mapaCol }; // i es 0-based en A:Z → fila real = i+1
-    }
-  }
-  return null;
-}
-
-// Guarda cambios de métricas de un asesor en la hoja TO (mes en curso). El
-// Coordinador no puede tocar los campos automáticos (PEC/PENC/conteos); el Admin sí.
+// Guarda las métricas MANUALES de un asesor en Du Site (Supabase), para el mes
+// activo. Solo se guardan las métricas manuales del área (satisfacción,
+// productividad, adherencia, precisión…); las automáticas (PEC/PENC/conteos) las
+// calcula la plataforma y no se tocan. NO escribe en el Excel.
 export async function guardarMetricasDesempeno(
   usuario: string,
-  cambios: Partial<Record<CampoDesempeno, string>>,
-  puedeEditarAutomaticos: boolean
+  area: Area,
+  cambios: Partial<Record<CampoDesempeno, string>>
 ): Promise<ResultadoGuardarMetricas> {
-  // Edición manual DESACTIVADA temporalmente: la hoja TO está formulada y una
-  // escritura puede pisar una fórmula. Se rehabilitará por columnas seguras.
-  if (!APP_ESCRIBE_TO) {
-    return { ok: false, error: "La edición desde la plataforma está pausada mientras se restauran las fórmulas de la hoja." };
-  }
-  const id = sheetId();
-  const loc = await localizarUsuarioTO(usuario);
-  if (!loc) return { ok: false, error: "No se encontró al funcionario en la hoja del mes en curso." };
-
+  const mesKey = mesActivoAYM(await leerMesActivo());
+  const manuales = new Set(camposPorOrigen(area).manual);
   const entradas = Object.entries(cambios) as [CampoDesempeno, string][];
   let guardados = 0;
-  for (const [campo, valor] of entradas) {
-    if (campo === "bono" || campo === "usuario" || campo === "funcionario" || campo === "area" || campo === "fecha") continue;
-    if (esCampoAutomatico(campo) && !puedeEditarAutomaticos) continue; // el coordinador no toca automáticos
-    const idx = loc.mapaCol.get(campo);
-    if (idx === undefined) continue; // esa área no tiene esa columna
-    const rango = `${TAB_TO}!${colLetter(idx)}${loc.filaNum}`;
-    await updateRange(id, rango, [[valor ?? ""]]);
-    guardados++;
+  try {
+    for (const [campo, valor] of entradas) {
+      if (!manuales.has(campo)) continue; // solo métricas manuales del área
+      await guardarMetricaManual(mesKey, usuario, campo, (valor ?? "").trim());
+      guardados++;
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "No se pudo guardar" };
   }
   return { ok: true, guardados };
 }

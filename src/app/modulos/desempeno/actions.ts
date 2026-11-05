@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
-import { esAdmin, esAdminOCoordinadora } from "@/lib/auth-helpers";
+import { esAdminOCoordinadora } from "@/lib/auth-helpers";
 import {
   obtenerDashboardDesempeno,
   cerrarMes,
@@ -10,6 +10,7 @@ import {
   type DashboardDesempeno,
   type DesempenoFiltros,
   type ResultadoCierre,
+  type Area,
   type CampoDesempeno,
   type ResultadoGuardarMetricas,
   type ResultadoSincronizar,
@@ -39,12 +40,13 @@ export async function sincronizarAutomaticasAction(): Promise<ResultadoSincroniz
   return sincronizarAutomaticas();
 }
 
-// Guarda las métricas editadas de un funcionario. El Coordinador no puede tocar
-// los campos automáticos (se filtran en el servidor); el Admin sí.
+// Guarda las métricas MANUALES editadas de un funcionario en Du Site (Supabase).
+// Solo se guardan las manuales del área; las automáticas las calcula la plataforma.
 export async function guardarMetricasAction(
   usuario: string,
+  area: Area,
   cambios: Partial<Record<CampoDesempeno, string>>
 ): Promise<ResultadoGuardarMetricas> {
-  const session = await requireGestion();
-  return guardarMetricasDesempeno(usuario, cambios, esAdmin(session));
+  await requireGestion();
+  return guardarMetricasDesempeno(usuario, area, cambios);
 }
