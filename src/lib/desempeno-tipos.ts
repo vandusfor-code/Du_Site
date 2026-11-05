@@ -121,4 +121,8 @@ export interface DashboardDesempeno {
   mesActualLabel: string;
   /** Opciones del selector de mes. */
   mesesDisponibles: { value: string; label: string }[];
+  /** Mes activo del libro (celda MES_ACTIVO de la hoja), p.ej. "Septiembre". */
+  mesActivoNombre: string;
+  /** Mes al que pasaría al cerrar, p.ej. "Octubre". */
+  mesActivoSiguiente: string;
 }

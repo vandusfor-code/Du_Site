@@ -27,9 +27,9 @@ export async function obtenerDashboardDesempenoAction(filtros: DesempenoFiltros)
   return obtenerDashboardDesempeno(filtros);
 }
 
-export async function cerrarMesAction(mesObjetivo?: string): Promise<ResultadoCierre> {
+export async function cerrarMesAction(): Promise<ResultadoCierre> {
   await requireGestion();
-  return cerrarMes(mesObjetivo);
+  return cerrarMes();
 }
 
 // Trae las automáticas (PEC/PENC/#auditorías) del mes en curso desde las

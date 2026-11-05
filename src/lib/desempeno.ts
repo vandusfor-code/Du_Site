@@ -43,9 +43,51 @@ const TAB_TO = "TO";
 const TAB_HISTORICO = "Historico_Desempeno";
 
 // La pestaña TO del libro de métricas está CALCULADA con fórmulas propias
-// (porcentajes, bono, etc.). La app NO debe escribir en ella o las borra. Este
-// interruptor deja todas las escrituras a TO desactivadas; la app solo lee.
+// (porcentajes, bono, etc.). La app NO debe escribir VALORES en ella o las borra.
+// Este interruptor deja la sincronización de valores y la edición manual
+// desactivadas. (El reinicio inteligente y avanzar el mes activo SÍ se permiten:
+// no pisan fórmulas.)
 const APP_ESCRIBE_TO = false;
+
+// Celda "mes activo" (desplegable MES_ACTIVO) de la hoja Base. TODO lo automático
+// (PEC/PENC de auditorías, radicados, SNC, PQRSF) filtra por ella. Avanzarla al
+// mes siguiente hace que todo se recalcule solo para el mes nuevo.
+const CELDA_MES_ACTIVO = "Base!G1";
+const MESES_NOMBRE = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+async function leerMesActivo(): Promise<string> {
+  try {
+    const v = await readRange(sheetId(), CELDA_MES_ACTIVO);
+    return String(v?.[0]?.[0] ?? "").trim();
+  } catch {
+    return "";
+  }
+}
+
+// Índice 0-based del nombre de mes ("Septiembre" → 8); -1 si no coincide.
+function indiceMesNombre(nombre: string): number {
+  const n = norm(nombre);
+  return MESES_NOMBRE.findIndex((m) => norm(m) === n);
+}
+
+function siguienteMesNombre(nombre: string): string {
+  const i = indiceMesNombre(nombre);
+  return i < 0 ? nombre : MESES_NOMBRE[(i + 1) % 12];
+}
+
+// Nombre de mes activo → "YYYY-MM" para el histórico. El año se infiere: si el mes
+// es posterior al calendario actual, es del año pasado (se cierran meses pasados).
+function mesActivoAYM(nombre: string): string {
+  const i = indiceMesNombre(nombre);
+  if (i < 0) return mesActualBogota();
+  const mesNum = i + 1;
+  const [y, mCal] = mesActualBogota().split("-").map(Number);
+  const year = mesNum <= mCal ? y : y - 1;
+  return `${year}-${String(mesNum).padStart(2, "0")}`;
+}
 
 function norm(s: unknown): string {
   return String(s ?? "")
@@ -339,6 +381,10 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     ...mesesHist.slice().reverse().map((m) => ({ value: m, label: mesLabel(m) })),
   ];
 
+  // Mes activo del libro (para el cierre).
+  const mesActivoNombre = await leerMesActivo();
+  const mesActivoSiguiente = siguienteMesNombre(mesActivoNombre);
+
   return {
     kpi: {
       funcionariosActivos: agg.total,
@@ -360,6 +406,8 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     esHistorico,
     mesActualLabel: esHistorico ? mesLabel(fMes) : "Mes en curso",
     mesesDisponibles,
+    mesActivoNombre,
+    mesActivoSiguiente,
   };
 }
 
@@ -367,10 +415,11 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
 /* CERRAR MES (snapshot manual) */
 /* ===================== */
 
-// Guarda/actualiza el cierre de un mes en el histórico (upsert por mes+usuario+área).
-// El mes se toma de la columna Fecha de TO (lo que representan los datos); si no
-// se puede determinar, usa el mes calendario actual.
-export async function cerrarMes(mesObjetivo?: string): Promise<ResultadoCierre> {
+// Cierra el MES ACTIVO del libro (celda MES_ACTIVO de la hoja Base): (1) archiva
+// sus resultados al histórico consultable, (2) AVANZA MES_ACTIVO al mes siguiente
+// —todo lo automático (auditorías, radicados, SNC, PQRSF) se recalcula solo para
+// el mes nuevo— y (3) reinicia solo las celdas manuales (las fórmulas quedan).
+export async function cerrarMes(): Promise<ResultadoCierre> {
   const id = sheetId();
   await asegurarHoja(id, TAB_HISTORICO, HISTORICO_HEADERS);
 
@@ -378,9 +427,9 @@ export async function cerrarMes(mesObjetivo?: string): Promise<ResultadoCierre> 
   const funcs: FuncionarioDesempeno[] = [];
   for (const b of bloques) if (b.area) funcs.push(...b.funcionarios);
 
-  // El mes que se cierra lo ELIGE el usuario (por defecto, el mes ANTERIOR: los
-  // meses se cierran a inicios del siguiente — octubre se cierra en noviembre).
-  const mes = /^\d{4}-\d{2}$/.test(mesObjetivo ?? "") ? (mesObjetivo as string) : mesAnteriorBogota();
+  // El mes que se cierra es el MES_ACTIVO del libro (lo que muestran los datos).
+  const nombreActivo = await leerMesActivo();
+  const mes = mesActivoAYM(nombreActivo);
 
   const existentes = await leerHistorico();
   const idx = Object.fromEntries(HISTORICO_HEADERS.map((h, i) => [h, i])) as Record<string, number>;
@@ -410,10 +459,17 @@ export async function cerrarMes(mesObjetivo?: string): Promise<ResultadoCierre> 
   }
   if (nuevas.length > 0) await appendRows(id, `${TAB_HISTORICO}!A:${HIST_LAST_COL}`, nuevas);
 
-  // Reinicio INTELIGENTE del mes en curso: vacía solo las celdas con VALOR fijo
-  // (las que se capturan a mano) y DEJA INTACTAS las que tienen fórmula (PEC,
-  // PENC, conteos, bono…). Así el nuevo mes arranca con las manuales en 0 y las
-  // fórmulas siguen calculando. Es seguro aunque falle (no toca fórmulas).
+  // Avanza el MES ACTIVO al mes siguiente: escribe una sola celda (valor del
+  // desplegable), nunca una fórmula. Con eso TODO lo automático (auditorías,
+  // radicados, SNC, PQRSF) se recalcula solo para el mes nuevo.
+  const siguiente = siguienteMesNombre(nombreActivo);
+  if (siguiente && indiceMesNombre(nombreActivo) >= 0) {
+    await updateRange(id, CELDA_MES_ACTIVO, [[siguiente]]);
+  }
+
+  // Reinicio INTELIGENTE: vacía solo las celdas con VALOR fijo (las manuales) y
+  // DEJA INTACTAS las que tienen fórmula (PEC/PENC/conteos/bono). Así el mes
+  // nuevo arranca con las manuales en 0 y las fórmulas siguen calculando.
   await reiniciarMetricasTO();
 
   return { mes, mesLabel: mesLabel(mes), guardados: nuevas.length, actualizados: updates.length };
@@ -502,12 +558,6 @@ const CONS_COL_ASESOR = 2;
 const CONS_COL_NOTA = 16;
 const CONS_COL_TIPO = 17;
 
-function mesAnteriorBogota(): string {
-  const [y, m] = mesActualBogota().split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1, 1));
-  d.setUTCMonth(d.getUTCMonth() - 1);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
 
 function fechaConsolidadoAMes(valor: unknown): string | null {
   const d = parseSheetDate(valor);

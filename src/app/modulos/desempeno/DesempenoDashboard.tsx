@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Users, BadgeCheck, AlertTriangle, DollarSign, Download, Search, SlidersHorizontal,
@@ -8,18 +8,6 @@ import {
   LogOut, Loader2, X, CalendarCheck, Save, RefreshCw,
 } from "lucide-react";
 
-const MESES_ES_UI = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-// Últimos 6 meses (YYYY-MM) con etiqueta, para el selector de "cerrar mes".
-function mesesRecientes(): { value: string; label: string }[] {
-  const out: { value: string; label: string }[] = [];
-  const now = new Date();
-  for (let i = 1; i <= 6; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    out.push({ value: ym, label: `${MESES_ES_UI[d.getMonth()]} ${d.getFullYear()}` });
-  }
-  return out;
-}
 import type { DashboardDesempeno, DesempenoFiltros, FilaTabla, CampoDesempeno, Area } from "@/lib/desempeno-tipos";
 import { AREAS_ORDEN, CAMPOS_EDITABLES_POR_AREA, CAMPOS_PORCENTAJE, esCampoAutomatico } from "@/lib/desempeno-tipos";
 import { obtenerDashboardDesempenoAction, cerrarMesAction, guardarMetricasAction, sincronizarAutomaticasAction } from "./actions";
@@ -87,8 +75,6 @@ export default function DesempenoDashboard({
   const [snap, setSnap] = useState<{ tipo: "ok" | "error"; msg: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [cierreOpen, setCierreOpen] = useState(false);
-  const opcionesCierre = useMemo(() => mesesRecientes(), []);
-  const [mesCierre, setMesCierre] = useState(() => mesesRecientes()[0]?.value ?? "");
   const [sincronizando, setSincronizando] = useState(false);
   const primera = useRef(true);
   const PAGE_SIZE = 10;
@@ -129,9 +115,10 @@ export default function DesempenoDashboard({
     setGuardando(true);
     setSnap(null);
     try {
-      const r = await cerrarMesAction(mesCierre);
+      const r = await cerrarMesAction();
       setCierreOpen(false);
-      setSnap({ tipo: "ok", msg: `Mes ${r.mesLabel} cerrado y métricas reiniciadas (${r.guardados} nuevos, ${r.actualizados} actualizados).` });
+      const sig = data?.mesActivoSiguiente ? ` Mes activo ahora: ${data.mesActivoSiguiente}.` : "";
+      setSnap({ tipo: "ok", msg: `Mes ${r.mesLabel} archivado y métricas manuales reiniciadas.${sig}` });
       await recargar({ area, busqueda, mes: "" });
     } catch (e) {
       setSnap({ tipo: "error", msg: e instanceof Error ? e.message : "Error al cerrar el mes" });
@@ -441,15 +428,20 @@ export default function DesempenoDashboard({
         <div className={s.overlay} onClick={() => { if (!guardando) setCierreOpen(false); }}>
           <div className={s.cierreModal} onClick={(e) => e.stopPropagation()}>
             <h3><CalendarCheck size={18} /> Cerrar mes</h3>
-            <p>Archiva el mes elegido en el histórico y <b>reinicia las métricas en 0</b> para empezar el siguiente. Las asesoras también verán el nuevo mes vacío.</p>
-            <label className={s.cierreLabel}>¿Qué mes estás cerrando?</label>
-            <select className={s.cierreSelect} value={mesCierre} onChange={(e) => setMesCierre(e.target.value)}>
-              {opcionesCierre.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
+            <p>
+              Vas a cerrar <b>{data?.mesActivoNombre || "el mes activo"}</b>
+              {data?.mesActivoSiguiente ? <> y pasar a <b>{data.mesActivoSiguiente}</b></> : null}.
+            </p>
+            <p className={s.cierreLabel}>Al confirmar:</p>
+            <ul style={{ margin: "0 0 4px 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.5 }}>
+              <li>Se <b>archiva</b> el resultado del mes al histórico (consultable en el selector de meses).</li>
+              <li>Se <b>avanza el mes activo</b> → auditorías, radicados, SNC y PQRSF se recalculan solos para el mes nuevo.</li>
+              <li>Se <b>reinician solo las métricas manuales</b> (satisfacción, productividad, adherencia, precisión). Las fórmulas no se tocan.</li>
+            </ul>
             <div className={s.cierreFoot}>
               <button className={s.cancelBtn} onClick={() => setCierreOpen(false)} disabled={guardando}>Cancelar</button>
               <button className={s.saveBtn} onClick={confirmarCierre} disabled={guardando}>
-                {guardando ? <Loader2 size={15} className={s.spin} /> : <CalendarCheck size={15} />} Cerrar y reiniciar
+                {guardando ? <Loader2 size={15} className={s.spin} /> : <CalendarCheck size={15} />} Cerrar y pasar de mes
               </button>
             </div>
           </div>
