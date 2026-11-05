@@ -55,6 +55,15 @@ export async function limpiarMetricasManual(mes: string): Promise<void> {
   if (error) throw new Error(`No se pudo limpiar: ${error.message}`);
 }
 
+// Borra TODAS las métricas manuales de un asesor (cualquier mes). Útil para
+// limpiar datos de prueba o reiniciar a una asesora.
+export async function borrarMetricasAsesor(asesor: string): Promise<void> {
+  if (!asesor) return;
+  const sb = getSupabase();
+  const { error } = await sb.from(TABLA_MANUAL).delete().eq("asesor", asesor);
+  if (error) throw new Error(`No se pudo borrar: ${error.message}`);
+}
+
 /* ── Configuración (mes activo nativo) ── */
 
 export async function obtenerConfig(clave: string): Promise<string | null> {

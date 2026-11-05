@@ -3,7 +3,12 @@ import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate } from
 import { obtenerMetricasRadicacionMes, type MetricasRadMes } from "@/lib/radicaciones";
 import { obtenerPqrsfPorAgenteMes } from "@/lib/lineaAmiga";
 import { calcularBono, camposEditablesDe } from "@/lib/desempeno-bono";
-import { obtenerMetricasManual, guardarMetricaManual, obtenerPecPencMes } from "@/lib/bono-store";
+import {
+  obtenerMetricasManual, guardarMetricaManual, obtenerPecPencMes,
+  obtenerConfig, guardarConfig, borrarMetricasAsesor,
+  archivarHistorico, obtenerHistorico, obtenerMesesHistorico,
+  type FilaHistoricoBono,
+} from "@/lib/bono-store";
 import {
   AREAS_ORDEN,
   LABELS,
@@ -89,6 +94,21 @@ function mesActivoAYM(nombre: string): string {
   const [y, mCal] = mesActualBogota().split("-").map(Number);
   const year = mesNum <= mCal ? y : y - 1;
   return `${year}-${String(mesNum).padStart(2, "0")}`;
+}
+
+// Mes activo del bono (NATIVO, independiente del Excel): config "mes_activo" o,
+// por defecto, el mes calendario actual. Aquí se cuentan PQRSF/radicados/SNC,
+// auditorías y métricas manuales.
+const CFG_MES_ACTIVO = "mes_activo";
+async function mesActivoBonoKey(): Promise<string> {
+  const cfg = await obtenerConfig(CFG_MES_ACTIVO);
+  return /^\d{4}-\d{2}$/.test(cfg ?? "") ? (cfg as string) : mesActualBogota();
+}
+function mesSiguienteKey(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1, 1));
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function norm(s: unknown): string {
@@ -247,42 +267,17 @@ function promedioPct(funcs: FuncionarioDesempeno[], campo: CampoDesempeno): numb
   return Math.round((nums.reduce((s, n) => s + n, 0) / nums.length) * 10) / 10;
 }
 
-/* ── Histórico: headers y helpers ── */
-const HISTORICO_HEADERS = [
-  "mes", "usuario", "funcionario", "area",
-  "pec", "penc", "productividad", "adherencia", "bono", "auditorias",
-  "pqrsfCreados", "pqrsfDevueltos", "precision", "errorRespuesta",
-  "radicadosPct", "snc", "sncRecibidos", "cantidadRadicados", "correccion", "sncSolucionados",
-  "satisfaccion", "calidadLlamada", "cerrado_el",
-];
-const HIST_CAMPOS = HISTORICO_HEADERS.slice(4, 22) as CampoDesempeno[];
-const HIST_LAST_COL = "W"; // 23 columnas → A:W
-
-async function leerHistorico(): Promise<unknown[][]> {
-  try {
-    return await readRange(sheetId(), `${TAB_HISTORICO}!A:${HIST_LAST_COL}`);
-  } catch {
-    return [];
-  }
-}
-
-// Reconstruye la lista de funcionarios de un mes cerrado desde el histórico.
-function funcsDeHistorico(data: unknown[][], mes: string): FuncionarioDesempeno[] {
-  if (data.length < 2) return [];
-  const idx = Object.fromEntries(HISTORICO_HEADERS.map((h, i) => [h, i])) as Record<string, number>;
-  const out: FuncionarioDesempeno[] = [];
-  for (let i = 1; i < data.length; i++) {
-    const r = data[i];
-    if (String(r[idx.mes] ?? "").trim() !== mes) continue;
-    const area = String(r[idx.area] ?? "").trim() as Area;
-    const valores: Partial<Record<CampoDesempeno, string>> = {};
-    for (const c of HIST_CAMPOS) {
-      const v = String(r[idx[c]] ?? "").trim();
-      if (v) valores[c] = v;
-    }
-    out.push({ usuario: String(r[idx.usuario] ?? "").trim(), funcionario: String(r[idx.funcionario] ?? "").trim(), area, fecha: mes, valores });
-  }
-  return out;
+/* ── Histórico NATIVO (Supabase) ── */
+// Reconstruye la lista de funcionarios de un mes cerrado desde bono_historico.
+async function funcsDeHistoricoNativo(mes: string): Promise<FuncionarioDesempeno[]> {
+  const hist = await obtenerHistorico(mes);
+  return hist.map((h) => ({
+    usuario: h.asesor,
+    funcionario: h.nombre,
+    area: h.area as Area,
+    fecha: mes,
+    valores: h.datos as Partial<Record<CampoDesempeno, string>>,
+  }));
 }
 
 /* ── Agregación común (sirve para vivo o histórico) ── */
@@ -300,19 +295,22 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
   const fMes = (filtros.mes ?? "").trim();
   const fBusqueda = norm(filtros.busqueda ?? "");
 
-  const histData = await leerHistorico();
-  const mesesHist = Array.from(new Set(histData.slice(1).map((r) => String(r[0] ?? "").trim()).filter(Boolean))).sort();
+  // Histórico NATIVO (Supabase): meses cerrados y sus funcionarios.
+  const mesesHist = await obtenerMesesHistorico();
+  const histPorMes = new Map<string, FuncionarioDesempeno[]>();
+  for (const m of mesesHist) histPorMes.set(m, await funcsDeHistoricoNativo(m));
 
-  // Mes activo del libro (una sola lectura; se reutiliza abajo).
-  const mesActivoNombre = await leerMesActivo();
-  const mesKeyActivo = mesActivoAYM(mesActivoNombre);
+  // Mes activo del bono (nativo; por defecto el mes calendario actual).
+  const mesKeyActivo = await mesActivoBonoKey();
+  const mmActivo = parseInt(mesKeyActivo.split("-")[1] ?? "0", 10);
+  const mesActivoNombre = MESES_NOMBRE[mmActivo - 1] ?? "";
 
-  // Fuente: mes cerrado (histórico) o mes en curso (TO vivo).
+  // Fuente: mes cerrado (histórico) o mes en curso (vivo).
   const esHistorico = fMes !== "" && mesesHist.includes(fMes);
   let todos: FuncionarioDesempeno[];
   let desconocidos = 0;
   if (esHistorico) {
-    todos = funcsDeHistorico(histData, fMes);
+    todos = histPorMes.get(fMes) ?? [];
   } else {
     const bloques = await leerBloquesTO();
     desconocidos = bloques.desconocidos;
@@ -405,7 +403,7 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
   // Agregados de cada mes cerrado (filtrados por área) + punto vivo si es "en curso".
   const serie: { mes: string; funcs: number; pec: number; penc: number; bonos: number }[] = [];
   for (const mes of mesesHist) {
-    const fh = funcsDeHistorico(histData, mes).filter((f) => !fArea || f.area === fArea);
+    const fh = (histPorMes.get(mes) ?? []).filter((f) => !fArea || f.area === fArea);
     if (fh.length === 0) continue;
     const a = agregar(fh);
     serie.push({ mes, funcs: a.total, pec: a.pec ?? 0, penc: a.pencProm ?? 0, bonos: a.bonos });
@@ -438,7 +436,7 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
   ];
 
   // Mes al que pasaría al cerrar.
-  const mesActivoSiguiente = siguienteMesNombre(mesActivoNombre);
+  const mesActivoSiguiente = MESES_NOMBRE[mmActivo % 12] ?? "";
 
   return {
     kpi: {
@@ -470,64 +468,34 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
 /* CERRAR MES (snapshot manual) */
 /* ===================== */
 
-// Cierra el MES ACTIVO del libro (celda MES_ACTIVO de la hoja Base): (1) archiva
-// sus resultados al histórico consultable, (2) AVANZA MES_ACTIVO al mes siguiente
-// —todo lo automático (auditorías, radicados, SNC, PQRSF) se recalcula solo para
-// el mes nuevo— y (3) reinicia solo las celdas manuales (las fórmulas quedan).
+// Cierra el MES ACTIVO (nativo): archiva el snapshot del mes a Supabase
+// (bono_historico, consultable) y AVANZA el mes activo al siguiente. El mes nuevo
+// arranca con las manuales vacías; lo automático se recalcula solo. No toca Excel.
 export async function cerrarMes(): Promise<ResultadoCierre> {
-  const id = sheetId();
-  await asegurarHoja(id, TAB_HISTORICO, HISTORICO_HEADERS);
+  const mes = await mesActivoBonoKey();
+  // Snapshot de lo que muestra el módulo (computado) → histórico nativo.
+  const dash = await obtenerDashboardDesempeno({});
+  const filas: FilaHistoricoBono[] = dash.tabla.filas.map((f) => ({
+    mes,
+    asesor: f.usuario,
+    nombre: f.funcionario,
+    area: f.area,
+    datos: Object.fromEntries(Object.entries(f.valores).map(([k, v]) => [k, String(v ?? "")])),
+  }));
+  const guardados = await archivarHistorico(filas);
+  // Avanza el mes activo nativo.
+  await guardarConfig(CFG_MES_ACTIVO, mesSiguienteKey(mes));
+  return { mes, mesLabel: mesLabel(mes), guardados, actualizados: 0 };
+}
 
-  const { bloques } = await leerBloquesTO();
-  const funcs: FuncionarioDesempeno[] = [];
-  for (const b of bloques) if (b.area) funcs.push(...b.funcionarios);
-
-  // El mes que se cierra es el MES_ACTIVO del libro (lo que muestran los datos).
-  const nombreActivo = await leerMesActivo();
-  const mes = mesActivoAYM(nombreActivo);
-
-  const existentes = await leerHistorico();
-  const idx = Object.fromEntries(HISTORICO_HEADERS.map((h, i) => [h, i])) as Record<string, number>;
-  const mapaFila = new Map<string, number>();
-  for (let i = 1; i < existentes.length; i++) {
-    const r = existentes[i];
-    const clave = `${String(r[idx.mes] ?? "").trim()}||${String(r[idx.usuario] ?? "").trim()}||${String(r[idx.area] ?? "").trim()}`;
-    mapaFila.set(clave, i + 1);
+// Borra las métricas manuales de un asesor (limpiar datos de prueba / reiniciar).
+export async function borrarMetricasDesempeno(usuario: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await borrarMetricasAsesor(usuario);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "No se pudo borrar" };
   }
-
-  const hoy = hoyBogotaISO();
-  const filaDe = (f: FuncionarioDesempeno): (string | number)[] => [
-    mes, f.usuario, f.funcionario, f.area,
-    ...HIST_CAMPOS.map((c) => f.valores[c] ?? ""),
-    hoy,
-  ];
-
-  const nuevas: (string | number)[][] = [];
-  const updates: { fila: number; valores: (string | number)[] }[] = [];
-  for (const f of funcs) {
-    const clave = `${mes}||${f.usuario}||${f.area}`;
-    if (mapaFila.has(clave)) updates.push({ fila: mapaFila.get(clave)!, valores: filaDe(f) });
-    else nuevas.push(filaDe(f));
-  }
-  for (const u of updates) {
-    await updateRange(id, `${TAB_HISTORICO}!A${u.fila}:${HIST_LAST_COL}${u.fila}`, [u.valores]);
-  }
-  if (nuevas.length > 0) await appendRows(id, `${TAB_HISTORICO}!A:${HIST_LAST_COL}`, nuevas);
-
-  // Avanza el MES ACTIVO al mes siguiente: escribe una sola celda (valor del
-  // desplegable), nunca una fórmula. Con eso TODO lo automático (auditorías,
-  // radicados, SNC, PQRSF) se recalcula solo para el mes nuevo.
-  const siguiente = siguienteMesNombre(nombreActivo);
-  if (siguiente && indiceMesNombre(nombreActivo) >= 0) {
-    await updateRange(id, CELDA_MES_ACTIVO, [[siguiente]]);
-  }
-
-  // Reinicio INTELIGENTE: vacía solo las celdas con VALOR fijo (las manuales) y
-  // DEJA INTACTAS las que tienen fórmula (PEC/PENC/conteos/bono). Así el mes
-  // nuevo arranca con las manuales en 0 y las fórmulas siguen calculando.
-  await reiniciarMetricasTO();
-
-  return { mes, mesLabel: mesLabel(mes), guardados: nuevas.length, actualizados: updates.length };
 }
 
 /* ===================== */
@@ -560,7 +528,7 @@ export async function guardarMetricasDesempeno(
   area: Area,
   cambios: Partial<Record<CampoDesempeno, string>>
 ): Promise<ResultadoGuardarMetricas> {
-  const mesKey = mesActivoAYM(await leerMesActivo());
+  const mesKey = await mesActivoBonoKey();
   // Se puede capturar CUALQUIER métrica del funcionario (cada asesora es distinta;
   // algunas 100% manuales; Joselyn tiene su set especial). Lo guardado manda.
   const validos = new Set(camposEditablesDe(area, usuario));

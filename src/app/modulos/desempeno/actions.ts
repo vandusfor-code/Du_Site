@@ -6,6 +6,7 @@ import {
   obtenerDashboardDesempeno,
   cerrarMes,
   guardarMetricasDesempeno,
+  borrarMetricasDesempeno,
   sincronizarAutomaticas,
   type DashboardDesempeno,
   type DesempenoFiltros,
@@ -49,4 +50,10 @@ export async function guardarMetricasAction(
 ): Promise<ResultadoGuardarMetricas> {
   await requireGestion();
   return guardarMetricasDesempeno(usuario, area, cambios);
+}
+
+// Borra las métricas manuales capturadas de un asesor (limpiar datos de prueba).
+export async function borrarMetricasAction(usuario: string): Promise<{ ok: boolean; error?: string }> {
+  await requireGestion();
+  return borrarMetricasDesempeno(usuario);
 }

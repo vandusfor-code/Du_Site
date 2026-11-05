@@ -11,7 +11,7 @@ import {
 import type { DashboardDesempeno, DesempenoFiltros, FilaTabla, CampoDesempeno, Area } from "@/lib/desempeno-tipos";
 import { AREAS_ORDEN, CAMPOS_PORCENTAJE, esCampoAutomatico } from "@/lib/desempeno-tipos";
 import { camposEditablesDe } from "@/lib/desempeno-bono";
-import { obtenerDashboardDesempenoAction, cerrarMesAction, guardarMetricasAction, sincronizarAutomaticasAction } from "./actions";
+import { obtenerDashboardDesempenoAction, cerrarMesAction, guardarMetricasAction, borrarMetricasAction, sincronizarAutomaticasAction } from "./actions";
 import s from "./desempeno.module.css";
 
 const AREA_COLOR: Record<string, string> = {
@@ -497,6 +497,20 @@ function EditarDrawer({
     }
   }
 
+  async function limpiar() {
+    setErr(null);
+    setGuardando(true);
+    try {
+      const r = await borrarMetricasAction(f.usuario);
+      if (r.ok) await onSaved();
+      else setErr(r.error ?? "No se pudo limpiar");
+    } catch {
+      setErr("No se pudo limpiar. Revisa la conexión e intenta de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   return (
     <div className={s.overlay} onClick={onClose}>
       <div className={s.drawer} onClick={(e) => e.stopPropagation()}>
@@ -546,6 +560,9 @@ function EditarDrawer({
 
         {editable && (
           <div className={s.drawerFoot}>
+            <button className={s.cancelBtn} onClick={limpiar} disabled={guardando} title="Borra las métricas manuales capturadas de esta asesora">
+              Limpiar
+            </button>
             <button className={s.cancelBtn} onClick={onClose} disabled={guardando}>Cancelar</button>
             <button className={s.saveBtn} onClick={guardar} disabled={guardando}>
               {guardando ? <Loader2 size={15} className={s.spin} /> : <Save size={15} />} Guardar
