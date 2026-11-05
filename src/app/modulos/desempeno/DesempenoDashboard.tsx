@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Users, BadgeCheck, AlertTriangle, DollarSign, Download, Search, SlidersHorizontal,
@@ -10,7 +10,6 @@ import {
 
 import type { DashboardDesempeno, DesempenoFiltros, FilaTabla, CampoDesempeno, Area } from "@/lib/desempeno-tipos";
 import { AREAS_ORDEN, CAMPOS_EDITABLES_POR_AREA, CAMPOS_PORCENTAJE, esCampoAutomatico } from "@/lib/desempeno-tipos";
-import { camposPorOrigen } from "@/lib/desempeno-bono";
 import { obtenerDashboardDesempenoAction, cerrarMesAction, guardarMetricasAction, sincronizarAutomaticasAction } from "./actions";
 import s from "./desempeno.module.css";
 
@@ -461,7 +460,6 @@ function EditarDrawer({
   onSaved: () => void | Promise<void>;
 }) {
   const campos = (CAMPOS_EDITABLES_POR_AREA[f.area as Area] ?? []) as CampoDesempeno[];
-  const manuales = useMemo(() => new Set(camposPorOrigen(f.area as Area).manual), [f.area]);
   const [valores, setValores] = useState<Partial<Record<CampoDesempeno, string>>>(() => {
     const init: Partial<Record<CampoDesempeno, string>> = {};
     for (const c of campos) init[c] = f.valores[c] ?? "";
@@ -470,11 +468,10 @@ function EditarDrawer({
   const [guardando, setGuardando] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Solo las métricas MANUALES del área son editables; las automáticas (las
-  // calcula la plataforma) y los meses cerrados quedan de solo lectura.
-  function campoBloqueado(c: CampoDesempeno): boolean {
-    if (!editable) return true;
-    return !manuales.has(c);
+  // Toda métrica del área es editable (cada asesora es distinta; muchas son
+  // 100% manuales). Solo los meses cerrados (histórico) quedan de solo lectura.
+  function campoBloqueado(_c: CampoDesempeno): boolean {
+    return !editable;
   }
 
   async function guardar() {

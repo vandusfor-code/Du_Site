@@ -1,7 +1,8 @@
 import "server-only";
 import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate } from "@/lib/sheets";
 import { obtenerMetricasRadicacionMes, type MetricasRadMes } from "@/lib/radicaciones";
-import { calcularBono, camposPorOrigen } from "@/lib/desempeno-bono";
+import { calcularBono } from "@/lib/desempeno-bono";
+import { CAMPOS_EDITABLES_POR_AREA } from "@/lib/desempeno-tipos";
 import { obtenerMetricasManual, guardarMetricaManual } from "@/lib/bono-store";
 import {
   AREAS_ORDEN,
@@ -317,11 +318,11 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     desconocidos = bloques.desconocidos;
     todos = [];
     for (const b of bloques.bloques) if (b.area) todos.push(...b.funcionarios);
-    // Métricas MANUALES capturadas en la plataforma (Supabase) MANDAN sobre lo
-    // que tenga el Excel. Luego el bono se calcula NATIVO con reglas de la app.
+    // Métricas capturadas en la plataforma (Supabase) MANDAN sobre lo que tenga
+    // el Excel. Luego el bono se calcula NATIVO con las reglas de la app.
     const manual = await obtenerMetricasManual(mesKeyActivo);
     for (const f of todos) {
-      for (const campo of camposPorOrigen(f.area).manual) {
+      for (const campo of CAMPOS_EDITABLES_POR_AREA[f.area] ?? []) {
         const v = manual.get(`${f.usuario}||${campo}`);
         if (v !== undefined && v !== "") f.valores[campo] = v;
       }
@@ -520,12 +521,14 @@ export async function guardarMetricasDesempeno(
   cambios: Partial<Record<CampoDesempeno, string>>
 ): Promise<ResultadoGuardarMetricas> {
   const mesKey = mesActivoAYM(await leerMesActivo());
-  const manuales = new Set(camposPorOrigen(area).manual);
+  // Se puede capturar CUALQUIER métrica del área (cada asesora es distinta;
+  // algunas son 100% manuales). Lo guardado en Du Site manda sobre el auto-cálculo.
+  const validos = new Set(CAMPOS_EDITABLES_POR_AREA[area] ?? []);
   const entradas = Object.entries(cambios) as [CampoDesempeno, string][];
   let guardados = 0;
   try {
     for (const [campo, valor] of entradas) {
-      if (!manuales.has(campo)) continue; // solo métricas manuales del área
+      if (!validos.has(campo)) continue; // no se guardan identidad/bono
       await guardarMetricaManual(mesKey, usuario, campo, (valor ?? "").trim());
       guardados++;
     }
