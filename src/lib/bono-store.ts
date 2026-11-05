@@ -10,6 +10,7 @@ import { getSupabase } from "@/lib/supabase";
 const TABLA_MANUAL = "bono_metrica_manual";
 const TABLA_CONFIG = "bono_config";
 const TABLA_HISTORICO = "bono_historico";
+const TABLA_AUDITORIA = "bono_auditoria";
 
 /* ── Métricas manuales ── */
 
@@ -71,6 +72,66 @@ export async function guardarConfig(clave: string, valor: string): Promise<void>
   const sb = getSupabase();
   const { error } = await sb.from(TABLA_CONFIG).upsert({ clave, valor }, { onConflict: "clave" });
   if (error) throw new Error(`No se pudo guardar config: ${error.message}`);
+}
+
+/* ── Auditorías → PEC/PENC ── */
+
+// Registra (upsert por id_gestion) una auditoría para el cálculo de PEC/PENC.
+// Best-effort: si falla, NO rompe el guardado de la auditoría en la hoja.
+export async function registrarAuditoriaBono(
+  idGestion: string,
+  mes: string,
+  asesor: string,
+  nota: number,
+  resultado: string
+): Promise<void> {
+  if (!idGestion || !mes || !asesor) return;
+  try {
+    const sb = getSupabase();
+    await sb.from(TABLA_AUDITORIA).upsert(
+      { id_gestion: idGestion, mes, asesor: asesor.toUpperCase(), nota, resultado: resultado.toUpperCase() },
+      { onConflict: "id_gestion" }
+    );
+  } catch {
+    // silencioso: el PEC/PENC del bono no debe bloquear la auditoría
+  }
+}
+
+export interface PecPenc { pec: number; penc: number; auditorias: number }
+
+// PEC = % de auditorías conformes (OK); PENC = promedio de la nota. Por asesor
+// (código en MAYÚSCULAS), para un mes 'YYYY-MM'.
+export async function obtenerPecPencMes(mes: string): Promise<Map<string, PecPenc>> {
+  const out = new Map<string, PecPenc>();
+  if (!mes) return out;
+  try {
+    const sb = getSupabase();
+    const { data, error } = await sb
+      .from(TABLA_AUDITORIA)
+      .select("asesor,nota,resultado")
+      .eq("mes", mes);
+    if (error) throw error;
+    const acc = new Map<string, { n: number; ok: number; suma: number }>();
+    for (const r of data ?? []) {
+      const code = String(r.asesor ?? "").trim().toUpperCase();
+      if (!code) continue;
+      const a = acc.get(code) ?? { n: 0, ok: 0, suma: 0 };
+      a.n += 1;
+      if (String(r.resultado ?? "").trim().toUpperCase() === "OK") a.ok += 1;
+      a.suma += Number(r.nota ?? 0);
+      acc.set(code, a);
+    }
+    for (const [code, a] of acc) {
+      out.set(code, {
+        pec: a.n > 0 ? Math.round((a.ok / a.n) * 1000) / 10 : 0,
+        penc: a.n > 0 ? Math.round((a.suma / a.n) * 10) / 10 : 0,
+        auditorias: a.n,
+      });
+    }
+  } catch {
+    // sin datos → vacío
+  }
+  return out;
 }
 
 /* ── Histórico de cierres ── */

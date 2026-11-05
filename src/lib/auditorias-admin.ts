@@ -2,6 +2,7 @@ import "server-only";
 import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate, hoyEnBogota } from "@/lib/sheets";
 import { parseCsv } from "@/lib/csv-parse";
 import { resolverAsesor } from "@/lib/auditoria-chatgpt-contrato";
+import { registrarAuditoriaBono } from "@/lib/bono-store";
 
 // ============================================================
 // AUDITORÍA COFREM — puerto del Apps Script original a Next.js.
@@ -455,8 +456,16 @@ export async function procesarTranscripciones(): Promise<ResultadoProcesamiento>
 
   const guardarBuffer = async () => {
     if (filasBuffer.length > 0) {
-      await appendRows(id, "Consolidado!A:AA", filasBuffer);
+      const lote = filasBuffer;
+      await appendRows(id, "Consolidado!A:AA", lote);
       filasBuffer = [];
+      // También a Supabase para PEC/PENC del bono (best-effort, por fila).
+      for (const r of lote) {
+        const d = parseSheetDate(r[0]);
+        const mes = d ? `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}` : "";
+        const nota = parseFloat(String(r[16] ?? "").replace("%", "").replace(",", ".")) || 0;
+        await registrarAuditoriaBono(String(r[6] ?? "").trim(), mes, String(r[2] ?? "").trim(), nota, String(r[17] ?? "").trim());
+      }
     }
     for (const u of actualizacionesEstado) {
       await updateRange(id, `Transcripciones1!E${u.fila}`, [[u.estado]]);
@@ -828,6 +837,9 @@ export async function guardarAuditoriaManual(input: AuditoriaManualInput): Promi
   ];
 
   await appendRows(id, "Consolidado!A:AA", [fila]);
+
+  // También a Supabase para el cálculo nativo de PEC/PENC del bono (best-effort).
+  await registrarAuditoriaBono(idGestion, fecha.slice(0, 7), asesor, nota, tipoNota);
 
   return { nota: nota + "%", tipoNota };
 }

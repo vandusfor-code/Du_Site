@@ -4,7 +4,7 @@ import { obtenerMetricasRadicacionMes, type MetricasRadMes } from "@/lib/radicac
 import { obtenerPqrsfPorAgenteMes } from "@/lib/lineaAmiga";
 import { calcularBono } from "@/lib/desempeno-bono";
 import { CAMPOS_EDITABLES_POR_AREA } from "@/lib/desempeno-tipos";
-import { obtenerMetricasManual, guardarMetricaManual } from "@/lib/bono-store";
+import { obtenerMetricasManual, guardarMetricaManual, obtenerPecPencMes } from "@/lib/bono-store";
 import {
   AREAS_ORDEN,
   LABELS,
@@ -322,12 +322,21 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     // AUTO desde los módulos: PQRSF creados (Línea amiga) y radicados/SNC
     // (Radicaciones), por mes, cruzados por nombre. Luego lo capturado en la
     // plataforma (Supabase) MANDA sobre el auto. El bono se calcula NATIVO.
-    const [manual, pqrsf, rad] = await Promise.all([
+    const [manual, pqrsf, rad, audit] = await Promise.all([
       obtenerMetricasManual(mesKeyActivo),
       obtenerPqrsfPorAgenteMes(mesKeyActivo).catch(() => new Map<string, number>()),
       obtenerMetricasRadicacionMes(mesKeyActivo).catch(() => new Map<string, MetricasRadMes>()),
+      obtenerPecPencMes(mesKeyActivo),
     ]);
     for (const f of todos) {
+      // PEC/PENC desde las auditorías (Supabase), por código de asesor.
+      // PEC = % conformes; PENC = promedio de la nota.
+      const pp = audit.get(f.usuario.trim().toUpperCase());
+      if (pp) {
+        f.valores.pec = `${pp.pec}%`;
+        f.valores.penc = `${pp.penc}%`;
+        f.valores.auditorias = String(pp.auditorias);
+      }
       // Conteo de PQRSF (Línea amiga / Chat)
       const pq = matchNombre(f.funcionario, pqrsf);
       if (pq !== null) f.valores.pqrsfCreados = String(pq);
