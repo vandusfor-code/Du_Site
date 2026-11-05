@@ -2,8 +2,7 @@ import "server-only";
 import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate } from "@/lib/sheets";
 import { obtenerMetricasRadicacionMes, type MetricasRadMes } from "@/lib/radicaciones";
 import { obtenerPqrsfPorAgenteMes } from "@/lib/lineaAmiga";
-import { calcularBono } from "@/lib/desempeno-bono";
-import { CAMPOS_EDITABLES_POR_AREA } from "@/lib/desempeno-tipos";
+import { calcularBono, camposEditablesDe } from "@/lib/desempeno-bono";
 import { obtenerMetricasManual, guardarMetricaManual, obtenerPecPencMes } from "@/lib/bono-store";
 import {
   AREAS_ORDEN,
@@ -228,17 +227,17 @@ function hoyBogotaISO(): string {
 }
 
 const INDICADORES_POR_AREA: Record<Area, CampoDesempeno[]> = {
-  "Línea amiga / Chat": ["pec", "penc", "productividad", "adherencia"],
-  "G. Empleo": ["pec", "penc", "productividad", "adherencia"],
-  "Encuestas": ["pec", "penc", "productividad", "adherencia", "precision", "errorRespuesta"],
+  "Línea amiga / Chat": ["satisfaccion", "pec", "penc", "productividad", "adherencia"],
+  "G. Empleo": ["satisfaccion", "pec", "penc", "productividad", "adherencia"],
+  "Encuestas": ["calidadLlamada", "pec", "penc", "productividad", "adherencia", "precision", "errorRespuesta"],
   "Radicación": ["productividad", "radicadosPct", "snc", "precision", "adherencia"],
   "G. Empleo Cofrem": ["pec", "penc"],
 };
 const COLUMNAS_POR_AREA: Record<Area, CampoDesempeno[]> = {
-  "Línea amiga / Chat": ["pec", "penc", "productividad", "adherencia", "bono", "pqrsfCreados", "pqrsfDevueltos", "auditorias"],
-  "G. Empleo": ["pec", "penc", "productividad", "adherencia", "bono"],
-  "Encuestas": ["pec", "penc", "productividad", "adherencia", "precision", "errorRespuesta", "bono"],
-  "Radicación": ["pec", "penc", "productividad", "radicadosPct", "snc", "precision", "adherencia", "bono", "sncRecibidos", "cantidadRadicados", "correccion", "sncSolucionados"],
+  "Línea amiga / Chat": ["satisfaccion", "pec", "penc", "productividad", "adherencia", "bono", "pqrsfCreados", "pqrsfDevueltos", "auditorias"],
+  "G. Empleo": ["satisfaccion", "pec", "penc", "productividad", "adherencia", "bono"],
+  "Encuestas": ["calidadLlamada", "pec", "penc", "productividad", "adherencia", "precision", "errorRespuesta", "bono"],
+  "Radicación": ["productividad", "radicadosPct", "snc", "precision", "adherencia", "bono", "sncRecibidos", "cantidadRadicados", "correccion", "sncSolucionados"],
   "G. Empleo Cofrem": ["pec", "penc", "auditorias"],
 };
 
@@ -340,7 +339,8 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
       // Conteo de PQRSF (Línea amiga / Chat)
       const pq = matchNombre(f.funcionario, pqrsf);
       if (pq !== null) f.valores.pqrsfCreados = String(pq);
-      // Radicación: conteos + SNC% = (radicados − SNC) / radicados
+      // Radicación: conteos + %. SNC% = (radicados − SNC) / radicados;
+      // RADICADOS% = (radicados − devueltos por error) / radicados.
       const r = matchNombre(f.funcionario, rad);
       if (r) {
         f.valores.cantidadRadicados = String(r.radicados);
@@ -349,14 +349,15 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
         f.valores.correccion = String(r.correccion);
         if (r.radicados > 0) {
           f.valores.snc = `${Math.round((1 - r.sncRecibidos / r.radicados) * 1000) / 10}%`;
+          f.valores.radicadosPct = `${Math.round((1 - r.devueltos / r.radicados) * 1000) / 10}%`;
         }
       }
       // Capturado en la plataforma MANDA sobre el auto.
-      for (const campo of CAMPOS_EDITABLES_POR_AREA[f.area] ?? []) {
+      for (const campo of camposEditablesDe(f.area, f.usuario)) {
         const v = manual.get(`${f.usuario}||${campo}`);
         if (v !== undefined && v !== "") f.valores[campo] = v;
       }
-      f.valores.bono = String(calcularBono(f.area, f.valores).total);
+      f.valores.bono = String(calcularBono(f.area, f.valores, f.usuario).total);
     }
   }
 
@@ -551,9 +552,9 @@ export async function guardarMetricasDesempeno(
   cambios: Partial<Record<CampoDesempeno, string>>
 ): Promise<ResultadoGuardarMetricas> {
   const mesKey = mesActivoAYM(await leerMesActivo());
-  // Se puede capturar CUALQUIER métrica del área (cada asesora es distinta;
-  // algunas son 100% manuales). Lo guardado en Du Site manda sobre el auto-cálculo.
-  const validos = new Set(CAMPOS_EDITABLES_POR_AREA[area] ?? []);
+  // Se puede capturar CUALQUIER métrica del funcionario (cada asesora es distinta;
+  // algunas 100% manuales; Joselyn tiene su set especial). Lo guardado manda.
+  const validos = new Set(camposEditablesDe(area, usuario));
   const entradas = Object.entries(cambios) as [CampoDesempeno, string][];
   let guardados = 0;
   try {

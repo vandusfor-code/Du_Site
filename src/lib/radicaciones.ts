@@ -648,6 +648,7 @@ export async function obtenerSNCTodas(): Promise<SNCEquipo> {
 
 export interface MetricasRadMes {
   radicados: number;
+  devueltos: number; // radicados devueltos por error (GESTIONES col E = "Si")
   sncRecibidos: number;
   sncSolucionados: number;
   correccion: number;
@@ -662,7 +663,7 @@ export async function obtenerMetricasRadicacionMes(mesYM: string): Promise<Map<s
   const bump = (nombre: string, k: keyof MetricasRadMes, n = 1) => {
     const key = normalize(nombre);
     if (!key) return;
-    const cur = out.get(key) ?? { radicados: 0, sncRecibidos: 0, sncSolucionados: 0, correccion: 0 };
+    const cur = out.get(key) ?? { radicados: 0, devueltos: 0, sncRecibidos: 0, sncSolucionados: 0, correccion: 0 };
     cur[k] += n;
     out.set(key, cur);
   };
@@ -676,7 +677,10 @@ export async function obtenerMetricasRadicacionMes(mesYM: string): Promise<Map<s
     const g = await readRange(id, "GESTIONES", { unformatted: true });
     for (let i = 1; i < g.length; i++) {
       if (!enMes(g[i][0])) continue;
-      bump(texto(g[i], 2).trim(), "radicados");
+      const nombre = texto(g[i], 2).trim();
+      bump(nombre, "radicados");
+      // Devuelto por error: col E "Si" (no se cuenta "No").
+      if (normalize(g[i][4]) === "si") bump(nombre, "devueltos");
     }
   } catch {
     // sin datos de gestiones → se queda en 0

@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 
 import type { DashboardDesempeno, DesempenoFiltros, FilaTabla, CampoDesempeno, Area } from "@/lib/desempeno-tipos";
-import { AREAS_ORDEN, CAMPOS_EDITABLES_POR_AREA, CAMPOS_PORCENTAJE, esCampoAutomatico } from "@/lib/desempeno-tipos";
+import { AREAS_ORDEN, CAMPOS_PORCENTAJE, esCampoAutomatico } from "@/lib/desempeno-tipos";
+import { camposEditablesDe } from "@/lib/desempeno-bono";
 import { obtenerDashboardDesempenoAction, cerrarMesAction, guardarMetricasAction, sincronizarAutomaticasAction } from "./actions";
 import s from "./desempeno.module.css";
 
@@ -459,7 +460,7 @@ function EditarDrawer({
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }) {
-  const campos = (CAMPOS_EDITABLES_POR_AREA[f.area as Area] ?? []) as CampoDesempeno[];
+  const campos = camposEditablesDe(f.area as Area, f.usuario) as CampoDesempeno[];
   const [valores, setValores] = useState<Partial<Record<CampoDesempeno, string>>>(() => {
     const init: Partial<Record<CampoDesempeno, string>> = {};
     for (const c of campos) init[c] = f.valores[c] ?? "";

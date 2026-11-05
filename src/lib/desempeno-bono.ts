@@ -10,7 +10,7 @@
 // pero calculado en Du Site, para no depender del Excel.
 // ============================================================
 
-import { AREAS_ORDEN, type Area, type CampoDesempeno } from "@/lib/desempeno-tipos";
+import { AREAS_ORDEN, CAMPOS_EDITABLES_POR_AREA, type Area, type CampoDesempeno } from "@/lib/desempeno-tipos";
 
 export const BASE_BONO = 300000;
 
@@ -65,6 +65,40 @@ export const REGLAS_BONO: Record<Area, ReglaBono[]> = {
   ],
 };
 
+// Reglas ESPECIALES por código de asesor (excepciones a las de su área). Joselyn
+// (J.MENDOZA382) maneja Empleo + Radicación: su tabla combina llamadas (PEC/PENC
+// auditadas) con radicación (RADICADOS/SNC de conteos). Suma $300.000; sin Precisión.
+export const REGLAS_ESPECIALES: Record<string, ReglaBono[]> = {
+  "J.MENDOZA382": [
+    { campo: "satisfaccion", umbral: 95, monto: 40000, origen: "manual" },
+    { campo: "pec", umbral: 98, monto: 70000, origen: "auto" },
+    { campo: "penc", umbral: 95, monto: 50000, origen: "auto" },
+    { campo: "radicadosPct", umbral: 95, monto: 40000, origen: "auto" },
+    { campo: "adherencia", umbral: 100, monto: 60000, origen: "manual" },
+    { campo: "snc", umbral: 95, monto: 40000, origen: "auto" },
+  ],
+};
+
+// Reglas aplicables a un funcionario: las especiales de su código si existen,
+// si no las de su área.
+export function reglasDe(area: Area, codigo?: string): ReglaBono[] {
+  const c = (codigo ?? "").trim().toUpperCase();
+  return (c && REGLAS_ESPECIALES[c]) || REGLAS_BONO[area] || [];
+}
+
+// Métricas que se muestran/capturan para un funcionario (set especial por código
+// si aplica, si no el de su área). Joselyn ve sus columnas combinadas.
+export const CAMPOS_ESPECIALES: Record<string, CampoDesempeno[]> = {
+  "J.MENDOZA382": [
+    "satisfaccion", "pec", "penc", "radicadosPct", "snc", "adherencia",
+    "sncRecibidos", "cantidadRadicados", "correccion", "sncSolucionados",
+  ],
+};
+export function camposEditablesDe(area: Area, codigo?: string): CampoDesempeno[] {
+  const c = (codigo ?? "").trim().toUpperCase();
+  return (c && CAMPOS_ESPECIALES[c]) || CAMPOS_EDITABLES_POR_AREA[area] || [];
+}
+
 export interface DetalleBonoItem {
   campo: CampoDesempeno;
   umbral: number;
@@ -91,11 +125,13 @@ export function normalizarPct(v: string | number | null | undefined): number | n
 }
 
 // Calcula el bono de un funcionario a partir de sus valores de métricas.
+// `codigo` permite aplicar reglas especiales (p.ej. Joselyn).
 export function calcularBono(
   area: Area,
-  valores: Partial<Record<CampoDesempeno, string | number>>
+  valores: Partial<Record<CampoDesempeno, string | number>>,
+  codigo?: string
 ): ResultadoBono {
-  const reglas = REGLAS_BONO[area] ?? [];
+  const reglas = reglasDe(area, codigo);
   const detalle: DetalleBonoItem[] = reglas.map((r) => {
     const valor = normalizarPct(valores[r.campo]);
     const cumple = valor !== null && valor >= r.umbral;
@@ -106,9 +142,9 @@ export function calcularBono(
   return { total, topeMaximo, detalle };
 }
 
-// Campos que la plataforma calcula sola (auto) y que captura a mano (manual), por área.
-export function camposPorOrigen(area: Area): { auto: CampoDesempeno[]; manual: CampoDesempeno[] } {
-  const reglas = REGLAS_BONO[area] ?? [];
+// Campos que la plataforma calcula sola (auto) y que captura a mano (manual).
+export function camposPorOrigen(area: Area, codigo?: string): { auto: CampoDesempeno[]; manual: CampoDesempeno[] } {
+  const reglas = reglasDe(area, codigo);
   return {
     auto: reglas.filter((r) => r.origen === "auto").map((r) => r.campo),
     manual: reglas.filter((r) => r.origen === "manual").map((r) => r.campo),
