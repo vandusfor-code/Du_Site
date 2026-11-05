@@ -318,6 +318,15 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     desconocidos = bloques.desconocidos;
     todos = [];
     for (const b of bloques.bloques) if (b.area) todos.push(...b.funcionarios);
+    // Dedupe por código: algunas (como Joselyn) aparecen en 2 bloques del Excel;
+    // en la plataforma debe salir una sola vez (sus reglas son por código).
+    const vistosCodigo = new Set<string>();
+    todos = todos.filter((f) => {
+      const k = f.usuario.trim().toUpperCase();
+      if (!k || vistosCodigo.has(k)) return false;
+      vistosCodigo.add(k);
+      return true;
+    });
     // AUTO desde los módulos: PQRSF creados (Línea amiga) y radicados/SNC
     // (Radicaciones), por mes, cruzados por nombre. Luego lo capturado en la
     // plataforma (Supabase) MANDA sobre el auto. El bono se calcula NATIVO.
