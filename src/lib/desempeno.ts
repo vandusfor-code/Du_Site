@@ -1,6 +1,7 @@
 import "server-only";
 import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate } from "@/lib/sheets";
 import { obtenerMetricasRadicacionMes, type MetricasRadMes } from "@/lib/radicaciones";
+import { calcularBono } from "@/lib/desempeno-bono";
 import {
   AREAS_ORDEN,
   LABELS,
@@ -312,6 +313,11 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     desconocidos = bloques.desconocidos;
     todos = [];
     for (const b of bloques.bloques) if (b.area) todos.push(...b.funcionarios);
+    // Bono NATIVO: lo calcula Du Site con las reglas de "Tabla objetivos" a partir
+    // de las métricas (no se lee la columna Bono del Excel). Para el mes en curso.
+    for (const f of todos) {
+      f.valores.bono = String(calcularBono(f.area, f.valores).total);
+    }
   }
 
   const filtrados = todos.filter((f) => {
