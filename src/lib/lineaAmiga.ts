@@ -545,3 +545,25 @@ export async function obtenerPqrsfSerie(): Promise<{ dias: PqrsfDia[]; meses: Pq
   const fechas = data.map((row) => parseSheetDate(row[0]));
   return serieDesdeFechas(fechas, 5, 5);
 }
+
+// ── Conteo de PQRSF por agente para un mes (para el bono nativo) ──
+// Clave: nombre normalizado del agente → cantidad de PQRSF creados en el mes.
+export async function obtenerPqrsfPorAgenteMes(mesYM: string): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const [y, m] = mesYM.split("-").map(Number);
+  if (!y || !m) return out;
+  try {
+    const id = sheetId();
+    const data = await readRange(id, SHEETS.PQRSF, { unformatted: true });
+    for (let i = 1; i < data.length; i++) {
+      const f = parseSheetDate(data[i][0]);
+      if (!f || f.getUTCFullYear() !== y || f.getUTCMonth() !== m - 1) continue;
+      const ag = normalize(texto(data[i], 1));
+      if (!ag) continue;
+      out.set(ag, (out.get(ag) ?? 0) + 1);
+    }
+  } catch {
+    // sin datos → mapa vacío
+  }
+  return out;
+}

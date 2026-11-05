@@ -1,6 +1,7 @@
 import "server-only";
 import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate } from "@/lib/sheets";
 import { obtenerMetricasRadicacionMes, type MetricasRadMes } from "@/lib/radicaciones";
+import { obtenerPqrsfPorAgenteMes } from "@/lib/lineaAmiga";
 import { calcularBono } from "@/lib/desempeno-bono";
 import { CAMPOS_EDITABLES_POR_AREA } from "@/lib/desempeno-tipos";
 import { obtenerMetricasManual, guardarMetricaManual } from "@/lib/bono-store";
@@ -318,10 +319,30 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     desconocidos = bloques.desconocidos;
     todos = [];
     for (const b of bloques.bloques) if (b.area) todos.push(...b.funcionarios);
-    // Métricas capturadas en la plataforma (Supabase) MANDAN sobre lo que tenga
-    // el Excel. Luego el bono se calcula NATIVO con las reglas de la app.
-    const manual = await obtenerMetricasManual(mesKeyActivo);
+    // AUTO desde los módulos: PQRSF creados (Línea amiga) y radicados/SNC
+    // (Radicaciones), por mes, cruzados por nombre. Luego lo capturado en la
+    // plataforma (Supabase) MANDA sobre el auto. El bono se calcula NATIVO.
+    const [manual, pqrsf, rad] = await Promise.all([
+      obtenerMetricasManual(mesKeyActivo),
+      obtenerPqrsfPorAgenteMes(mesKeyActivo).catch(() => new Map<string, number>()),
+      obtenerMetricasRadicacionMes(mesKeyActivo).catch(() => new Map<string, MetricasRadMes>()),
+    ]);
     for (const f of todos) {
+      // Conteo de PQRSF (Línea amiga / Chat)
+      const pq = matchNombre(f.funcionario, pqrsf);
+      if (pq !== null) f.valores.pqrsfCreados = String(pq);
+      // Radicación: conteos + SNC% = (radicados − SNC) / radicados
+      const r = matchNombre(f.funcionario, rad);
+      if (r) {
+        f.valores.cantidadRadicados = String(r.radicados);
+        f.valores.sncRecibidos = String(r.sncRecibidos);
+        f.valores.sncSolucionados = String(r.sncSolucionados);
+        f.valores.correccion = String(r.correccion);
+        if (r.radicados > 0) {
+          f.valores.snc = `${Math.round((1 - r.sncRecibidos / r.radicados) * 1000) / 10}%`;
+        }
+      }
+      // Capturado en la plataforma MANDA sobre el auto.
       for (const campo of CAMPOS_EDITABLES_POR_AREA[f.area] ?? []) {
         const v = manual.get(`${f.usuario}||${campo}`);
         if (v !== undefined && v !== "") f.valores[campo] = v;
@@ -585,20 +606,21 @@ function tokensNombre(s: string): string[] {
 }
 
 // Cruza un nombre COMPLETO de TO (p. ej. "Joselyn del Carmen Mendoza Jiménez")
-// con el mapa de Radicación, cuyas claves son nombres CORTOS (p. ej. "Joselyn
-// Mendoza"): mismo primer nombre y todos los tokens del corto contenidos en el
-// completo. Si dos claves distintas calzan, se considera ambiguo y no asigna.
-function matchRad(nombreTO: string, rad: Map<string, MetricasRadMes>): MetricasRadMes | null {
+// con un mapa cuyas claves son nombres CORTOS (p. ej. "Joselyn Mendoza"): mismo
+// primer nombre y todos los tokens del corto contenidos en el completo. Si dos
+// claves distintas calzan, se considera ambiguo y no asigna. Sirve para cualquier
+// módulo (Radicación, PQRSF…).
+function matchNombre<T>(nombreTO: string, mapa: Map<string, T>): T | null {
   const full = tokensNombre(nombreTO);
   if (full.length === 0) return null;
   const fullSet = new Set(full);
-  let encontrado: MetricasRadMes | null = null;
+  let encontrado: T | null = null;
   let ambiguo = false;
-  for (const [key, val] of rad) {
+  for (const [key, val] of mapa) {
     const kt = tokensNombre(key);
     if (kt.length === 0 || kt[0] !== full[0]) continue; // mismo primer nombre
     if (!kt.every((t) => fullSet.has(t))) continue; // apellidos del corto ⊆ completo
-    if (encontrado && encontrado !== val) ambiguo = true;
+    if (encontrado !== null && encontrado !== val) ambiguo = true;
     encontrado = val;
   }
   return ambiguo ? null : encontrado;
@@ -666,7 +688,7 @@ export async function sincronizarAutomaticas(): Promise<ResultadoSincronizar> {
     // Radicaciones nombre corto). Solo escribe en bloques con esas columnas.
     const idxNombre = mapaCol.get("funcionario");
     const nombre = idxNombre !== undefined ? String(fila[idxNombre] ?? "").trim() : "";
-    const r = nombre ? matchRad(nombre, rad) : null;
+    const r = nombre ? matchNombre(nombre, rad) : null;
     if (r) for (const { campo, key } of camposRad) await escribir(mapaCol.get(campo), fila, i + 1, String(r[key]));
   }
   return { ok: true, actualizados, mesLabel: mesLabel(mes) };
