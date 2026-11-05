@@ -126,9 +126,9 @@ async function conReintentosDeLectura<T>(fn: () => Promise<T>, intentos = 5): Pr
 export async function readRange(
   spreadsheetId: string,
   range: string,
-  opts?: { unformatted?: boolean }
+  opts?: { unformatted?: boolean; formula?: boolean }
 ): Promise<unknown[][]> {
-  const render = opts?.unformatted ? "UNFORMATTED_VALUE" : "FORMATTED_VALUE";
+  const render = opts?.formula ? "FORMULA" : opts?.unformatted ? "UNFORMATTED_VALUE" : "FORMATTED_VALUE";
   const path = `/${spreadsheetId}/values/${encodeURIComponent(range)}?valueRenderOption=${render}`;
   const data = await conReintentosDeLectura(() => sheetsFetch<{ values?: unknown[][] }>(path));
   return data.values ?? [];
