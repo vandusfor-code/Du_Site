@@ -335,6 +335,10 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
       obtenerPecPencMes(mesKeyActivo),
     ]);
     for (const f of todos) {
+      // El Excel SOLO aporta el roster (usuario/funcionaria/área). Los valores de
+      // métricas se calculan 100% nativo: ignoramos lo que traiga la hoja TO para
+      // no sumar datos viejos del Excel al bono.
+      f.valores = {};
       // PEC/PENC desde las auditorías (Supabase), por código de asesor.
       // PEC = % conformes; PENC = promedio de la nota.
       const pp = audit.get(f.usuario.trim().toUpperCase());
