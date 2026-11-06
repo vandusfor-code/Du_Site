@@ -1,34 +1,33 @@
 import "server-only";
-import { readRange, appendRows, updateRange, asegurarHoja } from "@/lib/sheets";
+import { readRange } from "@/lib/sheets";
 import { parsearPreguntasTSV, calificar, type Letra } from "@/lib/evaluaciones-tipos";
 import { enviarCorreoMasivo } from "@/lib/mailer";
 import { correoEvaluacionesPendientes } from "@/lib/emailTemplates";
+import {
+  listarQuizzesStore,
+  idsQuizzesStore,
+  insertarQuizStore,
+  insertarPreguntasStore,
+  activarQuizStore,
+  leerPreguntasStore,
+  obtenerResultadoStore,
+  obtenerResultadosDeQuizStore,
+  guardarResultadoStore,
+  type PreguntaRow,
+} from "@/lib/eval-store";
 
 // ============================================================
-// Evaluaciones (quizzes) — capa de datos (lado coordinación/admin).
+// Evaluaciones (quizzes) — capa de datos.
 //
-// Reutiliza la hoja de DuAcademy (SHEET_ID_QUIZ) con pestañas DEDICADAS que no
-// tocan las existentes: EVAL_QUIZZES, EVAL_PREGUNTAS, EVAL_RESULTADOS. Se
-// autocrean. (Si algún día se usa una hoja aparte, basta definir
-// SHEET_ID_EVALUACIONES.)
+// NATIVO: todo se guarda en Supabase (tablas eval_quizzes / eval_preguntas /
+// eval_resultados). Ya no depende de Google Sheets ni de SHEET_ID_QUIZ. Solo el
+// directorio de asesoras (para resultados y avisos por correo) se lee de las
+// hojas oficiales Usuarios/Funcionarios.
 // ============================================================
-
-const TAB_QUIZZES = "EVAL_QUIZZES";
-const TAB_PREGUNTAS = "EVAL_PREGUNTAS";
-const TAB_RESULTADOS = "EVAL_RESULTADOS";
-
-const HEADERS_QUIZZES = ["ID", "NOMBRE", "DESCRIPCION", "DURACION_MIN", "UMBRAL", "NUM_PREGUNTAS", "ACTIVO", "CREADO_POR", "CREADO_EN"];
-const HEADERS_PREGUNTAS = ["QUIZ_ID", "NUM", "ID_PREGUNTA", "PREGUNTA", "OPCION_A", "OPCION_B", "OPCION_C", "OPCION_D", "CORRECTA", "EXPLICACION"];
-const HEADERS_RESULTADOS = ["FECHA", "USUARIO", "QUIZ_ID", "ACIERTOS", "TOTAL", "PUNTAJE", "RESULTADO", "RESPUESTAS_JSON", "FALLADAS"];
 
 const UMBRAL_POR_DEFECTO = 60;
 const DURACION_POR_DEFECTO = 5;
 
-function sheetId(): string {
-  const id = process.env.SHEET_ID_EVALUACIONES || process.env.SHEET_ID_QUIZ;
-  if (!id) throw new Error("Falta la variable SHEET_ID_EVALUACIONES (o SHEET_ID_QUIZ).");
-  return id;
-}
 function usuariosSheetId(): string {
   const id = process.env.SHEET_ID_USUARIOS;
   if (!id) throw new Error("Falta la variable SHEET_ID_USUARIOS");
@@ -37,11 +36,15 @@ function usuariosSheetId(): string {
 function texto(row: unknown[], i: number): string {
   return (row[i] ?? "").toString();
 }
-function esActivo(v: string): boolean {
-  return ["si", "sí", "true", "1", "x", "activo"].includes(v.trim().toLowerCase());
-}
-function ahoraBogota(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "America/Bogota" });
+function formatFecha(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString("es-CO", {
+    timeZone: "America/Bogota",
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
 }
 
 export interface QuizResumen {
@@ -88,71 +91,39 @@ export async function crearQuiz(input: CrearQuizInput): Promise<{ ok: true; id: 
     return { ok: false, error: "No se detectaron preguntas válidas." };
   }
 
-  const id = sheetId();
-  await asegurarHoja(id, TAB_QUIZZES, HEADERS_QUIZZES);
-  await asegurarHoja(id, TAB_PREGUNTAS, HEADERS_PREGUNTAS);
-  await asegurarHoja(id, TAB_RESULTADOS, HEADERS_RESULTADOS);
-
-  const quizzesRaw = await readRange(id, `${TAB_QUIZZES}!A2:A`);
-  const usados = new Set(quizzesRaw.map((r) => texto(r, 0).trim()).filter(Boolean));
+  const usados = await idsQuizzesStore();
   const quizId = slugId(nombre, usados);
 
   const duracion = input.duracionMin > 0 ? input.duracionMin : DURACION_POR_DEFECTO;
   const umbral = input.umbral > 0 && input.umbral <= 100 ? input.umbral : UMBRAL_POR_DEFECTO;
 
   // Nace INACTIVO: la coordinadora lo activa cuando corresponda.
-  await appendRows(id, `${TAB_QUIZZES}!A:I`, [[
-    quizId, nombre, (input.descripcion ?? "").trim(), String(duracion), String(umbral),
-    String(parseado.preguntas.length), "NO", input.creadoPor, ahoraBogota(),
-  ]]);
-
-  const filas = parseado.preguntas.map((p, idx) => {
-    const op = (l: string) => p.opciones.find((o) => o.letra === l)?.texto ?? "";
-    return [quizId, String(idx + 1), p.id, p.pregunta, op("A"), op("B"), op("C"), op("D"), p.correcta, p.explicacion];
+  await insertarQuizStore({
+    id: quizId, nombre, descripcion: (input.descripcion ?? "").trim(),
+    duracionMin: duracion, umbral, numPreguntas: parseado.preguntas.length,
+    creadoPor: input.creadoPor,
   });
-  await appendRows(id, `${TAB_PREGUNTAS}!A:J`, filas);
+
+  const filas: PreguntaRow[] = parseado.preguntas.map((p, idx) => {
+    const op = (l: string) => p.opciones.find((o) => o.letra === l)?.texto ?? "";
+    return {
+      num: idx + 1, idPregunta: p.id, pregunta: p.pregunta,
+      opcionA: op("A"), opcionB: op("B"), opcionC: op("C"), opcionD: op("D"),
+      correcta: p.correcta as Letra, explicacion: p.explicacion,
+    };
+  });
+  await insertarPreguntasStore(quizId, filas);
 
   return { ok: true, id: quizId, numPreguntas: parseado.preguntas.length };
 }
 
 export async function listarQuizzes(): Promise<QuizResumen[]> {
-  const id = sheetId();
-  let data: unknown[][] = [];
-  try {
-    data = await readRange(id, `${TAB_QUIZZES}!A2:I`);
-  } catch {
-    return [];
-  }
-  const out: QuizResumen[] = [];
-  for (const r of data) {
-    const qid = texto(r, 0).trim();
-    if (!qid) continue;
-    out.push({
-      id: qid,
-      nombre: texto(r, 1).trim() || qid,
-      descripcion: texto(r, 2).trim(),
-      duracionMin: parseInt(texto(r, 3), 10) || DURACION_POR_DEFECTO,
-      umbral: parseInt(texto(r, 4), 10) || UMBRAL_POR_DEFECTO,
-      numPreguntas: parseInt(texto(r, 5), 10) || 0,
-      activo: esActivo(texto(r, 6)),
-      creadoPor: texto(r, 7).trim(),
-      creadoEn: texto(r, 8).trim(),
-    });
-  }
-  return out;
-}
-
-async function filaDeQuiz(quizId: string): Promise<number> {
-  const col = await readRange(sheetId(), `${TAB_QUIZZES}!A2:A`);
-  const objetivo = quizId.trim();
-  for (let i = 0; i < col.length; i++) if (texto(col[i], 0).trim() === objetivo) return i + 2;
-  return -1;
+  return listarQuizzesStore();
 }
 
 export async function activarQuiz(quizId: string, activo: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
-  const fila = await filaDeQuiz(quizId);
-  if (fila === -1) return { ok: false, error: "No existe el módulo." };
-  await updateRange(sheetId(), `${TAB_QUIZZES}!G${fila}`, [[activo ? "SI" : "NO"]]);
+  const existe = await activarQuizStore(quizId, activo);
+  if (!existe) return { ok: false, error: "No existe el módulo." };
   return { ok: true };
 }
 
@@ -184,21 +155,17 @@ export async function listarAsesorasActivas(): Promise<{ usuario: string; nombre
 }
 
 export async function obtenerResultadosQuiz(quizId: string): Promise<FilaResultado[]> {
-  const id = sheetId();
-  const [asesoras, resultadosRaw] = await Promise.all([
+  const [asesoras, resultados] = await Promise.all([
     listarAsesorasActivas(),
-    readRange(id, `${TAB_RESULTADOS}!A2:G`).catch(() => [] as unknown[][]),
+    obtenerResultadosDeQuizStore(quizId),
   ]);
 
-  // Último resultado por usuario para este quiz.
   const porUsuario = new Map<string, { porcentaje: number; resultado: string; fecha: string }>();
-  for (const r of resultadosRaw) {
-    if (texto(r, 2).trim() !== quizId) continue;
-    const usuario = texto(r, 1).trim().toUpperCase();
-    porUsuario.set(usuario, {
-      porcentaje: parseInt(texto(r, 5), 10) || 0,
-      resultado: texto(r, 6).trim(),
-      fecha: texto(r, 0).trim(),
+  for (const r of resultados) {
+    porUsuario.set(r.usuario.trim().toUpperCase(), {
+      porcentaje: r.puntaje,
+      resultado: r.resultado,
+      fecha: formatFecha(r.fecha),
     });
   }
 
@@ -254,7 +221,7 @@ export async function avisarEvaluaciones(): Promise<{ enviados: number }> {
 // Seguridad: la RESPUESTA CORRECTA nunca se envía al navegador por adelantado.
 // El feedback por pregunta se resuelve en el servidor (verificarRespuesta) y la
 // nota final SIEMPRE se recalcula en el servidor (finalizar). Un intento por
-// asesora, controlado por EVAL_RESULTADOS.
+// asesora, controlado por eval_resultados.
 // ============================================================
 
 interface PreguntaConClave {
@@ -267,48 +234,40 @@ interface PreguntaConClave {
 }
 
 async function leerPreguntasQuiz(quizId: string): Promise<PreguntaConClave[]> {
-  const data = await readRange(sheetId(), `${TAB_PREGUNTAS}!A2:J`);
-  const out: PreguntaConClave[] = [];
-  for (const r of data) {
-    if (texto(r, 0).trim() !== quizId) continue;
+  const filas = await leerPreguntasStore(quizId);
+  const out: PreguntaConClave[] = filas.map((r, idx) => {
     const opciones: { letra: Letra; texto: string }[] = [];
-    (["A", "B", "C", "D"] as Letra[]).forEach((l, i) => {
-      const t = texto(r, 4 + i).trim();
+    const vals: Record<Letra, string> = { A: r.opcionA, B: r.opcionB, C: r.opcionC, D: r.opcionD } as Record<Letra, string>;
+    (["A", "B", "C", "D"] as Letra[]).forEach((l) => {
+      const t = (vals[l] ?? "").trim();
       if (t) opciones.push({ letra: l, texto: t });
     });
-    out.push({
-      num: parseInt(texto(r, 1), 10) || out.length + 1,
-      id: texto(r, 2).trim(),
-      pregunta: texto(r, 3),
+    return {
+      num: r.num || idx + 1,
+      id: r.idPregunta,
+      pregunta: r.pregunta,
       opciones,
-      correcta: (texto(r, 8).trim().toUpperCase() as Letra),
-      explicacion: texto(r, 9),
-    });
-  }
+      correcta: r.correcta,
+      explicacion: r.explicacion,
+    };
+  });
   out.sort((a, b) => a.num - b.num);
   return out;
 }
 
 // Último resultado de una asesora en un quiz (o null).
 async function resultadoDe(usuario: string, quizId: string): Promise<{ fecha: string; porcentaje: number; resultado: string; aciertos: number; total: number; respuestas: Record<string, Letra>; falladas: string } | null> {
-  const data = await readRange(sheetId(), `${TAB_RESULTADOS}!A2:I`).catch(() => [] as unknown[][]);
-  const u = usuario.trim().toUpperCase();
-  for (let i = data.length - 1; i >= 0; i--) {
-    const r = data[i];
-    if (texto(r, 1).trim().toUpperCase() !== u || texto(r, 2).trim() !== quizId) continue;
-    let respuestas: Record<string, Letra> = {};
-    try { respuestas = JSON.parse(texto(r, 7) || "{}"); } catch { respuestas = {}; }
-    return {
-      fecha: texto(r, 0).trim(),
-      aciertos: parseInt(texto(r, 3), 10) || 0,
-      total: parseInt(texto(r, 4), 10) || 0,
-      porcentaje: parseInt(texto(r, 5), 10) || 0,
-      resultado: texto(r, 6).trim(),
-      respuestas,
-      falladas: texto(r, 8),
-    };
-  }
-  return null;
+  const r = await obtenerResultadoStore(usuario, quizId);
+  if (!r) return null;
+  return {
+    fecha: formatFecha(r.fecha),
+    aciertos: r.aciertos,
+    total: r.total,
+    porcentaje: r.puntaje,
+    resultado: r.resultado,
+    respuestas: r.respuestas,
+    falladas: r.falladas,
+  };
 }
 
 export interface PanelAsesora {
@@ -396,11 +355,12 @@ export async function finalizarQuizAsesora(usuario: string, quizId: string, resp
   });
   const cal = calificar(correctasPorNum, respuestasPorNum, quiz.umbral);
 
-  await appendRows(sheetId(), `${TAB_RESULTADOS}!A:I`, [[
-    ahoraBogota(), usuario, quizId, String(cal.aciertos), String(cal.total),
-    String(cal.porcentaje), cal.resultado, JSON.stringify(respuestasPorId),
-    cal.falladas.length ? cal.falladas.join(", ") : "Ninguna",
-  ]]);
+  await guardarResultadoStore({
+    usuario, quizId,
+    aciertos: cal.aciertos, total: cal.total, puntaje: cal.porcentaje,
+    resultado: cal.resultado, respuestas: respuestasPorId,
+    falladas: cal.falladas.length ? cal.falladas.join(", ") : "Ninguna",
+  });
 
   return { ok: true, data: { aciertos: cal.aciertos, total: cal.total, porcentaje: cal.porcentaje, resultado: cal.resultado, errores: cal.total - cal.aciertos } };
 }
