@@ -63,6 +63,9 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      # ── Cron de Calidad (token que valida el agendador QStash) ──
+      - key: CRON_SECRET
+        sync: false
       # ── Correo SMTP (notificaciones) ──
       - key: SMTP_HOST
         sync: false
