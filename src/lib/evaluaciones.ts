@@ -9,6 +9,7 @@ import {
   insertarQuizStore,
   insertarPreguntasStore,
   activarQuizStore,
+  eliminarQuizStore,
   leerPreguntasStore,
   obtenerResultadoStore,
   obtenerResultadosDeQuizStore,
@@ -125,6 +126,11 @@ export async function activarQuiz(quizId: string, activo: boolean): Promise<{ ok
   const existe = await activarQuizStore(quizId, activo);
   if (!existe) return { ok: false, error: "No existe el módulo." };
   return { ok: true };
+}
+
+export async function eliminarQuiz(quizId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try { await eliminarQuizStore(quizId); return { ok: true }; }
+  catch (e) { return { ok: false, error: e instanceof Error ? e.message : "No se pudo eliminar" }; }
 }
 
 // ── Matriz de calificaciones de un quiz: quién lo hizo, con su nota, y quién no. ──

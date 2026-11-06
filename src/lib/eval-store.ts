@@ -125,6 +125,14 @@ export async function insertarPreguntasStore(
   if (error) throw new Error(`No se pudieron guardar las preguntas: ${error.message}`);
 }
 
+export async function eliminarQuizStore(quizId: string): Promise<void> {
+  const sb = getSupabase();
+  // Las preguntas caen por FK on delete cascade; los resultados se borran aparte.
+  await sb.from(T_RES).delete().eq("quiz_id", quizId);
+  const { error } = await sb.from(T_QUIZ).delete().eq("id", quizId);
+  if (error) throw new Error(`No se pudo eliminar: ${error.message}`);
+}
+
 // Devuelve true si el quiz existía y se actualizó.
 export async function activarQuizStore(quizId: string, activo: boolean): Promise<boolean> {
   const sb = getSupabase();

@@ -6,6 +6,7 @@ import {
   crearQuiz,
   listarQuizzes,
   activarQuiz,
+  eliminarQuiz,
   obtenerResultadosQuiz,
   avisarEvaluaciones,
   obtenerPanelAsesora,
@@ -44,6 +45,11 @@ export async function crearQuizAction(input: Omit<CrearQuizInput, "creadoPor">):
 export async function activarQuizAction(quizId: string, activo: boolean): Promise<Resultado> {
   await requireGestion();
   return activarQuiz(quizId, activo);
+}
+
+export async function eliminarQuizAction(quizId: string): Promise<Resultado> {
+  await requireGestion();
+  return eliminarQuiz(quizId);
 }
 
 export async function obtenerResultadosQuizAction(quizId: string): Promise<FilaResultado[]> {

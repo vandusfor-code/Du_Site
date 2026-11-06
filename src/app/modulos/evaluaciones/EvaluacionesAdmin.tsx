@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ListChecks, Plus, Bell, RefreshCw, Users, X, FileText } from "lucide-react";
+import { ListChecks, Plus, Bell, RefreshCw, Users, X, FileText, Trash2 } from "lucide-react";
 import { parsearPreguntasTSV, type ResultadoParseoPreguntas } from "@/lib/evaluaciones-tipos";
 import type { QuizResumen, FilaResultado } from "@/lib/evaluaciones";
 import {
   listarQuizzesAction,
   crearQuizAction,
   activarQuizAction,
+  eliminarQuizAction,
   obtenerResultadosQuizAction,
   avisarEvaluacionesAction,
 } from "./actions";
@@ -75,6 +76,16 @@ export default function EvaluacionesAdmin({
     try {
       const res = await activarQuizAction(q.id, !q.activo);
       if (res.ok) { setBanner({ tipo: "ok", msg: `Módulo "${q.nombre}" ${q.activo ? "desactivado" : "activado"}.` }); await refrescar(); }
+      else setBanner({ tipo: "error", msg: res.error });
+    } catch (e) { setBanner({ tipo: "error", msg: e instanceof Error ? e.message : "Error" }); }
+  }
+
+  async function borrar(q: QuizResumen) {
+    if (!window.confirm(`¿Eliminar el módulo "${q.nombre}" y todas sus preguntas y resultados? Esta acción no se puede deshacer.`)) return;
+    setBanner(null);
+    try {
+      const res = await eliminarQuizAction(q.id);
+      if (res.ok) { setBanner({ tipo: "ok", msg: `Módulo "${q.nombre}" eliminado.` }); await refrescar(); }
       else setBanner({ tipo: "error", msg: res.error });
     } catch (e) { setBanner({ tipo: "error", msg: e instanceof Error ? e.message : "Error" }); }
   }
@@ -165,6 +176,7 @@ export default function EvaluacionesAdmin({
               <div style={{ display: "flex", gap: 8 }}>
                 <button style={S.ghost} onClick={() => verResultados(q)}><Users size={14} /> Resultados</button>
                 <button style={q.activo ? S.ghost : S.btn} onClick={() => toggleActivo(q)}>{q.activo ? "Desactivar" : "Activar"}</button>
+                <button style={{ ...S.ghost, width: 40, padding: 0, justifyContent: "center", color: "#d64545" }} onClick={() => borrar(q)} title="Eliminar"><Trash2 size={15} /></button>
               </div>
             </div>
           ))}

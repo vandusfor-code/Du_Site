@@ -3,7 +3,7 @@ import { modulosPermitidos, MODULOS } from "@/lib/modulos";
 import { HomeView, type TareaPendiente, type HomeData } from "@/components/home-view";
 import { logoutAction } from "./logout/actions";
 import { obtenerAuditoriasYConteoAnterior, obtenerCronograma } from "@/lib/metricas";
-import { obtenerDatosCompletos } from "@/lib/duacademy";
+import { obtenerPanelCursos } from "@/lib/duacademy-cursos";
 import { obtenerNotificaciones as obtenerNotificacionesRadicaciones, obtenerRadicacionesSerie, type RadicacionDia } from "@/lib/radicaciones";
 import { getNotificaciones as obtenerNotificacionesLineaAmiga, obtenerGestionesMes, obtenerPqrsfSerie, type PqrsfDia } from "@/lib/lineaAmiga";
 import { resolverAsesoraId } from "@/lib/documentacion-identidad";
@@ -119,7 +119,7 @@ export default async function Home() {
   const [auditoriasYConteoR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, gestionesMesR, cronogramaR, bannerR, serieRadR, seriePqrsfR] =
     await Promise.allSettled([
       tieneMetricas ? obtenerAuditoriasYConteoAnterior(usuario) : Promise.resolve({ auditorias: [], conteoMesAnterior: 0 }),
-      has("quiz") ? obtenerDatosCompletos(nombre) : Promise.resolve(null),
+      has("quiz") ? obtenerPanelCursos(usuario) : Promise.resolve(null),
       has("radicaciones") ? obtenerNotificacionesRadicaciones(nombre) : Promise.resolve([]),
       has("linea-amiga") ? obtenerNotificacionesLineaAmiga(nombre) : Promise.resolve([]),
       has("documentacion") ? resolverAsesoraId(usuario).then((id) => obtenerPendientesDocumentacion(id)) : Promise.resolve([]),
@@ -153,18 +153,11 @@ export default async function Home() {
     });
 
   if (duacademyR.status === "fulfilled" && duacademyR.value) {
-    const datos = duacademyR.value;
-    const hechos = new Set(datos.historial.map((h) => h.idItem));
-    const cursosPendientes = datos.todosLosCursos.filter(
-      (c) => datos.asignadosCursos.includes(c.ID_MODULO) && !hechos.has(c.ID_MODULO)
-    );
-    const simsPendientes = datos.todasLasSims.filter(
-      (s) => datos.asignadosSims.includes(s.ID_SIMULACION) && !hechos.has(s.ID_SIMULACION)
-    );
-    [...cursosPendientes, ...simsPendientes].forEach((item, i) => {
+    // DuAcademy NATIVO: los cursos activos que la asesora aún no ha presentado.
+    duacademyR.value.pendientes.forEach((c) => {
       listaTareas.push({
-        id: `duacademy-${item.ID_MODULO || item.ID_SIMULACION || i}`,
-        titulo: `Completar: ${item.TITULO || "Formación asignada"}`,
+        id: `duacademy-${c.id}`,
+        titulo: `Completar curso: ${c.titulo}`,
         moduloId: "quiz",
         moduloNombre: "DuAcademy",
         moduloHref: "/modulos/quiz",
