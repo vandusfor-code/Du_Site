@@ -6,9 +6,11 @@ import { NextResponse } from "next/server";
 // No hace trabajo pesado ni toca la base de datos.
 export const dynamic = "force-dynamic";
 
-export function GET() {
+function ok() {
   return NextResponse.json({ ok: true, ts: Date.now() }, { headers: { "cache-control": "no-store" } });
 }
+export function GET() { return ok(); }
+export function POST() { return ok(); } // QStash dispara con POST
 export function HEAD() {
   return new NextResponse(null, { status: 200, headers: { "cache-control": "no-store" } });
 }
