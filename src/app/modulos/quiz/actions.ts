@@ -1,95 +1,108 @@
 "use server";
 
 import { auth } from "@/auth";
+import { esAdminOCoordinadora } from "@/lib/auth-helpers";
 import {
-  obtenerPerfil,
-  obtenerDatosCompletos,
-  obtenerPreguntas,
-  guardarResultado,
-  hablarConIA,
-  actualizarPingConexion,
-  obtenerDatosAdmin,
-  asignarModulosUsuario,
-  enviarCorreoGeneral,
+  crearCurso,
+  listarCursos,
+  activarCurso,
+  eliminarCurso,
+  obtenerResultadosCurso,
+  listarBase,
+  crearTemaBase,
+  eliminarTemaBase,
   obtenerLeaderboard,
-  type Perfil,
-  type DatosCompletos,
-  type Pregunta,
-  type MensajeIA,
-  type DatosAdmin,
+  obtenerPanelCursos,
+  abrirCurso,
+  iniciarExamen,
+  verificarRespuesta,
+  finalizarExamen,
+  obtenerMiProgreso,
+  type CrearCursoInput,
+  type CursoResumen,
+  type FilaResultadoCurso,
+  type TemaBase,
   type LeaderboardEntry,
-} from "@/lib/duacademy";
+  type PanelCursos,
+  type CursoDetalle,
+  type ExamenParaPresentar,
+  type ResultadoExamen,
+} from "@/lib/duacademy-cursos";
+import type { Letra } from "@/lib/evaluaciones-tipos";
 
-async function perfilActual(): Promise<Perfil> {
+async function requireSesion() {
   const session = await auth();
-  const nombre = session?.user?.nombre;
-  if (!nombre) throw new Error("No autenticado");
-  const perfil = await obtenerPerfil(nombre);
-  if (!perfil) throw new Error("No se encontró tu perfil en DuAcademy");
-  return perfil;
+  if (!session?.user) throw new Error("No autenticado");
+  return session;
+}
+async function requireGestion() {
+  const session = await requireSesion();
+  if (!esAdminOCoordinadora(session)) throw new Error("No autorizado");
+  return session;
 }
 
-async function requireAdmin(): Promise<Perfil> {
-  const perfil = await perfilActual();
-  if (perfil.rol.trim().toLowerCase() !== "admin") {
-    throw new Error("No tienes permisos de administrador");
-  }
-  return perfil;
-}
+/* ── Admin ── */
 
-export async function obtenerDatosCompletosAction(): Promise<DatosCompletos | null> {
-  const perfil = await perfilActual();
-  return obtenerDatosCompletos(perfil.nombre);
+export async function crearCursoAction(input: Omit<CrearCursoInput, "creadoPor">): Promise<{ ok: true; id: string; numPreguntas: number } | { ok: false; error: string }> {
+  const session = await requireGestion();
+  return crearCurso({ ...input, creadoPor: session.user.nombre });
 }
-
+export async function listarCursosAction(): Promise<CursoResumen[]> {
+  await requireGestion();
+  return listarCursos();
+}
+export async function activarCursoAction(id: string, activo: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireGestion();
+  return activarCurso(id, activo);
+}
+export async function eliminarCursoAction(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireGestion();
+  return eliminarCurso(id);
+}
+export async function obtenerResultadosCursoAction(id: string): Promise<FilaResultadoCurso[]> {
+  await requireGestion();
+  return obtenerResultadosCurso(id);
+}
+export async function listarBaseAction(): Promise<TemaBase[]> {
+  await requireGestion();
+  return listarBase();
+}
+export async function crearTemaBaseAction(tema: string, info: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireGestion();
+  return crearTemaBase(tema, info);
+}
+export async function eliminarTemaBaseAction(id: number): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireGestion();
+  return eliminarTemaBase(id);
+}
 export async function obtenerLeaderboardAction(): Promise<LeaderboardEntry[]> {
-  await perfilActual();
+  await requireGestion();
   return obtenerLeaderboard();
 }
 
-export async function obtenerPreguntasAction(idCurso: string): Promise<Pregunta[]> {
-  await perfilActual();
-  return obtenerPreguntas(idCurso);
-}
+/* ── Asesora ── */
 
-export async function guardarResultadoAction(
-  idItem: string,
-  nota: number,
-  errores = ""
-): Promise<void> {
-  const perfil = await perfilActual();
-  await guardarResultado(perfil.email, idItem, nota, errores);
+export async function obtenerPanelCursosAction(): Promise<PanelCursos> {
+  const session = await requireSesion();
+  return obtenerPanelCursos(session.user.usuario);
 }
-
-export async function hablarConIAAction(
-  mensajeUsuario: string,
-  idSimulacion: string,
-  historialAnterior: MensajeIA[]
-): Promise<string> {
-  const perfil = await perfilActual();
-  return hablarConIA(mensajeUsuario, idSimulacion, historialAnterior, perfil.email);
+export async function abrirCursoAction(cursoId: string): Promise<{ ok: true; data: CursoDetalle } | { ok: false; error: string }> {
+  const session = await requireSesion();
+  return abrirCurso(session.user.usuario, cursoId);
 }
-
-export async function actualizarPingConexionAction(): Promise<void> {
-  const perfil = await perfilActual();
-  await actualizarPingConexion(perfil.email);
+export async function iniciarExamenAction(cursoId: string): Promise<{ ok: true; data: ExamenParaPresentar } | { ok: false; error: string }> {
+  const session = await requireSesion();
+  return iniciarExamen(session.user.usuario, cursoId);
 }
-
-export async function obtenerDatosAdminAction(): Promise<DatosAdmin> {
-  await requireAdmin();
-  return obtenerDatosAdmin();
+export async function verificarRespuestaAction(cursoId: string, idPregunta: string, letra: Letra): Promise<{ ok: true; correcta: boolean; letraCorrecta: Letra } | { ok: false; error: string }> {
+  await requireSesion();
+  return verificarRespuesta(cursoId, idPregunta, letra);
 }
-
-export async function asignarModulosUsuarioAction(
-  email: string,
-  cursos: string,
-  sims: string
-): Promise<boolean> {
-  await requireAdmin();
-  return asignarModulosUsuario(email, cursos, sims);
+export async function finalizarExamenAction(cursoId: string, respuestas: Record<string, Letra>): Promise<{ ok: true; data: ResultadoExamen } | { ok: false; error: string }> {
+  const session = await requireSesion();
+  return finalizarExamen(session.user.usuario, cursoId, respuestas);
 }
-
-export async function enviarCorreoGeneralAction(): Promise<{ enviados: number }> {
-  await requireAdmin();
-  return enviarCorreoGeneral();
+export async function obtenerMiProgresoAction(): Promise<{ completados: number; aprobados: number; promedio: number; racha: number }> {
+  const session = await requireSesion();
+  return obtenerMiProgreso(session.user.usuario);
 }
