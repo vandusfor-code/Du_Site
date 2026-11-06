@@ -31,14 +31,14 @@ export const REGLAS_BONO: Record<Area, ReglaBono[]> = {
     { campo: "satisfaccion", umbral: 95, monto: 40000, origen: "manual" },
     { campo: "pec", umbral: 98, monto: 70000, origen: "auto" },
     { campo: "penc", umbral: 95, monto: 50000, origen: "auto" },
-    { campo: "productividad", umbral: 95, monto: 80000, origen: "manual" },
+    { campo: "productividad", umbral: 95, monto: 80000, origen: "auto" },
     { campo: "adherencia", umbral: 100, monto: 60000, origen: "manual" },
   ],
   "G. Empleo": [
     { campo: "satisfaccion", umbral: 95, monto: 40000, origen: "manual" },
     { campo: "pec", umbral: 98, monto: 70000, origen: "auto" },
     { campo: "penc", umbral: 95, monto: 50000, origen: "auto" },
-    { campo: "productividad", umbral: 95, monto: 80000, origen: "manual" },
+    { campo: "productividad", umbral: 95, monto: 80000, origen: "auto" },
     { campo: "adherencia", umbral: 100, monto: 60000, origen: "manual" },
   ],
   "Encuestas": [

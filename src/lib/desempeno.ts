@@ -368,6 +368,19 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
         const v = manual.get(`${f.usuario}||${campo}`);
         if (v !== undefined && v !== "") f.valores[campo] = v;
       }
+      // Productividad de Línea amiga / G. Empleo = "gestión efectiva sin
+      // reprocesos" (Tabla objetivos): (PQRSF creados − devueltos) / creados.
+      // Es AUTOMÁTICA desde el registro de PQRSF; los devueltos pueden capturarse
+      // a mano (si no, cuentan 0 → 100%). Se calcula después del override manual
+      // para que mande el dato derivado.
+      if (f.area === "Línea amiga / Chat" || f.area === "G. Empleo") {
+        const creados = Number(f.valores.pqrsfCreados ?? 0);
+        const devueltos = Number(f.valores.pqrsfDevueltos ?? 0);
+        if (Number.isFinite(creados) && creados > 0) {
+          const efectivas = Math.max(0, creados - (Number.isFinite(devueltos) ? devueltos : 0));
+          f.valores.productividad = `${Math.round((efectivas / creados) * 1000) / 10}%`;
+        }
+      }
       f.valores.bono = String(calcularBono(f.area, f.valores, f.usuario).total);
     }
   }
