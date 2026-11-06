@@ -1,4 +1,4 @@
-export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno" | "documentacion" | "pqrsf-comunicar" | "extensiones" | "calidad" | "puntos-pago" | "evaluaciones";
+export type ModuloId = "metricas" | "pqrsf-data" | "linea-amiga" | "radicaciones" | "quiz" | "admin" | "desempeno" | "documentacion" | "pqrsf-comunicar" | "extensiones" | "calidad" | "puntos-pago" | "evaluaciones" | "gestion-empleo";
 
 export interface Modulo {
   id: ModuloId;
@@ -99,6 +99,13 @@ export const MODULOS: Modulo[] = [
     descripcion: "Quizzes de conocimiento operativo: presenta los módulos asignados y revisa tus resultados.",
     href: "/modulos/evaluaciones",
     color: "#1677ff",
+  },
+  {
+    id: "gestion-empleo",
+    nombre: "Gestión de empleo",
+    descripcion: "Validación de aportes PILA y requisitos del Subsidio de Desempleo.",
+    href: "/modulos/gestion-empleo",
+    color: "#6d28d9",
   },
 ];
 

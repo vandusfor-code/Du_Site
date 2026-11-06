@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   MapPin,
   ListChecks,
+  Briefcase,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuloId } from "@/lib/modulos";
@@ -37,4 +38,5 @@ export const MODULO_VISUALS: Record<ModuloId, ModuloVisual> = {
   calidad: { icon: ClipboardCheck, accentBg: "#ccfbf1", accentFg: "#0d9488" },
   "puntos-pago": { icon: MapPin, accentBg: "#efeaff", accentFg: "#5b4ee6" },
   evaluaciones: { icon: ListChecks, accentBg: "#e7f1ff", accentFg: "#1677ff" },
+  "gestion-empleo": { icon: Briefcase, accentBg: "#ede9fe", accentFg: "#6d28d9" },
 };
