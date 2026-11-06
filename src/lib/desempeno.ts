@@ -596,21 +596,51 @@ function tokensNombre(s: string): string[] {
   return norm(s).split(/\s+/).filter(Boolean);
 }
 
+// Distancia de edición acotada: solo nos interesa saber si es <= 1, así que
+// devolvemos 2 apenas la diferencia de longitudes ya la descarta.
+function distanciaEdicion(a: string, b: string): number {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > 1) return 2;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// ¿Dos tokens de un nombre refieren al mismo? Iguales, uno prefijo del otro
+// ("Angi"/"Angie") o a una letra de distancia ("Aragonez"/"Aragones"). La
+// tolerancia exige >= 4 caracteres para que nombres cortos ("Ana") solo crucen
+// exactos y no se mezclen con parecidos.
+function tokenNombreIgual(a: string, b: string): boolean {
+  if (a === b) return true;
+  const min = Math.min(a.length, b.length);
+  if (min >= 4 && (a.startsWith(b) || b.startsWith(a))) return true;
+  if (min >= 4 && distanciaEdicion(a, b) <= 1) return true;
+  return false;
+}
+
 // Cruza un nombre COMPLETO de TO (p. ej. "Joselyn del Carmen Mendoza Jiménez")
-// con un mapa cuyas claves son nombres CORTOS (p. ej. "Joselyn Mendoza"): mismo
-// primer nombre y todos los tokens del corto contenidos en el completo. Si dos
-// claves distintas calzan, se considera ambiguo y no asigna. Sirve para cualquier
-// módulo (Radicación, PQRSF…).
+// con un mapa cuyas claves son nombres de otro módulo (formulario de Línea amiga,
+// Radicación…). Las dos listas se mantienen a mano en hojas distintas, así que
+// toleramos pequeñas variaciones de ortografía: mismo primer nombre y que cada
+// token del nombre más corto tenga su equivalente en el más largo (iguales o casi,
+// vía tokenNombreIgual). Si dos claves distintas calzan, es ambiguo y no asigna.
 function matchNombre<T>(nombreTO: string, mapa: Map<string, T>): T | null {
   const full = tokensNombre(nombreTO);
   if (full.length === 0) return null;
-  const fullSet = new Set(full);
   let encontrado: T | null = null;
   let ambiguo = false;
   for (const [key, val] of mapa) {
     const kt = tokensNombre(key);
-    if (kt.length === 0 || kt[0] !== full[0]) continue; // mismo primer nombre
-    if (!kt.every((t) => fullSet.has(t))) continue; // apellidos del corto ⊆ completo
+    if (kt.length === 0) continue;
+    if (!tokenNombreIgual(kt[0], full[0])) continue; // mismo primer nombre (tolerante)
+    const [corto, largo] = kt.length <= full.length ? [kt, full] : [full, kt];
+    if (!corto.every((t) => largo.some((u) => tokenNombreIgual(t, u)))) continue;
     if (encontrado !== null && encontrado !== val) ambiguo = true;
     encontrado = val;
   }
