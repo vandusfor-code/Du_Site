@@ -32,6 +32,7 @@ export default function GestionEmpleoApp({ nombre, esSupervision }: { nombre: st
   const [vista, setVista] = useState<VistaResultado | null>(null);
 
   return (
+    <div style={{ background: "#f4f5f7", minHeight: "100vh", width: "100%", colorScheme: "light" }}>
     <div style={S.page}>
       <div style={{ ...S.card, padding: "20px 24px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
         <div style={{ width: 50, height: 50, borderRadius: 14, background: "#f1edfd", color: ACC, display: "grid", placeItems: "center", flexShrink: 0 }}><Briefcase size={26} /></div>
@@ -52,6 +53,7 @@ export default function GestionEmpleoApp({ nombre, esSupervision }: { nombre: st
       {seccion === "config" && esSupervision && <Configuracion />}
 
       <div style={{ marginTop: 28 }}><Link href="/" style={{ color: ACC, fontWeight: 600, fontSize: 14 }}>← Volver al inicio</Link></div>
+    </div>
     </div>
   );
 }
