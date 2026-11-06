@@ -25,11 +25,10 @@ function tema(estado: string) {
 }
 
 export default function ResultadoPila({
-  vista, onNueva, onGuardarObservacion,
+  vista, onNueva,
 }: {
   vista: VistaResultado;
   onNueva: () => void;
-  onGuardarObservacion?: (texto: string) => Promise<void>;
 }) {
   const t = tema(vista.estado);
   const [pagina, setPagina] = useState(1);
@@ -37,8 +36,6 @@ export default function ResultadoPila({
   const [verExcluidos, setVerExcluidos] = useState(true);
   const [expandido, setExpandido] = useState<string | null>(null);
   const [obs, setObs] = useState(vista.observacionAsesor);
-  const [guardando, setGuardando] = useState(false);
-  const [guardado, setGuardado] = useState(false);
 
   const empresas = useMemo(() => Array.from(new Set(vista.resumenPorPeriodo.flatMap((p) => p.nits))).sort(), [vista]);
   const filtrados = useMemo(() => {
@@ -51,12 +48,6 @@ export default function ResultadoPila({
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   const pag = Math.min(pagina, totalPaginas);
   const visibles = filtrados.slice((pag - 1) * POR_PAGINA, pag * POR_PAGINA);
-
-  async function guardar() {
-    if (!onGuardarObservacion || guardando) return;
-    setGuardando(true); setGuardado(false);
-    try { await onGuardarObservacion(obs); setGuardado(true); } finally { setGuardando(false); }
-  }
 
   const indicadores = [
     { icon: <Target size={18} />, label: "Días requeridos", valor: vista.diasRequeridos, color: "#6b7280" },
@@ -72,7 +63,7 @@ export default function ResultadoPila({
         <div style={{ fontSize: 12, color: "#9199a8" }}>Gestión de empleo <span style={{ margin: "0 6px" }}>›</span> Validador PILA <span style={{ margin: "0 6px" }}>›</span> <b style={{ color: "#4a5168" }}>Resultado</b></div>
         <div style={{ display: "flex", gap: 10 }}>
           <button style={S.ghost} onClick={onNueva}><RotateCcw size={15} /> Nueva validación</button>
-          <button style={S.btn} onClick={() => generarInformePdf(vista)}><Download size={15} /> Descargar PDF</button>
+          <button style={S.btn} onClick={() => generarInformePdf({ ...vista, observacionAsesor: obs })}><Download size={15} /> Descargar PDF</button>
         </div>
       </div>
 
@@ -216,19 +207,10 @@ export default function ResultadoPila({
               {vista.inconsistencias.filter((i) => i.nivel !== "info").slice(0, 6).map((i, k) => <li key={k}>{i.mensaje}</li>)}
             </ul>
           )}
-          {onGuardarObservacion ? (
-            <>
-              <div style={S.label}>Observación del asesor (manual)</div>
-              <textarea value={obs} onChange={(e) => { setObs(e.target.value); setGuardado(false); }} rows={3} placeholder="Agrega una nota sobre esta validación…"
-                style={{ width: "100%", border: "1px solid #e1e5ee", borderRadius: 10, padding: "10px 12px", fontSize: 13, marginTop: 6, resize: "vertical" }} />
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8, alignItems: "center" }}>
-                {guardado && <span style={{ color: "#16834b", fontSize: 12.5 }}>Guardada ✓</span>}
-                <button style={S.btn} onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar observación"}</button>
-              </div>
-            </>
-          ) : vista.observacionAsesor ? (
-            <div style={{ fontSize: 12.5 }}><b>Del asesor:</b> {vista.observacionAsesor}</div>
-          ) : null}
+          <div style={S.label}>Observación del asesor (opcional · va en el PDF)</div>
+          <textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={3} placeholder="Agrega una nota para incluir en el informe PDF…"
+            style={{ width: "100%", border: "1px solid #e1e5ee", borderRadius: 10, padding: "10px 12px", fontSize: 13, marginTop: 6, resize: "vertical" }} />
+          <div style={{ fontSize: 11, color: "#9199a8", marginTop: 6 }}>Esta validación no se guarda; la nota solo se incluye en el PDF que descargues.</div>
         </div>
       </div>
     </div>

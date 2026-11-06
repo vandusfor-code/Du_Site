@@ -1,20 +1,16 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Briefcase, Upload, FileText, X, Calendar, Layers, Sigma, History, BarChart3, Settings, Search, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Briefcase, Upload, FileText, X, Calendar, Layers, Sigma, Settings, CheckCircle2 } from "lucide-react";
 import type { ConfigReglas } from "@/lib/empleo/pila-tipos";
-import { VistaResultado, desdeResultado, desdeDb } from "./empleo-vista";
+import { VistaResultado, desdeResultado } from "./empleo-vista";
 import ResultadoPila from "./ResultadoPila";
-import {
-  validarPilaAction, listarValidacionesAction, obtenerValidacionAction, guardarObservacionAction,
-  obtenerEstadisticasAction, obtenerConfigAction, guardarConfigAction,
-} from "./actions";
-import type { FilaHistorial, Estadisticas } from "@/lib/empleo/empleo-store";
+import { validarPilaAction, obtenerConfigAction, guardarConfigAction } from "./actions";
 
 const ACC = "#6d28d9";
 const S = {
-  page: { maxWidth: 1180, margin: "0 auto", padding: "28px 22px 72px", fontFamily: "Inter, system-ui, sans-serif", color: "#1b2233" } as const,
+  page: { width: "100%", maxWidth: 1760, margin: "0 auto", padding: "28px 32px 72px", fontFamily: "Inter, system-ui, sans-serif", color: "#1b2233" } as const,
   card: { border: "1px solid #eceef3", borderRadius: 16, background: "#fff", boxShadow: "0 8px 28px rgba(23,30,56,.05)" } as const,
   btn: { height: 44, borderRadius: 10, padding: "0 20px", fontSize: 13.5, fontWeight: 650, cursor: "pointer", border: `1px solid ${ACC}`, background: ACC, color: "#fff", display: "inline-flex", alignItems: "center", gap: 8 } as const,
   ghost: { height: 40, borderRadius: 10, padding: "0 14px", fontSize: 13, fontWeight: 650, cursor: "pointer", border: "1px solid #e3e6ee", background: "#fff", color: "#4a5168", display: "inline-flex", alignItems: "center", gap: 7 } as const,
@@ -23,7 +19,7 @@ const S = {
   tab: (on: boolean) => ({ height: 40, borderRadius: 10, padding: "0 16px", fontSize: 13, fontWeight: 650, cursor: "pointer", border: on ? `1px solid ${ACC}` : "1px solid #e3e6ee", background: on ? "#f1edfd" : "#fff", color: on ? ACC : "#4a5168", display: "inline-flex", alignItems: "center", gap: 7 } as const),
 };
 
-type Seccion = "validador" | "historial" | "reportes" | "config";
+type Seccion = "validador" | "config";
 type TipoT = "dependiente" | "independiente";
 
 function hoyISO(): string {
@@ -33,7 +29,7 @@ function hoyISO(): string {
 
 export default function GestionEmpleoApp({ nombre, esSupervision }: { nombre: string; esSupervision: boolean }) {
   const [seccion, setSeccion] = useState<Seccion>("validador");
-  const [vista, setVista] = useState<VistaResultado | null>(null); // resultado mostrándose
+  const [vista, setVista] = useState<VistaResultado | null>(null);
 
   return (
     <div style={S.page}>
@@ -45,23 +41,14 @@ export default function GestionEmpleoApp({ nombre, esSupervision }: { nombre: st
         </div>
       </div>
 
-      {/* Sub-navegación del módulo */}
       <div style={{ display: "flex", gap: 9, marginBottom: 18, flexWrap: "wrap" }}>
         <button style={S.tab(seccion === "validador")} onClick={() => setSeccion("validador")}><Sigma size={15} /> Validador PILA</button>
-        <button style={S.tab(seccion === "historial")} onClick={() => { setSeccion("historial"); setVista(null); }}><History size={15} /> Historial</button>
-        {esSupervision && <button style={S.tab(seccion === "reportes")} onClick={() => setSeccion("reportes")}><BarChart3 size={15} /> Reportes</button>}
-        {esSupervision && <button style={S.tab(seccion === "config")} onClick={() => setSeccion("config")}><Settings size={15} /> Configuración</button>}
+        {esSupervision && <button style={S.tab(seccion === "config")} onClick={() => { setSeccion("config"); setVista(null); }}><Settings size={15} /> Configuración</button>}
       </div>
 
       {seccion === "validador" && (
-        vista ? <ResultadoPila vista={vista} onNueva={() => setVista(null)} onGuardarObservacion={async (txt) => { if (vista.id) { await guardarObservacionAction(vista.id, txt); } }} />
-          : <Validador onResultado={(v) => setVista(v)} />
+        vista ? <ResultadoPila vista={vista} onNueva={() => setVista(null)} /> : <Validador onResultado={(v) => setVista(v)} />
       )}
-      {seccion === "historial" && (
-        vista ? <ResultadoPila vista={vista} onNueva={() => setVista(null)} onGuardarObservacion={async (txt) => { if (vista.id) { await guardarObservacionAction(vista.id, txt); } }} />
-          : <Historial esSupervision={esSupervision} onAbrir={(v) => setVista(v)} />
-      )}
-      {seccion === "reportes" && esSupervision && <Reportes />}
       {seccion === "config" && esSupervision && <Configuracion />}
 
       <div style={{ marginTop: 28 }}><Link href="/" style={{ color: ACC, fontWeight: 600, fontSize: 14 }}>← Volver al inicio</Link></div>
@@ -113,7 +100,7 @@ function Validador({ onResultado }: { onResultado: (v: VistaResultado) => void }
   );
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 18 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 18 }}>
       <div style={{ ...S.card, padding: 24 }}>
         <h2 style={{ margin: "0 0 4px", fontSize: 18 }}>Nueva validación de aportes</h2>
         <p style={{ margin: "0 0 18px", color: "#737e90", fontSize: 13.5 }}>Analiza el histórico de aportes (PILA) y determina si el usuario cumple con el requisito.</p>
@@ -149,7 +136,7 @@ function Validador({ onResultado }: { onResultado: (v: VistaResultado) => void }
         {paso === 2 && (
           <>
             <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>Cargar histórico de aportes PILA</h3>
-            <p style={{ margin: "0 0 14px", color: "#737e90", fontSize: 13 }}>Adjunta el reporte descargado desde SSuRhipp para analizar los periodos cotizados.</p>
+            <p style={{ margin: "0 0 14px", color: "#737e90", fontSize: 13 }}>Adjunta el reporte descargado desde SSuRhipp para analizar los periodos cotizados. El archivo se procesa al momento y no se almacena.</p>
             {!archivo ? (
               <label
                 onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
@@ -179,7 +166,6 @@ function Validador({ onResultado }: { onResultado: (v: VistaResultado) => void }
         )}
       </div>
 
-      {/* Columna derecha: info del proceso */}
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ ...S.card, padding: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}><Calendar size={16} color={ACC} /><b style={{ fontSize: 14 }}>Información del proceso</b></div>
@@ -198,121 +184,6 @@ function Validador({ onResultado }: { onResultado: (v: VistaResultado) => void }
           {["Estado de cumplimiento (Cumple / No cumple / Revisión).", "Total de días acreditados.", "Detalle de aportes por periodo.", "Inconsistencias y observaciones.", "Descarga del reporte en PDF."].map((t, i) => (
             <div key={i} style={{ display: "flex", gap: 9, fontSize: 12.5, color: "#4a5168", padding: "4px 0" }}><CheckCircle2 size={15} color={ACC} /> {t}</div>
           ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ====================== HISTORIAL ====================== */
-function Historial({ esSupervision, onAbrir }: { esSupervision: boolean; onAbrir: (v: VistaResultado) => void }) {
-  const [filas, setFilas] = useState<FilaHistorial[] | null>(null);
-  const [busqueda, setBusqueda] = useState("");
-  const [estado, setEstado] = useState("");
-  const [tipo, setTipo] = useState("");
-  const [cargandoId, setCargandoId] = useState<string | null>(null);
-
-  const cargar = useCallback(async () => {
-    setFilas(null);
-    try { setFilas(await listarValidacionesAction({ busqueda, estado: estado || undefined, tipo: tipo || undefined })); }
-    catch { setFilas([]); }
-  }, [busqueda, estado, tipo]);
-  useEffect(() => { cargar(); }, [cargar]);
-
-  async function abrir(id: string) {
-    setCargandoId(id);
-    try { const v = await obtenerValidacionAction(id); if (v) onAbrir(desdeDb(v)); }
-    finally { setCargandoId(null); }
-  }
-
-  const badge = (e: string) => {
-    const m = e === "CUMPLE" ? ["#eafaf1", "#16834b", "CUMPLE"] : e === "NO_CUMPLE" ? ["#fff0f1", "#d64545", "NO CUMPLE"] : ["#fff8ec", "#b45309", "REVISIÓN"];
-    return <span style={{ fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 20, background: m[0], color: m[1] }}>{m[2]}</span>;
-  };
-
-  return (
-    <div style={{ ...S.card, padding: 18 }}>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14, alignItems: "center" }}>
-        <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
-          <Search size={15} style={{ position: "absolute", left: 11, top: 12, color: "#9199a8" }} />
-          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} onKeyDown={(e) => e.key === "Enter" && cargar()} placeholder="Buscar por nombre o documento…" style={{ ...S.input, height: 40, paddingLeft: 32 }} />
-        </div>
-        <select value={estado} onChange={(e) => setEstado(e.target.value)} style={{ ...S.input, height: 40, width: "auto" }}>
-          <option value="">Todos los estados</option><option value="CUMPLE">Cumple</option><option value="NO_CUMPLE">No cumple</option><option value="REQUIERE_REVISION">Requiere revisión</option>
-        </select>
-        <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={{ ...S.input, height: 40, width: "auto" }}>
-          <option value="">Todos</option><option value="dependiente">Dependiente</option><option value="independiente">Independiente</option>
-        </select>
-        <button style={{ ...S.ghost, height: 40 }} onClick={cargar}><RefreshCw size={14} /> Buscar</button>
-      </div>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead><tr>{["Fecha", "Trabajador", "Documento", "Tipo", "Acreditados", "Requeridos", "Estado", ...(esSupervision ? ["Asesor"] : []), ""].map((h) => <th key={h} style={{ padding: "9px 8px", textAlign: "left", fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.3, color: "#9199a8", fontWeight: 700 }}>{h}</th>)}</tr></thead>
-          <tbody>
-            {filas === null ? <tr><td colSpan={9} style={{ padding: 24, textAlign: "center", color: "#9199a8" }}>Cargando…</td></tr> :
-              filas.length === 0 ? <tr><td colSpan={9} style={{ padding: 24, textAlign: "center", color: "#9199a8" }}>Sin validaciones.</td></tr> :
-                filas.map((f) => (
-                  <tr key={f.id} style={{ borderTop: "1px solid #eef0f4" }}>
-                    <td style={{ padding: "9px 8px", fontSize: 12, color: "#737e90" }}>{new Date(f.creadoEn).toLocaleDateString("es-CO")}</td>
-                    <td style={{ padding: "9px 8px", fontSize: 12.5, fontWeight: 600 }}>{f.trabajadorNombre}</td>
-                    <td style={{ padding: "9px 8px", fontSize: 12.5 }}>{f.trabajadorDocumento}</td>
-                    <td style={{ padding: "9px 8px", fontSize: 12 }}>{f.tipoTrabajador === "dependiente" ? "Dependiente" : "Independiente"}</td>
-                    <td style={{ padding: "9px 8px", fontSize: 12.5, fontWeight: 700 }}>{f.diasAcreditados}</td>
-                    <td style={{ padding: "9px 8px", fontSize: 12.5 }}>{f.diasRequeridos}</td>
-                    <td style={{ padding: "9px 8px" }}>{badge(f.estado)}</td>
-                    {esSupervision && <td style={{ padding: "9px 8px", fontSize: 12 }}>{f.asesorNombre}</td>}
-                    <td style={{ padding: "9px 8px" }}><button style={{ ...S.ghost, height: 32 }} onClick={() => abrir(f.id)}>{cargandoId === f.id ? "…" : "Ver"}</button></td>
-                  </tr>
-                ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-/* ====================== REPORTES ====================== */
-function Reportes() {
-  const [est, setEst] = useState<Estadisticas | null>(null);
-  useEffect(() => { obtenerEstadisticasAction({}).then(setEst).catch(() => setEst(null)); }, []);
-  if (!est) return <div style={{ ...S.card, padding: 30, textAlign: "center", color: "#9199a8" }}>Cargando…</div>;
-  const maxMes = Math.max(1, ...est.porMes.map((m) => m.total));
-  const kpis = [
-    ["Total validaciones", est.total, "#6d28d9"], ["Cumplen", est.cumple, "#16834b"],
-    ["No cumplen", est.noCumple, "#d64545"], ["Requieren revisión", est.revision, "#b45309"],
-    ["% Cumplimiento", `${est.pctCumplimiento}%`, "#6d28d9"], ["Promedio días acreditados", est.promedioDias, "#0891b2"],
-  ];
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 12 }}>
-        {kpis.map(([k, v, c], i) => (
-          <div key={i} style={{ ...S.card, padding: "14px 16px" }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3, color: "#9199a8" }}>{k as string}</div>
-            <div style={{ fontSize: 24, fontWeight: 800, marginTop: 4, color: c as string }}>{v as string | number}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <div style={{ ...S.card, padding: 18 }}>
-          <b style={{ fontSize: 14 }}>Validaciones por asesor</b>
-          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 10, fontSize: 12.5 }}>
-            <thead><tr>{["Asesor", "Total", "Cumplen"].map((h) => <th key={h} style={{ textAlign: "left", padding: "7px 6px", fontSize: 10.5, color: "#9199a8", textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
-            <tbody>{est.porAsesor.length === 0 ? <tr><td colSpan={3} style={{ padding: 16, textAlign: "center", color: "#9199a8" }}>Sin datos.</td></tr> :
-              est.porAsesor.map((a) => <tr key={a.asesor} style={{ borderTop: "1px solid #eef0f4" }}><td style={{ padding: "8px 6px", fontWeight: 600 }}>{a.asesor}</td><td style={{ padding: "8px 6px" }}>{a.total}</td><td style={{ padding: "8px 6px", color: "#16834b", fontWeight: 650 }}>{a.cumple}</td></tr>)}</tbody>
-          </table>
-        </div>
-        <div style={{ ...S.card, padding: 18 }}>
-          <b style={{ fontSize: 14 }}>Validaciones por mes</b>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 160, marginTop: 16 }}>
-            {est.porMes.length === 0 ? <div style={{ color: "#9199a8", fontSize: 13, margin: "auto" }}>Sin datos.</div> :
-              est.porMes.map((m) => (
-                <div key={m.mes} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#4a5168" }}>{m.total}</div>
-                  <div style={{ width: "70%", background: ACC, borderRadius: "6px 6px 0 0", height: `${(m.total / maxMes) * 120}px` }} />
-                  <div style={{ fontSize: 10.5, color: "#9199a8" }}>{m.mes.slice(5)}/{m.mes.slice(2, 4)}</div>
-                </div>
-              ))}
-          </div>
         </div>
       </div>
     </div>
@@ -338,7 +209,7 @@ function Configuracion() {
   );
 
   return (
-    <div style={{ ...S.card, padding: 24, maxWidth: 640 }}>
+    <div style={{ ...S.card, padding: 24, maxWidth: 680 }}>
       <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>Parámetros de validación</h3>
       <p style={{ margin: "0 0 18px", color: "#737e90", fontSize: 13 }}>Umbrales operativos (versión {cfg.version}).</p>
       <div style={{ padding: "11px 14px", borderRadius: 10, background: "#fff8ec", color: "#b45309", fontSize: 12.5, border: "1px solid #f5d9a8", marginBottom: 18 }}>

@@ -1,10 +1,8 @@
-// Forma NORMALIZADA del resultado para la UI. La produce tanto el Validador
-// (resultado recién calculado) como el Historial (filas de Supabase), para
-// reutilizar el mismo componente de resultados. Cliente-seguro.
+// Forma NORMALIZADA del resultado para la UI (cliente-segura). La produce el
+// Validador a partir del resultado recién calculado. No se persiste nada.
 
 import type { EstadoResultado, Novedad } from "@/lib/empleo/pila-tipos";
 import type { ResultadoProcesado } from "./actions";
-import type { ValidacionCompleta } from "@/lib/empleo/empleo-store";
 
 export interface RegistroVista {
   fila: number;
@@ -61,7 +59,7 @@ export interface VistaResultado {
 export function desdeResultado(p: ResultadoProcesado): VistaResultado {
   const r = p.resultado;
   return {
-    id: p.id,
+    id: null,
     estado: r.estado,
     motivo: r.motivo,
     trabajadorNombre: p.meta.nombre ?? "—",
@@ -93,60 +91,6 @@ export function desdeResultado(p: ResultadoProcesado): VistaResultado {
     observacionAsesor: "",
     versionMotor: r.versionMotor,
     advertenciasLectura: p.advertenciasLectura,
-  };
-}
-
-function num(v: unknown): number { return Number(v ?? 0); }
-function arr<T>(v: unknown): T[] { return Array.isArray(v) ? (v as T[]) : []; }
-
-export function desdeDb(v: ValidacionCompleta): VistaResultado {
-  const c = v.cabecera;
-  const regsPorPeriodo = new Map<string, RegistroVista[]>();
-  for (const r of v.registros) {
-    const periodo = String(r.periodo ?? "");
-    const rv: RegistroVista = {
-      fila: num(r.fila), nit: String(r.nit ?? ""), periodo, fechaPago: String(r.fecha_pago ?? ""),
-      aporte: num(r.aporte), diasCot: num(r.dias_cot), ibc: r.ibc == null ? null : num(r.ibc),
-      planilla: r.planilla ? String(r.planilla) : null, novedades: arr<Novedad>(r.novedades),
-      estado: String(r.estado_registro ?? ""),
-    };
-    if (!regsPorPeriodo.has(periodo)) regsPorPeriodo.set(periodo, []);
-    regsPorPeriodo.get(periodo)!.push(rv);
-  }
-  const resumen: PeriodoVista[] = v.resumen.map((p) => ({
-    periodo: String(p.periodo ?? ""), nits: arr<string>(p.nits), registros: num(p.registros),
-    diasReportados: num(p.dias_reportados), diasReconocidos: num(p.dias_reconocidos),
-    aporteAcumulado: num(p.aporte_acumulado), novedades: arr<Novedad>(p.novedades),
-    estado: String(p.estado ?? ""), excedeLimite: Boolean(p.excede_limite), fueraDeVentana: Boolean(p.fuera_ventana),
-    detalle: regsPorPeriodo.get(String(p.periodo ?? "")) ?? [],
-  }));
-  return {
-    id: String(c.id),
-    estado: String(c.estado) as EstadoResultado,
-    motivo: String(c.motivo ?? ""),
-    trabajadorNombre: String(c.trabajador_nombre ?? "—"),
-    trabajadorDocumento: String(c.trabajador_documento ?? "—"),
-    tipoTrabajador: String(c.tipo_trabajador ?? ""),
-    fechaSolicitud: String(c.fecha_solicitud ?? "").slice(0, 10),
-    ventana: { desde: String(c.ventana_desde ?? "").slice(0, 10), hasta: String(c.ventana_hasta ?? "").slice(0, 10) },
-    diasRequeridos: num(c.dias_requeridos), diasAcreditados: num(c.dias_acreditados),
-    diasDiferencia: num(c.dias_diferencia), periodosConAporte: num(c.periodos_con_aporte),
-    analisis: {
-      registrosLeidos: num((c.analisis as Record<string, unknown>)?.registrosLeidos),
-      registrosConAporte: num((c.analisis as Record<string, unknown>)?.registrosConAporte),
-      registrosAporteCero: num((c.analisis as Record<string, unknown>)?.registrosAporteCero),
-      registrosFueraVentana: num((c.analisis as Record<string, unknown>)?.registrosFueraVentana),
-      registrosSospechososDuplicado: num((c.analisis as Record<string, unknown>)?.registrosSospechososDuplicado),
-    },
-    inconsistencias: arr<{ nivel: string; periodo: string | null; mensaje: string }>(c.inconsistencias),
-    resumenPorPeriodo: resumen,
-    asesorNombre: String(c.asesor_nombre ?? ""),
-    archivoNombre: String(c.archivo_nombre ?? ""),
-    creadoEn: String(c.creado_en ?? ""),
-    observacionAuto: String(c.observacion_auto ?? ""),
-    observacionAsesor: String(c.observacion_asesor ?? ""),
-    versionMotor: String(c.version_motor ?? ""),
-    advertenciasLectura: [],
   };
 }
 
