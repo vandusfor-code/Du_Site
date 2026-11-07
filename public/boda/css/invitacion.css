@@ -13,8 +13,8 @@
 .inv .foto:not(.tiene)::after{content:"Foto";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);font-size:.85rem;letter-spacing:.2em;text-transform:uppercase}
 
 /* portada */
-.inv .hero{height:min(100svh,780px);min-height:560px;color:#fff}
-.inv .hero .foto{position:absolute;inset:0;height:100%}
+.inv .hero{height:min(100svh,780px);min-height:560px;color:#fff;overflow:hidden}
+.inv .hero .foto{position:absolute;inset:0;top:-8%;height:116%;transform:translate3d(0,var(--py,0px),0);will-change:transform}
 .inv .hero .foto::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(to bottom,rgba(0,0,0,.35),transparent 30%,transparent 55%,rgba(0,0,0,.55))}
 .inv .hero .arriba{position:absolute;top:44px;left:0;right:0;z-index:2;font-size:1.15rem;letter-spacing:.08em}
 .inv .hero .abajo{position:absolute;bottom:34px;left:0;right:0;z-index:2}
@@ -120,10 +120,123 @@
 .inv .cierre{height:40px}
 .inv .vista-previa{background:#fff7d6;color:#7a6200;font:600 .8rem/1.3 system-ui,sans-serif;padding:8px 12px;letter-spacing:.02em}
 
-/* animación al hacer scroll */
-.inv.anim .rev{opacity:0;transform:translateY(22px);transition:opacity .9s ease,transform .9s ease}
+/* =====================  ANIMACIONES  ===================== */
+@keyframes a-fade{from{opacity:0}to{opacity:1}}
+@keyframes a-up{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+@keyframes a-title{from{opacity:0;transform:translateY(30px) scale(.94);letter-spacing:.3em;filter:blur(8px)}to{opacity:1;transform:none;letter-spacing:.04em;filter:none}}
+@keyframes a-kb{from{transform:scale(1)}to{transform:scale(1.16)}}
+@keyframes a-fall{0%{top:-6%;opacity:0;transform:translateX(0) rotate(0)}10%{opacity:.95}90%{opacity:.95}100%{top:106%;opacity:0;transform:translateX(var(--dx)) rotate(540deg)}}
+@keyframes a-bounce{0%,100%{transform:rotate(45deg) translate(0,0);opacity:.4}50%{transform:rotate(45deg) translate(5px,5px);opacity:1}}
+@keyframes a-draw{to{stroke-dashoffset:0}}
+@keyframes a-beat{0%,100%{transform:scale(1)}14%{transform:scale(1.18)}28%{transform:scale(1)}42%{transform:scale(1.12)}70%{transform:scale(1)}}
+@keyframes a-pop{0%{transform:scale(.55);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+@keyframes a-pulso{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c) 55%,transparent)}70%,100%{box-shadow:0 0 0 16px transparent}}
+@keyframes a-pulso-b{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}70%,100%{box-shadow:0 0 0 18px rgba(255,255,255,0)}}
+@keyframes a-eq{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
+@keyframes a-spin{to{transform:rotate(360deg)}}
+@keyframes a-line{to{width:130px}}
+@keyframes a-dot{0%{transform:translateY(-50%) scale(1)}50%{transform:translateY(-50%) scale(1.6)}100%{transform:translateY(-50%) scale(1)}}
+
+/* portada: la foto "respira" y el texto aparece en secuencia */
+.inv .hero .foto img{animation:a-kb 22s ease-in-out infinite alternate;transform-origin:50% 40%}
+.inv .hero .arriba,.inv .hero h1,.inv .hero .fecha,.inv .hero .desliza{opacity:0}
+.inv.listo .hero .arriba{animation:a-fade 1.4s .2s both}
+.inv.listo .hero h1{animation:a-title 1.8s .5s both}
+.inv.listo .hero .fecha{animation:a-up 1.3s 1.2s both}
+.inv.listo .hero .desliza{animation:a-fade 1s 2s both}
+.inv .hero .desliza{margin:18px auto 0;width:22px;height:30px;display:block}
+.inv .hero .desliza i{display:block;width:12px;height:12px;margin:6px auto 0;border-right:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(45deg);animation:a-bounce 1.8s infinite}
+
+/* pétalos que caen */
+.inv .petalos,.inv-intro .petalos{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
+.inv .petalos i,.inv-intro .petalos i{position:absolute;top:-6%;width:calc(14px*var(--s));height:calc(19px*var(--s));background:rgba(255,255,255,.82);border-radius:100% 0 100% 0;animation:a-fall linear infinite;opacity:0}
+.inv .petalos i:nth-child(3n),.inv-intro .petalos i:nth-child(3n){background:rgba(255,200,214,.9)}
+.inv .petalos i:nth-child(5n),.inv-intro .petalos i:nth-child(5n){background:rgba(255,236,200,.85)}
+
+/* aparición al hacer scroll (distintos movimientos) */
+.inv.anim .rev{opacity:0;transform:translateY(34px);transition:opacity .95s ease,transform 1.05s cubic-bezier(.2,.7,.2,1)}
+.inv.anim .rev[data-a=left]{transform:translateX(-60px)}
+.inv.anim .rev[data-a=right]{transform:translateX(60px)}
+.inv.anim .rev[data-a=zoom]{transform:scale(.86)}
+.inv.anim .rev[data-a=none]{opacity:1;transform:none}
 .inv.anim .rev.v{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){.inv.anim .rev{opacity:1;transform:none;transition:none}}
+.inv.anim .foto.rev.v img{animation:a-kb 16s ease-in-out infinite alternate}
+
+/* títulos: las letras se "abren" al aparecer */
+.inv.anim .titulo{letter-spacing:.3em;transition:letter-spacing 1.6s cubic-bezier(.2,.7,.2,1)}
+.inv.anim .v .titulo,.inv.anim .titulo.v{letter-spacing:.03em}
+
+/* nombres: se "escriben" de izquierda a derecha */
+.inv.anim .nombres span{clip-path:inset(-15% 100% -15% -5%);transition:clip-path 1.5s cubic-bezier(.4,0,.2,1)}
+.inv.anim .nombres.v span{clip-path:inset(-15% -5% -15% -5%)}
+.inv.anim .nombres.v span:nth-child(1){transition-delay:.1s}
+.inv.anim .nombres.v span:nth-child(2){transition-delay:.7s}
+.inv.anim .nombres.v span:nth-child(3){transition-delay:1.1s}
+
+/* calendario: el corazón se dibuja y late */
+.inv .cal .hoy svg path{stroke-dasharray:130;stroke-dashoffset:130}
+.inv .dia.v .cal .hoy svg path{animation:a-draw 1.8s .6s ease forwards}
+.inv .dia.v .cal .hoy svg{animation:a-beat 2.2s 2.6s ease-in-out infinite}
+.inv .cuenta strong.pop{animation:a-pop .45s ease}
+
+/* vestimenta: los colores aparecen uno por uno */
+.inv.anim .vest .colores i{transform:scale(0)}
+.inv.anim .vest.v .colores i{animation:a-pop .6s calc(.5s + var(--i)*.18s) both}
+
+/* itinerario: la línea crece y los puntos saltan */
+.inv.anim .linea::before{transform:translateX(-50%) scaleY(0);transform-origin:top;transition:transform 2.6s ease}
+.inv.anim .linea.v::before{transform:translateX(-50%) scaleY(1)}
+.inv.anim .ev.v::after{animation:a-dot .7s ease}
+
+/* botón de confirmar late suavemente */
+.inv .btn.grande{animation:a-pulso 2.6s infinite}
+.inv .btn.grande:hover{transform:translateY(-2px)}
+.inv .btn{transition:background .2s,transform .2s}
+
+/* reproductor: barras de ecualizador cuando suena */
+.inv .controles .eq{display:none;gap:3px;align-items:flex-end;height:22px;margin-left:6px}
+.inv .player.sonando .eq{display:flex}
+.inv .eq i{display:block;width:4px;height:100%;background:var(--c);border-radius:2px;transform-origin:bottom;animation:a-eq .9s ease-in-out infinite}
+.inv .eq i:nth-child(2){animation-delay:.2s}
+.inv .eq i:nth-child(3){animation-delay:.45s}
+.inv .eq i:nth-child(4){animation-delay:.1s}
+
+/* botón flotante de música */
+.inv .fab{display:none;position:fixed;right:max(16px,calc((100vw - 480px)/2 + 16px));bottom:18px;z-index:60;width:48px;height:48px;border-radius:50%;border:0;background:var(--c);color:#fff;place-items:center;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.28)}
+.inv .fab svg{width:22px;height:22px}
+.inv.listo .fab{display:grid;animation:a-pop .6s .8s both}
+.inv .fab.sonando svg{animation:a-spin 5s linear infinite}
+
+/* portada de bienvenida (sobre) */
+.inv-intro{position:fixed;inset:0;z-index:9990;display:grid;place-items:center;padding:24px;color:#fff;text-align:center;font-family:'Lora',Georgia,serif;background:linear-gradient(160deg,var(--c),#1b1b1b) center/cover no-repeat;transition:transform 1.15s cubic-bezier(.7,0,.2,1),opacity 1.15s ease}
+.inv-intro::before{content:"";position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.42),rgba(0,0,0,.7))}
+.inv-intro.abre{transform:translateY(-105%);opacity:.2}
+.inv-intro .in-card{position:relative;z-index:2;max-width:360px}
+.inv-intro .in-top{font-size:.78rem;letter-spacing:.24em;text-transform:uppercase;opacity:0;animation:a-fade 1.4s .3s forwards}
+.inv-intro .in-names{font-family:'Great Vibes','Brush Script MT',cursive;font-size:4rem;line-height:1.02;margin:14px 0 12px;opacity:0;animation:a-title 2s .8s forwards}
+.inv-intro .in-names span{display:block;font-size:2.4rem;margin:2px 0}
+.inv-intro .in-line{width:0;height:1px;background:rgba(255,255,255,.8);margin:0 auto;animation:a-line 1.5s 1.8s forwards}
+.inv-intro .in-date{margin-top:18px;letter-spacing:.34em;font-size:1rem;opacity:0;animation:a-fade 1.3s 2.1s forwards}
+.inv-intro .in-for{margin-top:26px;font-style:italic;font-size:.95rem;line-height:1.5;opacity:0;animation:a-fade 1.3s 2.5s forwards}
+.inv-intro .in-for b{font-style:normal;font-size:1.08rem;letter-spacing:.04em}
+.inv-intro .in-open{margin-top:34px;display:inline-flex;align-items:center;gap:10px;padding:14px 26px;border-radius:40px;border:1.5px solid #fff;background:rgba(255,255,255,.14);color:#fff;font:700 .9rem 'Lora',serif;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;opacity:0;animation:a-fade 1.2s 3s forwards,a-pulso-b 2.4s 4.2s infinite;transition:background .2s}
+.inv-intro .in-open:hover{background:rgba(255,255,255,.3)}
+
+/* respeta a quien tiene desactivadas las animaciones */
+@media (prefers-reduced-motion:reduce){
+  .inv.anim .rev,.inv.anim .rev[data-a]{opacity:1;transform:none;transition:none}
+  .inv.anim .titulo{letter-spacing:.03em;transition:none}
+  .inv.anim .nombres span{clip-path:none;transition:none}
+  .inv .hero .arriba,.inv .hero h1,.inv .hero .fecha,.inv .hero .desliza{opacity:1;animation:none}
+  .inv .hero .foto img,.inv .petalos i,.inv .btn.grande,.inv .foto.rev.v img{animation:none}
+  .inv .petalos,.inv-intro .petalos{display:none}
+  .inv-intro .in-top,.inv-intro .in-names,.inv-intro .in-date,.inv-intro .in-for,.inv-intro .in-open{opacity:1;animation:none}
+  .inv-intro .in-line{width:130px;animation:none}
+  .inv.anim .linea::before{transform:translateX(-50%)}
+  .inv.anim .vest .colores i{transform:none;animation:none}
+  .inv .cal .hoy svg path{stroke-dashoffset:0}
+}
+
 
 /* ventana emergente de confirmación (fuera de .inv) */
 .inv-modal{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:20px;background:rgba(15,15,15,.55);backdrop-filter:blur(2px);font-family:'Lora',Georgia,serif;animation:fadeIn .2s ease}

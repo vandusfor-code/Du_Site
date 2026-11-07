@@ -19,6 +19,10 @@ export const fmtHora = h => {
   H = H % 12 || 12;
   return `${H}:${m[2]} ${s}`;
 };
+// Fotos de ejemplo (ilustraciones en /ejemplos). Se guardan como "ejemplo:nombre" y se
+// reemplazan cuando se sube una foto propia.
+export const esEjemplo = u => typeof u === "string" && u.startsWith("ejemplo:");
+export const resolverFoto = u => (esEjemplo(u) ? new URL("../ejemplos/" + u.slice(8) + ".svg", import.meta.url).href : u);
 export const urlSegura = u => /^https?:\/\//i.test((u || "").trim()) ? u.trim() : "";
 
 // Colores principales que puede elegir la persona que llena la invitación.
@@ -61,12 +65,12 @@ export const DEFAULT_CONFIG = {
   versiculo: "Tres cosas permanecerán para siempre: la fe, la esperanza y el amor. Pero la más grande de ellas es el amor.",
   cita: "1 Corintios 13:13",
   mensaje: "Hoy unimos nuestras vidas ante Dios, convencidos de que el amor que nos une se fortalece con su presencia.\n\nComo un cordón de tres dobleces, deseamos construir un hogar donde Él sea el centro de nuestra unión.",
-  portada: "",
-  // Una foto opcional por apartado de la invitación + galería final
-  fotos: { mensaje: "", calendario: "", vestimenta: "", itinerario: "", final: [] },
+  portada: "ejemplo:portada",
+  // Una foto opcional por apartado de la invitación + galería final (por defecto, ilustraciones de ejemplo)
+  fotos: { mensaje: "ejemplo:mensaje", calendario: "ejemplo:anillos", vestimenta: "ejemplo:vestimenta", itinerario: "ejemplo:itinerario", final: ["ejemplo:final1", "ejemplo:final2", "ejemplo:final3", "ejemplo:final4"] },
   cancion: "",
-  ceremonia: { nombre: "", dir: "", hora: "", mapa: "", foto: "" },
-  recepcion: { mismo: false, nombre: "", dir: "", hora: "", mapa: "", foto: "" },
+  ceremonia: { nombre: "", dir: "", hora: "", mapa: "", foto: "ejemplo:iglesia" },
+  recepcion: { mismo: false, nombre: "", dir: "", hora: "", mapa: "", foto: "ejemplo:salon" },
   // Por defecto se pide evitar negro, morado y blanco (se pueden cambiar en el formulario)
   vestimenta: { tipo: "Formal", colores: ["#1c1c1c", "#6e4a8e", "#ffffff"], nota: "" },
   itinerario: [

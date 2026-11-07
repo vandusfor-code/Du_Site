@@ -1,6 +1,6 @@
 // Panel de administración: formulario de la boda, generador de invitaciones y lista de respuestas.
 import { rpc, subirArchivo, comprimirImagen } from "./api.js";
-import { esc, DEFAULT_CONFIG, CANCIONES, mezclar, clonar, getPath, setPath, PALETAS, COLORES_VEST, TIPOS_VEST, ICONOS, urlSegura } from "./util.js";
+import { esc, DEFAULT_CONFIG, CANCIONES, esEjemplo, resolverFoto, mezclar, clonar, getPath, setPath, PALETAS, COLORES_VEST, TIPOS_VEST, ICONOS, urlSegura } from "./util.js";
 import { renderInvitacion } from "./invitacion.js";
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -105,9 +105,9 @@ export async function iniciarPanel(root, key) {
   const foto1 = (k, label, hint) => {
     const u = getPath(cfg, k);
     return `<div class="f"><span>${label}</span><div class="up">
-      <div class="up-prev">${u ? `<img src="${esc(u)}" alt="">` : "Sin foto"}</div>
-      <div class="up-btns"><label class="btn sec chico">${u ? "Cambiar foto" : "Subir foto"}<input type="file" accept="image/*" hidden data-up="${k}"></label>
-      ${u ? `<button type="button" class="lnk mal" data-rm="${k}">Quitar</button>` : ""}</div></div>${hint ? `<small style="display:block;margin-top:4px;color:var(--sub);font-size:.8rem">${hint}</small>` : ""}</div>`;
+      <div class="up-prev">${u ? `<img src="${esc(resolverFoto(u))}" alt="">${esEjemplo(u) ? `<span class="ej">Ejemplo</span>` : ""}` : "Sin foto"}</div>
+      <div class="up-btns"><label class="btn sec chico">${u ? (esEjemplo(u) ? "Subir tu foto" : "Cambiar foto") : "Subir foto"}<input type="file" accept="image/*" hidden data-up="${k}"></label>
+      ${u ? `<button type="button" class="lnk mal" data-rm="${k}">${esEjemplo(u) ? "Quitar el ejemplo" : "Quitar"}</button>` : ""}</div></div>${hint ? `<small style="display:block;margin-top:4px;color:var(--sub);font-size:.8rem">${hint}</small>` : ""}</div>`;
   };
 
   const sec = (n, titulo, sub, cuerpo) => `<section class="card fsec" id="sec-${n}"><h2><span class="num">${n}</span>${titulo}</h2>${sub ? `<p class="sub">${sub}</p>` : ""}${cuerpo}</section>`;
@@ -123,16 +123,16 @@ export async function iniciarPanel(root, key) {
     </div>`;
   };
 
-  const finalHTML = () => `<div class="grid-fotos">${cfg.fotos.final.map((u, i) => `<div class="t"><img src="${esc(u)}" alt=""><button type="button" data-rm-f="${i}" aria-label="Quitar foto">×</button></div>`).join("")}
+  const finalHTML = () => `<div class="grid-fotos">${cfg.fotos.final.map((u, i) => `<div class="t"><img src="${esc(resolverFoto(u))}" alt="">${esEjemplo(u) ? `<span class="ej">Ejemplo</span>` : ""}<button type="button" data-rm-f="${i}" aria-label="Quitar foto">×</button></div>`).join("")}
     ${cfg.fotos.final.length < MAX_FINAL ? `<label class="mas">+ Agregar<input type="file" accept="image/*" multiple hidden data-up="fotos.final"></label>` : ""}</div>
-    <small style="display:block;margin-top:8px;color:var(--sub);font-size:.8rem">${cfg.fotos.final.length} de ${MAX_FINAL} fotos.</small>`;
+    <small style="display:block;margin-top:8px;color:var(--sub);font-size:.8rem">${cfg.fotos.final.length} de ${MAX_FINAL} fotos.${cfg.fotos.final.some(esEjemplo) ? " Las de ejemplo se reemplazan al subir las tuyas." : ""}</small>`;
 
   // ---------- formulario completo ----------
   function faltantes() {
     const c = cfg, f = [];
     if (!c.novio || !c.novia) f.push("nombres de los novios");
     if (!c.fecha) f.push("fecha de la boda");
-    if (!c.portada) f.push("foto de portada");
+    if (!c.portada || esEjemplo(c.portada)) f.push("foto de portada (ahora hay una de ejemplo)");
     if (!c.ceremonia.nombre) f.push("lugar de la ceremonia");
     if (!c.ceremonia.hora) f.push("hora de la ceremonia");
     if (!urlSegura(c.ceremonia.mapa)) f.push("enlace de Google Maps de la ceremonia");
@@ -144,7 +144,7 @@ export async function iniciarPanel(root, key) {
     const falta = faltantes();
     main.innerHTML = `
       ${borrador ? `<div class="aviso">Tienes cambios sin guardar de tu última visita. <button class="btn chico" data-rec>Recuperar</button><button class="lnk" data-desc>Descartar</button></div>` : ""}
-      <div class="intro-form"><b>Formulario de la invitación.</b> Llénalo una sola vez. Puedes volver a este mismo enlace cuando quieras para cambiar lo que necesites: al guardar, se actualizan <u>todas</u> las invitaciones.</div>
+      <div class="intro-form"><b>Formulario de la invitación.</b> Llénalo una sola vez. Las fotos marcadas como <b>Ejemplo</b> son ilustraciones de muestra: sube las tuyas para reemplazarlas. Puedes volver a este mismo enlace cuando quieras para cambiar lo que necesites: al guardar, se actualizan <u>todas</u> las invitaciones.</div>
 
       ${sec(1, "Los novios y la fecha", "", `
         <div class="fila">${F("Nombre del novio", "novio", { ph: "Ej: Manuel" })}${F("Nombre de la novia", "novia", { ph: "Ej: Wendy" })}</div>
@@ -292,6 +292,7 @@ export async function iniciarPanel(root, key) {
     toast("Subiendo…");
     try {
       if (k === "fotos.final") {
+        cfg.fotos.final = cfg.fotos.final.filter(u => !esEjemplo(u)); // las de ejemplo se reemplazan por las tuyas
         for (const f of files.slice(0, MAX_FINAL - cfg.fotos.final.length)) cfg.fotos.final.push(await subirArchivo(await comprimirImagen(f), eventoId, "jpg"));
       } else if (k === "cancion") {
         const f = files[0];
