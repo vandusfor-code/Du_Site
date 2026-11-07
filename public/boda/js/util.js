@@ -1,4 +1,5 @@
 // Utilidades y valores por defecto compartidos por la invitación y el panel.
+import { SUPABASE_URL } from "./config.js";
 
 export const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 export const pad = n => String(n).padStart(2, "0");
@@ -48,15 +49,26 @@ export const ICONOS = {
   estrella:{ n: "Otro", svg: `<svg viewBox="0 0 48 48"><path d="M24 5l5.500 12 13 1.500-9.700 8.800 2.800 12.900L24 33l-11.600 7.200 2.800-12.900L5.500 18.500l13-1.500z"/></svg>` }
 };
 
+// Canciones ya subidas al almacén "boda" de Supabase, entre las que se puede elegir.
+const BASE_CANCIONES = `${SUPABASE_URL}/storage/v1/object/public/boda/canciones/`;
+export const CANCIONES = [
+  { t: "Qué suerte tenerte", a: "Fonseca", url: BASE_CANCIONES + "que-suerte-tenerte.mp3" },
+  { t: "Tú de qué vas", a: "Franco de Vita", url: BASE_CANCIONES + "tu-de-que-vas.mp3" }
+];
+
 export const DEFAULT_CONFIG = {
   novio: "", novia: "", fecha: "", color: "verde",
   versiculo: "Tres cosas permanecerán para siempre: la fe, la esperanza y el amor. Pero la más grande de ellas es el amor.",
   cita: "1 Corintios 13:13",
   mensaje: "Hoy unimos nuestras vidas ante Dios, convencidos de que el amor que nos une se fortalece con su presencia.\n\nComo un cordón de tres dobleces, deseamos construir un hogar donde Él sea el centro de nuestra unión.",
-  portada: "", galeria: [], cancion: "",
+  portada: "",
+  // Una foto opcional por apartado de la invitación + galería final
+  fotos: { mensaje: "", calendario: "", vestimenta: "", itinerario: "", final: [] },
+  cancion: "",
   ceremonia: { nombre: "", dir: "", hora: "", mapa: "", foto: "" },
   recepcion: { mismo: false, nombre: "", dir: "", hora: "", mapa: "", foto: "" },
-  vestimenta: { tipo: "Formal", colores: [], nota: "" },
+  // Por defecto se pide evitar negro, morado y blanco (se pueden cambiar en el formulario)
+  vestimenta: { tipo: "Formal", colores: ["#1c1c1c", "#6e4a8e", "#ffffff"], nota: "" },
   itinerario: [
     { t: "Eucaristía", h: "", ic: "iglesia" },
     { t: "Recepción", h: "", ic: "copas" },
@@ -70,7 +82,7 @@ export const DEFAULT_CONFIG = {
 
 // Mezcla profunda: lo guardado pisa los valores por defecto.
 export function mezclar(base, extra) {
-  if (Array.isArray(base)) return Array.isArray(extra) ? extra : base;
+  if (Array.isArray(base)) return JSON.parse(JSON.stringify(Array.isArray(extra) ? extra : base));
   if (base && typeof base === "object") {
     const out = {};
     for (const k of Object.keys(base)) out[k] = mezclar(base[k], extra && extra[k] !== undefined ? extra[k] : undefined);

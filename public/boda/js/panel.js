@@ -1,22 +1,13 @@
-// Panel de administración: asistente de datos, generador de invitaciones y lista de respuestas.
+// Panel de administración: formulario de la boda, generador de invitaciones y lista de respuestas.
 import { rpc, subirArchivo, comprimirImagen } from "./api.js";
-import { esc, DEFAULT_CONFIG, mezclar, clonar, getPath, setPath, PALETAS, COLORES_VEST, TIPOS_VEST, ICONOS, fmtFechaLarga, urlSegura } from "./util.js";
+import { esc, DEFAULT_CONFIG, CANCIONES, mezclar, clonar, getPath, setPath, PALETAS, COLORES_VEST, TIPOS_VEST, ICONOS, urlSegura } from "./util.js";
 import { renderInvitacion } from "./invitacion.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-const PASOS = [
-  { id: "novios",    t: "Los novios" },
-  { id: "fotos",     t: "Fotos" },
-  { id: "mensaje",   t: "Mensaje y música" },
-  { id: "ceremonia", t: "Ceremonia" },
-  { id: "recepcion", t: "Recepción" },
-  { id: "detalles",  t: "Detalles del día" },
-  { id: "revisar",   t: "Revisar y guardar" }
-];
-
 const IC = (n, p) => `<svg viewBox="0 0 24 24" width="${n}" height="${n}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const MAX_FINAL = 6;
 
 export async function iniciarPanel(root, key) {
   // ---------- carga inicial ----------
@@ -33,8 +24,9 @@ export async function iniciarPanel(root, key) {
   const draftKey = "boda-borrador-" + eventoId;
   let borrador = null;
   try { const b = JSON.parse(localStorage.getItem(draftKey) || "null"); if (b && b.dirty) borrador = b; } catch {}
-  let tab = "datos", paso = 0, dirty = false, saving = false, guardadoAlgunaVez = !!(data.config && data.config.novio);
-  let resultadoNuevo = null, filtro = "todos", refreshTimer = null;
+  let tab = "datos", dirty = false, saving = false;
+  let guardadoAlgunaVez = !!(data.config && data.config.novio);
+  let resultadoNuevo = null, filtro = "todos", refreshTimer = null, nuevoPases = 1;
 
   const base = location.origin + location.pathname.replace(/index\.html$/, "");
   const enlace = c => `${base}?i=${c}`;
@@ -44,12 +36,14 @@ export async function iniciarPanel(root, key) {
       <div class="acc"><button class="btn chico sec" id="b-prev">${IC(15, '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>')} Vista previa</button>
       <button class="btn chico pri" id="b-save">Guardado</button></div></header>
     <nav class="adm-tabs"><button data-tab="datos">Mi invitación</button><button data-tab="inv">Invitaciones <span class="n" id="n-inv"></span></button><button data-tab="res">Respuestas <span class="n" id="n-res"></span></button></nav>
-    <main id="main"></main></div><div id="toast"></div>`;
+    <main id="main"></main>
+    <div class="dirty-bar" id="dirty-bar" hidden><span>Tienes cambios sin guardar</span><button class="btn pri" data-save>Guardar cambios</button></div>
+  </div><div id="toast"></div>`;
   const main = $("#main", root);
 
   // ---------- utilidades de interfaz ----------
   let toastT;
-  const toast = (m, err) => { const t = $("#toast"); t.textContent = m; t.className = "on" + (err ? " err" : ""); clearTimeout(toastT); toastT = setTimeout(() => (t.className = ""), 3200); };
+  const toast = (m, err) => { const t = $("#toast"); t.textContent = m; t.className = "on" + (err ? " err" : ""); clearTimeout(toastT); toastT = setTimeout(() => (t.className = ""), 3400); };
 
   const dialogo = (titulo, cuerpo, botones) => new Promise(res => {
     const d = document.createElement("div");
@@ -77,6 +71,8 @@ export async function iniciarPanel(root, key) {
     b.disabled = !dirty && !saving;
     b.className = "btn chico " + (dirty ? "pri" : "sec");
     b.innerHTML = saving ? `<span class="spin"></span> Guardando…` : dirty ? "Guardar cambios" : `${IC(15, '<path d="M5 12.500l4.500 4.500L19 7.500"/>')} Guardado`;
+    $("#dirty-bar").hidden = !(dirty && tab === "datos");
+    const fb = $("#f-save"); if (fb) { fb.disabled = !dirty || saving; fb.textContent = saving ? "Guardando…" : dirty ? "Guardar cambios" : "Todo guardado ✓"; }
   }
   function marcarCambio() {
     dirty = true; actualizarGuardar();
@@ -92,13 +88,12 @@ export async function iniciarPanel(root, key) {
       await rpc("boda_admin_guardar", { p_key: key, p_config: cfg });
       dirty = false; guardadoAlgunaVez = true;
       try { localStorage.removeItem(draftKey); } catch {}
-      toast("¡Guardado! Tu invitación está lista");
+      toast("¡Guardado! Ya se actualizó en todas las invitaciones");
     } catch (e) { toast("No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.", true); }
     saving = false; actualizarGuardar();
-    if (tab === "datos" && PASOS[paso].id === "revisar") pintar();
   }
 
-  // ---------- campos ----------
+  // ---------- componentes del formulario ----------
   const F = (label, k, o = {}) => {
     const v = getPath(cfg, k) ?? "";
     const campo = o.type === "textarea"
@@ -107,113 +102,130 @@ export async function iniciarPanel(root, key) {
     return `<label class="f"><span>${label}</span>${campo}${o.hint ? `<small>${o.hint}</small>` : ""}</label>`;
   };
 
-  const foto1 = (k, label, o = {}) => {
+  const foto1 = (k, label, hint) => {
     const u = getPath(cfg, k);
     return `<div class="f"><span>${label}</span><div class="up">
       <div class="up-prev">${u ? `<img src="${esc(u)}" alt="">` : "Sin foto"}</div>
-      <div class="up-btns"><label class="btn sec chico">${u ? "Cambiar foto" : "Elegir foto"}<input type="file" accept="image/*" hidden data-up="${k}"></label>
-      ${u ? `<button type="button" class="lnk mal" data-rm="${k}">Quitar</button>` : ""}</div></div>${o.hint ? `<small style="color:var(--sub);font-size:.8rem">${o.hint}</small>` : ""}</div>`;
+      <div class="up-btns"><label class="btn sec chico">${u ? "Cambiar foto" : "Subir foto"}<input type="file" accept="image/*" hidden data-up="${k}"></label>
+      ${u ? `<button type="button" class="lnk mal" data-rm="${k}">Quitar</button>` : ""}</div></div>${hint ? `<small style="display:block;margin-top:4px;color:var(--sub);font-size:.8rem">${hint}</small>` : ""}</div>`;
   };
 
-  // ---------- pasos del asistente ----------
-  const VISTAS = {
-    novios: () => `<h2>Cuéntanos de los novios</h2><p class="sub">Solo lo básico. Todo se puede cambiar después.</p>
-      <div class="fila">${F("Nombre del novio", "novio", { ph: "Ej: Duvan" })}${F("Nombre de la novia", "novia", { ph: "Ej: Daniela" })}</div>
-      ${F("Fecha de la boda", "fecha", { type: "date" })}
-      <div class="f"><span>Color principal de la invitación</span><div class="sw">${Object.entries(PALETAS).map(([k, v]) => `<button type="button" data-color="${k}" class="${cfg.color === k ? "on" : ""}" style="background:${v.c}" title="${v.n}" aria-label="${v.n}"></button>`).join("")}</div></div>`,
+  const sec = (n, titulo, sub, cuerpo) => `<section class="card fsec" id="sec-${n}"><h2><span class="num">${n}</span>${titulo}</h2>${sub ? `<p class="sub">${sub}</p>` : ""}${cuerpo}</section>`;
 
-    fotos: () => `<h2>Las fotos</h2><p class="sub">Sube la que más les guste para la portada y de 4 a 8 fotos más. Se acomodan solas en la invitación.</p>
-      ${foto1("portada", "Foto de portada", { hint: "Funciona mejor una foto vertical." })}
-      <div class="f" style="margin-top:20px"><span>Más fotos (${cfg.galeria.length}/8)</span>
-        <div class="grid-fotos">${cfg.galeria.map((u, i) => `<div class="t"><img src="${esc(u)}" alt=""><button type="button" data-rm-g="${i}" aria-label="Quitar foto">×</button></div>`).join("")}
-        ${cfg.galeria.length < 8 ? `<label class="mas">+ Agregar<input type="file" accept="image/*" multiple hidden data-up="galeria"></label>` : ""}</div></div>`,
+  const cancionesHTML = () => {
+    const propia = cfg.cancion && !CANCIONES.some(c => c.url === cfg.cancion);
+    const opt = (valor, activo, titulo, sub, audio) => `<label class="song ${activo ? "on" : ""}"><input type="radio" name="song" data-song="${esc(valor)}" ${activo ? "checked" : ""}><span class="song-t"><b>${titulo}</b>${sub ? `<small>${sub}</small>` : ""}${audio ? `<audio controls preload="none" src="${esc(audio)}"></audio>` : ""}</span></label>`;
+    return `<div class="songs">
+      ${opt("", !cfg.cancion, "Sin música", "La invitación se verá sin reproductor.", "")}
+      ${CANCIONES.map(c => opt(c.url, cfg.cancion === c.url, esc(c.t), esc(c.a), c.url)).join("")}
+      ${propia ? opt(cfg.cancion, true, "Tu canción subida", "", cfg.cancion) : ""}
+      <div class="song-up"><label class="btn sec chico">${propia ? "Cambiar por otra canción (MP3)" : "Subir otra canción (MP3)"}<input type="file" accept="audio/mpeg,audio/mp4,.mp3,.m4a" hidden data-up="cancion"></label><small>Máximo 8 MB. Esta canción suena en todas las invitaciones.</small></div>
+    </div>`;
+  };
 
-    mensaje: () => `<h2>Mensaje y música</h2><p class="sub">Ya dejamos un texto de ejemplo; cámbialo por el de ustedes.</p>
-      ${F("Versículo o frase", "versiculo", { type: "textarea", rows: 3 })}
-      ${F("Cita del versículo", "cita", { ph: "Ej: 1 Corintios 13:13" })}
-      ${F("Mensaje de los novios", "mensaje", { type: "textarea", rows: 6, hint: "Deja una línea en blanco para separar párrafos." })}
-      <div class="f"><span>Canción (opcional)</span>${cfg.cancion
-        ? `<div class="audio-ok"><audio controls src="${esc(cfg.cancion)}"></audio><button type="button" class="lnk mal" data-rm="cancion">Quitar</button></div>`
-        : `<label class="btn sec chico">Subir canción (MP3)<input type="file" accept="audio/mpeg,audio/mp4,.mp3,.m4a" hidden data-up="cancion"></label><small>Máximo 8 MB. Se reproduce cuando el invitado toca el botón.</small>`}</div>`,
+  const finalHTML = () => `<div class="grid-fotos">${cfg.fotos.final.map((u, i) => `<div class="t"><img src="${esc(u)}" alt=""><button type="button" data-rm-f="${i}" aria-label="Quitar foto">×</button></div>`).join("")}
+    ${cfg.fotos.final.length < MAX_FINAL ? `<label class="mas">+ Agregar<input type="file" accept="image/*" multiple hidden data-up="fotos.final"></label>` : ""}</div>
+    <small style="display:block;margin-top:8px;color:var(--sub);font-size:.8rem">${cfg.fotos.final.length} de ${MAX_FINAL} fotos.</small>`;
 
-    ceremonia: () => `<h2>La ceremonia</h2><p class="sub">¿Dónde y a qué hora se celebra?</p>
-      ${F("Nombre del lugar", "ceremonia.nombre", { ph: "Ej: Iglesia Nuestra Señora de…" })}
-      ${F("Hora", "ceremonia.hora", { type: "time" })}
-      ${F("Dirección", "ceremonia.dir", { ph: "Calle, barrio, ciudad" })}
-      ${F("Enlace de Google Maps", "ceremonia.mapa", { type: "url", ph: "https://maps.app.goo.gl/…", hint: "En Google Maps busca el lugar → Compartir → Copiar enlace, y pégalo aquí." })}
-      ${foto1("ceremonia.foto", "Foto del lugar (opcional)")}`,
+  // ---------- formulario completo ----------
+  function faltantes() {
+    const c = cfg, f = [];
+    if (!c.novio || !c.novia) f.push("nombres de los novios");
+    if (!c.fecha) f.push("fecha de la boda");
+    if (!c.portada) f.push("foto de portada");
+    if (!c.ceremonia.nombre) f.push("lugar de la ceremonia");
+    if (!c.ceremonia.hora) f.push("hora de la ceremonia");
+    if (!urlSegura(c.ceremonia.mapa)) f.push("enlace de Google Maps de la ceremonia");
+    if (!c.recepcion.mismo && !c.recepcion.nombre) f.push("lugar de la recepción");
+    return f;
+  }
 
-    recepcion: () => `<h2>La recepción</h2><p class="sub">¿Se celebra en otro lugar?</p>
-      <label class="chk"><input type="checkbox" data-k="recepcion.mismo" data-re="1" ${cfg.recepcion.mismo ? "checked" : ""}><span><b>Es en el mismo lugar de la ceremonia</b><small>Mostraremos un solo lugar en la invitación.</small></span></label>
-      ${cfg.recepcion.mismo ? "" : `
-      ${F("Nombre del lugar", "recepcion.nombre", { ph: "Ej: Salón Las Marías" })}
-      ${F("Hora", "recepcion.hora", { type: "time" })}
-      ${F("Dirección", "recepcion.dir", { ph: "Calle, barrio, ciudad" })}
-      ${F("Enlace de Google Maps", "recepcion.mapa", { type: "url", ph: "https://maps.app.goo.gl/…" })}
-      ${foto1("recepcion.foto", "Foto del lugar (opcional)")}`}`,
+  function pintarDatos() {
+    const falta = faltantes();
+    main.innerHTML = `
+      ${borrador ? `<div class="aviso">Tienes cambios sin guardar de tu última visita. <button class="btn chico" data-rec>Recuperar</button><button class="lnk" data-desc>Descartar</button></div>` : ""}
+      <div class="intro-form"><b>Formulario de la invitación.</b> Llénalo una sola vez. Puedes volver a este mismo enlace cuando quieras para cambiar lo que necesites: al guardar, se actualizan <u>todas</u> las invitaciones.</div>
 
-    detalles: () => `<h2>Detalles del día</h2><p class="sub">Vestimenta, programa y confirmación.</p>
-      <div class="f"><span>Código de vestimenta</span><div class="chips">${TIPOS_VEST.map(t => `<button type="button" data-tipo="${esc(t)}" class="${cfg.vestimenta.tipo === t ? "on" : ""}">${t}</button>`).join("")}</div></div>
-      <div class="f"><span>Colores que prefieren evitar</span><div class="sw vest">${COLORES_VEST.map(c => `<button type="button" data-vc="${c.c}" class="${cfg.vestimenta.colores.includes(c.c) ? "on" : ""}" style="background:${c.c}" title="${c.n}" aria-label="${c.n}"></button>`).join("")}</div><small>Toca los colores para marcarlos; escribimos la frase por ti.</small></div>
-      ${F("Nota adicional de vestimenta (opcional)", "vestimenta.nota", { ph: "Ej: Traer abrigo, será al aire libre" })}
-      <div class="f"><span>Programa del día</span>
+      ${sec(1, "Los novios y la fecha", "", `
+        <div class="fila">${F("Nombre del novio", "novio", { ph: "Ej: Manuel" })}${F("Nombre de la novia", "novia", { ph: "Ej: Wendy" })}</div>
+        ${F("Fecha de la boda", "fecha", { type: "date" })}
+        <div class="f"><span>Color principal</span><div class="sw">${Object.entries(PALETAS).map(([k, v]) => `<button type="button" data-color="${k}" class="${cfg.color === k ? "on" : ""}" style="background:${v.c}" title="${v.n}" aria-label="${v.n}"></button>`).join("")}</div></div>`)}
+
+      ${sec(2, "Portada", "Es lo primero que ve el invitado, a pantalla completa.", foto1("portada", "Foto de portada", "Funciona mejor una foto vertical."))}
+
+      ${sec(3, "Música", "Elige la canción que sonará en todas las invitaciones. Puedes escucharlas antes de decidir.", cancionesHTML())}
+
+      ${sec(4, "Versículo y mensaje", "Ya dejamos textos de ejemplo; cámbialos por los de ustedes.", `
+        ${F("Versículo o frase", "versiculo", { type: "textarea", rows: 3 })}
+        ${F("Cita del versículo", "cita", { ph: "Ej: 1 Corintios 13:13" })}
+        ${F("Mensaje de los novios", "mensaje", { type: "textarea", rows: 6, hint: "Deja una línea en blanco para separar párrafos." })}
+        ${foto1("fotos.mensaje", "Foto de esta sección (opcional)", "Aparece debajo del versículo, con borde de papel rasgado.")}`)}
+
+      ${sec(5, "Calendario", "El calendario y la cuenta regresiva se arman solos con la fecha y la hora de la ceremonia.", foto1("fotos.calendario", "Foto de esta sección (opcional)", "Aparece debajo del calendario."))}
+
+      ${sec(6, "Ceremonia", "¿Dónde y a qué hora se celebra?", `
+        ${F("Nombre del lugar", "ceremonia.nombre", { ph: "Ej: Iglesia Nuestra Señora de…" })}
+        ${F("Hora", "ceremonia.hora", { type: "time" })}
+        ${F("Dirección", "ceremonia.dir", { ph: "Calle, barrio, ciudad" })}
+        ${F("Enlace de Google Maps", "ceremonia.mapa", { type: "url", ph: "https://maps.app.goo.gl/…", hint: "En Google Maps busca el lugar → Compartir → Copiar enlace, y pégalo aquí." })}
+        ${foto1("ceremonia.foto", "Foto del lugar (opcional)")}`)}
+
+      ${sec(7, "Recepción", "", `
+        <label class="chk"><input type="checkbox" data-k="recepcion.mismo" data-re="1" ${cfg.recepcion.mismo ? "checked" : ""}><span><b>Es en el mismo lugar de la ceremonia</b><small>Mostraremos un solo lugar en la invitación.</small></span></label>
+        ${cfg.recepcion.mismo ? "" : `
+        ${F("Nombre del lugar", "recepcion.nombre", { ph: "Ej: Salón Las Marías" })}
+        ${F("Hora", "recepcion.hora", { type: "time" })}
+        ${F("Dirección", "recepcion.dir", { ph: "Calle, barrio, ciudad" })}
+        ${F("Enlace de Google Maps", "recepcion.mapa", { type: "url", ph: "https://maps.app.goo.gl/…" })}
+        ${foto1("recepcion.foto", "Foto del lugar (opcional)")}`}`)}
+
+      ${sec(8, "Código de vestimenta", "Ya marcamos negro, morado y blanco como colores a evitar. Puedes cambiarlos.", `
+        <div class="f"><span>Tipo de vestimenta</span><div class="chips">${TIPOS_VEST.map(t => `<button type="button" data-tipo="${esc(t)}" class="${cfg.vestimenta.tipo === t ? "on" : ""}">${t}</button>`).join("")}</div></div>
+        <div class="f"><span>Colores que prefieren evitar</span><div class="sw vest">${COLORES_VEST.map(c => `<button type="button" data-vc="${c.c}" class="${cfg.vestimenta.colores.includes(c.c) ? "on" : ""}" style="background:${c.c}" title="${c.n}" aria-label="${c.n}"></button>`).join("")}</div><small>Toca un color para marcarlo o quitarlo. Escribimos la frase por ti.</small></div>
+        ${F("Nota adicional (opcional)", "vestimenta.nota", { ph: "Ej: Será al aire libre, traer abrigo" })}
+        ${foto1("fotos.vestimenta", "Foto de esta sección (opcional)", "Aparece debajo del código de vestimenta.")}`)}
+
+      ${sec(9, "Itinerario", "El programa del día. Pon la hora de cada momento; si la dejas vacía solo se muestra el nombre.", `
         ${cfg.itinerario.map((x, i) => `<div class="it">
           <select data-k="itinerario.${i}.ic" aria-label="Icono">${Object.entries(ICONOS).map(([k, v]) => `<option value="${k}" ${x.ic === k ? "selected" : ""}>${v.n}</option>`).join("")}</select>
           <input type="text" data-k="itinerario.${i}.t" value="${esc(x.t)}" placeholder="Ej: Cena">
           <input type="time" data-k="itinerario.${i}.h" value="${esc(x.h)}" aria-label="Hora">
           <button type="button" class="x" data-rm-it="${i}" aria-label="Quitar">×</button></div>`).join("")}
         <button type="button" class="btn chico sec" data-add-it>+ Agregar momento</button>
-        <small>Pon la hora de cada momento; si la dejas vacía solo se muestra el nombre.</small></div>
-      <label class="chk"><input type="checkbox" data-k="sobres.activo" data-re="1" ${cfg.sobres.activo ? "checked" : ""}><span><b>Incluir “lluvia de sobres”</b><small>Un mensaje para quienes quieran hacer un regalo en efectivo.</small></span></label>
-      ${cfg.sobres.activo ? F("Texto de la lluvia de sobres", "sobres.texto", { type: "textarea", rows: 3 }) : ""}
-      ${F("Confirmar asistencia antes del", "confirmarAntes", { type: "date" })}`,
+        <div style="margin-top:18px">${foto1("fotos.itinerario", "Foto de esta sección (opcional)", "Aparece debajo del itinerario.")}</div>`)}
 
-    revisar: () => {
-      const c = cfg, r = [];
-      r.push([!!(c.novio && c.novia), "Nombres de los novios", 0]);
-      r.push([!!c.fecha, "Fecha de la boda", 0]);
-      r.push([!!c.portada, "Foto de portada", 1]);
-      r.push([c.galeria.length >= 1, `Fotos adicionales (${c.galeria.length})`, 1]);
-      r.push([!!(c.ceremonia.nombre && c.ceremonia.hora), "Lugar y hora de la ceremonia", 3]);
-      r.push([!!urlSegura(c.ceremonia.mapa), "Enlace de Google Maps de la ceremonia", 3]);
-      r.push([c.recepcion.mismo || !!(c.recepcion.nombre && c.recepcion.hora), "Lugar y hora de la recepción", 4]);
-      r.push([!!c.confirmarAntes, "Fecha límite para confirmar", 5]);
-      const faltan = r.filter(x => !x[0]).length;
-      return `<h2>Todo listo para guardar</h2><p class="sub">${faltan ? `Faltan ${faltan} dato${faltan > 1 ? "s" : ""}. Puedes guardar igual y completarlos después.` : "¡Está todo completo!"}</p>
-        <ul class="rev-lista">${r.map(([ok, t, p]) => `<li><span class="p ${ok ? "ok" : "falta"}">${ok ? "✓" : "!"}</span>${t}${ok ? "" : `<button class="lnk" data-go="${p}">Completar</button>`}</li>`).join("")}</ul>
-        <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn pri" data-save style="flex:1;min-width:180px;padding:13px">${dirty ? "Guardar mi invitación" : "Guardado ✓"}</button><button class="btn" data-prev>Ver vista previa</button></div>
-        ${guardadoAlgunaVez && !dirty ? `<div class="resultado" style="margin-top:18px"><b>¡Tu invitación está guardada!</b><div style="margin:6px 0 12px;font-size:.92rem">Ahora crea las invitaciones personalizadas para cada invitado.</div><button class="btn pri" data-gotab="inv">Crear invitaciones →</button></div>` : ""}`;
-    }
-  };
+      ${sec(10, "Lluvia de sobres", "", `
+        <label class="chk"><input type="checkbox" data-k="sobres.activo" data-re="1" ${cfg.sobres.activo ? "checked" : ""}><span><b>Incluir “lluvia de sobres”</b><small>Un mensaje para quienes quieran hacer un detalle en efectivo.</small></span></label>
+        ${cfg.sobres.activo ? F("Texto", "sobres.texto", { type: "textarea", rows: 3 }) : ""}`)}
 
-  function pintarDatos() {
-    const p = PASOS[paso];
-    main.innerHTML = `
-      ${borrador ? `<div class="aviso">Tienes cambios sin guardar de tu última visita. <button class="btn chico" data-rec>Recuperar</button><button class="lnk" data-desc>Descartar</button></div>` : ""}
-      <div class="card">
-        <div class="pasos">${PASOS.map((_, i) => `<i class="${i < paso ? "hecho" : i === paso ? "actual" : ""}"></i>`).join("")}</div>
-        <div class="paso-info"><span>Paso ${paso + 1} de ${PASOS.length}</span><span>${p.t}</span></div>
-        <div id="paso">${VISTAS[p.id]()}</div>
-        ${p.id === "revisar" ? "" : `<div class="nav"><button class="btn sec" data-prev-paso ${paso === 0 ? "disabled" : ""}>← Atrás</button><button class="btn pri" data-next-paso>Siguiente →</button></div>`}
-        ${p.id === "revisar" ? `<div class="nav"><button class="btn sec" data-prev-paso>← Atrás</button><span></span></div>` : ""}
+      ${sec(11, "Confirmación de asistencia", "Los invitados confirman directamente en su invitación; tú ves las respuestas en la pestaña Respuestas.", F("Confirmar asistencia antes del", "confirmarAntes", { type: "date" }))}
+
+      ${sec(12, "Fotos finales", `Hasta ${MAX_FINAL} fotos para el cierre de la invitación, bajo “¡Te esperamos!”.`, finalHTML())}
+
+      <div class="card cierre-form">
+        ${falta.length ? `<div class="aviso" style="margin-bottom:14px">Todavía falta: ${falta.join(", ")}. Puedes guardar igual y completarlo después.</div>` : `<div class="resultado" style="margin:0 0 14px">Está todo lo importante completo.</div>`}
+        <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn pri" id="f-save" data-save style="flex:1;min-width:200px;padding:14px"></button><button class="btn" data-preview>Ver vista previa</button></div>
+        ${guardadoAlgunaVez && !dirty ? `<p class="sub" style="margin:14px 0 0">¡Listo! Ahora crea las invitaciones de cada invitado. <button class="lnk" data-gotab="inv">Ir a Invitaciones →</button></p>` : ""}
       </div>`;
+    actualizarGuardar();
   }
+  // Redibuja el formulario sin que la pantalla salte
+  const repintarDatos = () => { const y = window.scrollY; pintarDatos(); window.scrollTo(0, y); };
 
   // ---------- pestaña: invitaciones ----------
-  let nuevoPases = 1;
   function pintarInvitaciones() {
     const listo = cfg.novio && cfg.novia && guardadoAlgunaVez;
     main.innerHTML = `
       ${listo ? "" : `<div class="aviso">Primero completa y guarda los datos de tu invitación. <button class="btn chico" data-gotab="datos">Ir a mi invitación</button></div>`}
-      <div class="card"><h2>Nueva invitación</h2><p class="sub">Escribe a quién invitas. Se crea un enlace único y, cuando esa persona confirme, sabrás exactamente quién fue.</p>
+      <div class="card"><h2>Nueva invitación</h2><p class="sub">Aquí solo escribes el nombre de cada invitado: toda la información de la boda ya está en tu formulario. Se crea un enlace único y, cuando esa persona confirme, sabrás exactamente quién fue.</p>
         <div class="nuevo">
           <label class="f" style="margin:0"><span>Nombre del invitado o familia</span><input id="in-nombre" type="text" placeholder="Ej: Duvan Ramos & Familia" maxlength="120"></label>
           <div><span style="display:block;font-weight:600;font-size:.92rem;margin-bottom:6px">Personas</span><div class="pases"><button type="button" id="p-menos" aria-label="Menos">−</button><b id="p-n">${nuevoPases}</b><button type="button" id="p-mas" aria-label="Más">+</button></div></div>
         </div>
         <div style="margin-top:14px"><button class="btn pri" id="gen">Generar invitación</button></div>
         <div id="resultado">${resultadoNuevo ? htmlResultado(resultadoNuevo) : ""}</div>
-        <details><summary>Agregar varias a la vez</summary>
-          <label class="f" style="margin-top:10px"><textarea id="in-lote" rows="5" placeholder="Una por línea. Si quieres, agrega las personas después de una coma:&#10;Duvan Ramos & Familia, 4&#10;María López, 1"></textarea></label>
+        <details><summary>Agregar muchas a la vez</summary>
+          <label class="f" style="margin-top:10px"><textarea id="in-lote" rows="6" placeholder="Una por línea. Si quieres, agrega las personas después de una coma:&#10;Duvan Ramos & Familia, 4&#10;María López, 1"></textarea></label>
           <button class="btn" id="gen-lote">Generar todas</button></details>
       </div>
       <h2 style="margin:24px 4px 4px">Tus invitaciones (${invitados.length})</h2>
@@ -248,8 +260,8 @@ export async function iniciarPanel(root, key) {
   }
 
   function descargarCSV() {
-    const filas = [["Nombre", "Estado", "Personas invitadas", "Personas que asisten", "Respondió"]];
-    invitados.forEach(i => filas.push([i.nombre, estadoTxt[i.estado], i.pases, i.estado === "confirmado" ? (i.asistentes || i.pases) : "", i.respondido ? new Date(i.respondido).toLocaleString("es-CO") : ""]));
+    const filas = [["Nombre", "Estado", "Personas invitadas", "Personas que asisten", "Respondió", "Enlace"]];
+    invitados.forEach(i => filas.push([i.nombre, estadoTxt[i.estado], i.pases, i.estado === "confirmado" ? (i.asistentes || i.pases) : "", i.respondido ? new Date(i.respondido).toLocaleString("es-CO") : "", enlace(i.codigo)]));
     const csv = "﻿" + filas.map(f => f.map(x => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\r\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
@@ -279,8 +291,8 @@ export async function iniciarPanel(root, key) {
     if (!files.length) return;
     toast("Subiendo…");
     try {
-      if (k === "galeria") {
-        for (const f of files.slice(0, 8 - cfg.galeria.length)) cfg.galeria.push(await subirArchivo(await comprimirImagen(f), eventoId, "jpg"));
+      if (k === "fotos.final") {
+        for (const f of files.slice(0, MAX_FINAL - cfg.fotos.final.length)) cfg.fotos.final.push(await subirArchivo(await comprimirImagen(f), eventoId, "jpg"));
       } else if (k === "cancion") {
         const f = files[0];
         if (f.size > 8 * 1024 * 1024) throw new Error("La canción pesa más de 8 MB");
@@ -288,7 +300,7 @@ export async function iniciarPanel(root, key) {
       } else {
         setPath(cfg, k, await subirArchivo(await comprimirImagen(files[0], k === "portada" ? 1800 : 1200), eventoId, "jpg"));
       }
-      marcarCambio(); toast("Listo ✓"); pintar();
+      marcarCambio(); toast("Listo ✓"); repintarDatos();
     } catch (e) { toast("No se pudo subir: " + (e.message || "error"), true); inp.value = ""; }
   }
 
@@ -309,20 +321,17 @@ export async function iniciarPanel(root, key) {
     const d = t.dataset;
     if (d.tab) return irTab(d.tab);
     if (d.gotab) return irTab(d.gotab);
-    if (t.id === "b-prev" || d.prev !== undefined) return vistaPrevia();
+    if (t.id === "b-prev" || d.preview !== undefined) return vistaPrevia();
     if (t.id === "b-save" || d.save !== undefined) return guardar();
-    if (d.nextPaso !== undefined) { paso = Math.min(PASOS.length - 1, paso + 1); window.scrollTo(0, 0); return pintarDatos(); }
-    if (d.prevPaso !== undefined) { paso = Math.max(0, paso - 1); window.scrollTo(0, 0); return pintarDatos(); }
-    if (d.go !== undefined) { paso = +d.go; window.scrollTo(0, 0); return pintarDatos(); }
     if (d.rec !== undefined) { cfg = mezclar(DEFAULT_CONFIG, borrador.cfg); borrador = null; dirty = true; return pintar(); }
     if (d.desc !== undefined) { try { localStorage.removeItem(draftKey); } catch {} borrador = null; return pintarDatos(); }
-    if (d.color) { cfg.color = d.color; marcarCambio(); return pintarDatos(); }
-    if (d.tipo) { cfg.vestimenta.tipo = d.tipo; marcarCambio(); return pintarDatos(); }
-    if (d.vc) { const a = cfg.vestimenta.colores, i = a.indexOf(d.vc); i < 0 ? a.push(d.vc) : a.splice(i, 1); marcarCambio(); return pintarDatos(); }
-    if (d.addIt !== undefined) { cfg.itinerario.push({ t: "", h: "", ic: "estrella" }); marcarCambio(); pintarDatos(); const ins = $$(".it input[type=text]"); return ins[ins.length - 1]?.focus(); }
-    if (d.rmIt !== undefined) { cfg.itinerario.splice(+d.rmIt, 1); marcarCambio(); return pintarDatos(); }
-    if (d.rm) { setPath(cfg, d.rm, ""); marcarCambio(); return pintarDatos(); }
-    if (d.rmG !== undefined) { cfg.galeria.splice(+d.rmG, 1); marcarCambio(); return pintarDatos(); }
+    if (d.color) { cfg.color = d.color; marcarCambio(); return repintarDatos(); }
+    if (d.tipo) { cfg.vestimenta.tipo = d.tipo; marcarCambio(); return repintarDatos(); }
+    if (d.vc) { const a = cfg.vestimenta.colores, i = a.indexOf(d.vc); i < 0 ? a.push(d.vc) : a.splice(i, 1); marcarCambio(); return repintarDatos(); }
+    if (d.addIt !== undefined) { cfg.itinerario.push({ t: "", h: "", ic: "estrella" }); marcarCambio(); repintarDatos(); const ins = $$(".it input[type=text]"); return ins[ins.length - 1]?.focus(); }
+    if (d.rmIt !== undefined) { cfg.itinerario.splice(+d.rmIt, 1); marcarCambio(); return repintarDatos(); }
+    if (d.rm) { setPath(cfg, d.rm, ""); marcarCambio(); return repintarDatos(); }
+    if (d.rmF !== undefined) { cfg.fotos.final.splice(+d.rmF, 1); marcarCambio(); return repintarDatos(); }
     if (d.copy) return copiar(enlace(d.copy));
     if (d.filtro) { filtro = d.filtro; return pintarRespuestas(); }
     if (d.refresh !== undefined) return recargar(false);
@@ -372,11 +381,19 @@ export async function iniciarPanel(root, key) {
     if (!k) return;
     setPath(cfg, k, e.target.type === "checkbox" ? e.target.checked : e.target.value);
     marcarCambio();
-    if (e.target.dataset.re) pintarDatos();
+    if (e.target.dataset.re) repintarDatos();
   });
-  root.addEventListener("change", e => { if (e.target.dataset.up) subir(e.target); });
+  root.addEventListener("change", e => {
+    if (e.target.dataset.up) return subir(e.target);
+    if (e.target.name === "song") {
+      cfg.cancion = e.target.dataset.song || "";
+      $$(".song", root).forEach(l => l.classList.toggle("on", $("input", l).checked));
+      marcarCambio();
+    }
+  });
+  // Solo suena una canción a la vez en el formulario
+  root.addEventListener("play", e => { $$("audio", root).forEach(a => { if (a !== e.target) a.pause(); }); }, true);
   root.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "in-nombre") $("#gen").click(); });
 
-  if (borrador) { /* el aviso se muestra en la pestaña de datos */ }
   pintar();
 }

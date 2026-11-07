@@ -42,7 +42,7 @@ function textoColores(cols) {
 /* ---------- construcción ---------- */
 export function renderInvitacion(root, cfg, guest, opts = {}) {
   const f = parseFecha(cfg.fecha);
-  const g = (cfg.galeria || []).filter(Boolean);
+  const fo = cfg.fotos || {};
   const colorMain = (PALETAS[cfg.color] || PALETAS.verde).c;
   const rec = cfg.recepcion.mismo ? null : cfg.recepcion;
   const nota = textoColores(cfg.vestimenta.colores);
@@ -52,7 +52,7 @@ export function renderInvitacion(root, cfg, guest, opts = {}) {
   ).join("");
 
   const mensaje = (cfg.mensaje || "").split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
-  const mosaico = g.slice(4, 8);
+  const mosaico = (fo.final || []).filter(Boolean);
 
   root.className = "inv anim";
   root.style.setProperty("--c", colorMain);
@@ -78,7 +78,7 @@ export function renderInvitacion(root, cfg, guest, opts = {}) {
     </div>` : ""}
   </section>
 
-  ${g[0] ? foto(g[0], "Foto", `data-roto="1" style="aspect-ratio:4/5;margin-top:30px"`) : ""}
+  ${fo.mensaje ? foto(fo.mensaje, "Foto", `data-roto="1" style="aspect-ratio:4/5;margin-top:30px"`) : ""}
 
   ${mensaje.length ? `<section class="intro rev">${mensaje.map(p => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`).join("")}</section>` : ""}
 
@@ -94,7 +94,7 @@ export function renderInvitacion(root, cfg, guest, opts = {}) {
     </div></div>
   </section>` : ""}
 
-  ${g[1] ? foto(g[1], "Foto", `style="aspect-ratio:3/4"`) : ""}
+  ${fo.calendario ? foto(fo.calendario, "Foto", `style="aspect-ratio:3/4"`) : ""}
 
   ${cfg.ceremonia.nombre || (rec && rec.nombre) ? `<section class="ubic">
     <h2 class="titulo rev">Ubicación</h2>
@@ -114,11 +114,11 @@ export function renderInvitacion(root, cfg, guest, opts = {}) {
     </svg>
   </section>
 
-  ${g[2] ? foto(g[2], "Foto", `style="aspect-ratio:4/5"`) : ""}
+  ${fo.vestimenta ? foto(fo.vestimenta, "Foto", `style="aspect-ratio:4/5"`) : ""}
 
   ${itin ? `<section class="itin"><h2 class="titulo rev">Itinerario</h2><div class="linea">${itin}</div></section>` : ""}
 
-  ${g[3] ? foto(g[3], "Foto", `style="aspect-ratio:3/4"`) : ""}
+  ${fo.itinerario ? foto(fo.itinerario, "Foto", `style="aspect-ratio:3/4"`) : ""}
 
   ${cfg.sobres.activo && cfg.sobres.texto ? `<section class="simple rev">${IC_SOBRE}<h2 class="titulo">Lluvia de sobres</h2><p>${esc(cfg.sobres.texto)}</p></section>` : ""}
 

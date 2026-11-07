@@ -136,3 +136,23 @@
 .centro{min-height:100vh;display:grid;place-items:center;padding:30px;text-align:center;font-family:'Lora',Georgia,serif;color:#444;background:#f5f4ef}
 .centro h1{font-family:'Great Vibes',cursive;font-weight:400;font-size:3rem;color:#53582f;margin:0 0 10px}
 .centro p{margin:0;line-height:1.6;max-width:380px}
+
+/* formulario en una sola página */
+.adm .intro-form{background:#eef3e2;border:1px solid #cfdcae;color:#33401a;padding:12px 14px;border-radius:12px;font-size:.9rem;line-height:1.5;margin-bottom:14px}
+.adm .fsec{margin-bottom:14px;scroll-margin-top:120px}
+.adm .fsec h2{display:flex;align-items:center;gap:10px}
+.adm .fsec h2 .num{flex:none;width:28px;height:28px;border-radius:50%;background:var(--c);color:#fff;font-size:.85rem;display:grid;place-items:center}
+.adm .cierre-form{margin-top:6px}
+.adm .dirty-bar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;background:#fff;border-top:1px solid var(--borde);box-shadow:0 -4px 18px rgba(0,0,0,.08);font-weight:600;font-size:.92rem}
+.adm .dirty-bar[hidden]{display:none}
+
+/* selector de canción */
+.adm .songs{display:flex;flex-direction:column;gap:10px}
+.adm .song{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1.5px solid var(--borde);border-radius:12px;cursor:pointer;background:#fff;transition:.15s}
+.adm .song.on{border-color:var(--c);background:#f6f8ee;box-shadow:0 0 0 1px var(--c)}
+.adm .song input{margin-top:4px;width:18px;height:18px;accent-color:var(--c);flex:none}
+.adm .song-t{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.adm .song-t small{color:var(--sub)}
+.adm .song-t audio{width:100%;height:38px;margin-top:6px}
+.adm .song-up{margin-top:4px}
+.adm .song-up small{display:block;margin-top:6px;color:var(--sub);font-size:.8rem}
