@@ -1,5 +1,5 @@
 import "server-only";
-import { readRange, appendRow, parseSheetDate, formatSheetDate, formatDuration } from "@/lib/sheets";
+import { readRange, appendRow, parseSheetDate, formatSheetDate } from "@/lib/sheets";
 
 function sheetId(): string {
   const id = process.env.SHEET_ID_METRICAS;
@@ -81,9 +81,8 @@ export async function obtenerMetricas(asesor: string): Promise<MetricasAsesor> {
   const asesorBuscado = (asesor || "").trim().toUpperCase();
   const sinBono = ASESORES_SIN_BONO.includes(asesorBuscado);
 
-  const [dataTO, dataDesempeno, dataConsolidado] = await Promise.all([
+  const [dataTO, dataConsolidado] = await Promise.all([
     readRange(id, "TO!A2:P", { unformatted: true }),
-    readRange(id, "Desempeño!A2:J", { unformatted: true }),
     readRange(id, "Consolidado!A2:W", { unformatted: true }),
   ]);
 
@@ -92,9 +91,6 @@ export async function obtenerMetricas(asesor: string): Promise<MetricasAsesor> {
   const metrics: Metrica[] = [];
 
   const rowUser = dataTO.find(
-    (row) => texto(row, 0).trim().toUpperCase() === asesorBuscado
-  );
-  const rowDesempeno = dataDesempeno.find(
     (row) => texto(row, 0).trim().toUpperCase() === asesorBuscado
   );
 
@@ -146,17 +142,6 @@ export async function obtenerMetricas(asesor: string): Promise<MetricasAsesor> {
       metrics.push({ label: "Por Corrección", value: String(cell(rowUser, 12)) });
       metrics.push({ label: "SNC Solucionados", value: String(cell(rowUser, 13)) });
       bonoGanado = sinBono ? 0 : parseBono(cell(rowUser, 9));
-    }
-
-    if (rowDesempeno) {
-      metrics.push({ label: "Gest.", value: String(cell(rowDesempeno, 2)) });
-      metrics.push({ label: "% Ans Rate", value: fmtPct(cell(rowDesempeno, 3)) });
-      metrics.push({ label: "ATT", value: formatDuration(rowDesempeno[4]) });
-      metrics.push({ label: "Missed", value: String(cell(rowDesempeno, 5)) });
-      metrics.push({ label: "Hold", value: formatDuration(rowDesempeno[6]) });
-      metrics.push({ label: "ACW", value: formatDuration(rowDesempeno[7]) });
-      metrics.push({ label: "AHT", value: formatDuration(rowDesempeno[8]) });
-      metrics.push({ label: "Meta", value: texto(rowDesempeno, 9) || "N/A" });
     }
   }
 
