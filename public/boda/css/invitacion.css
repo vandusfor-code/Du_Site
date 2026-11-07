@@ -1,0 +1,147 @@
+/* Estilos de la invitación (todo bajo .inv para no chocar con el panel) */
+.inv{--c:#53582f;--c-osc:#43471f;--texto:#1c1c1c;--script:'Great Vibes','Brush Script MT',cursive;--serif:'Lora',Georgia,serif;
+  max-width:480px;margin:0 auto;background:#fff;overflow:hidden;font-family:var(--serif);color:var(--texto);
+  box-shadow:0 0 40px rgba(0,0,0,.12);-webkit-font-smoothing:antialiased;text-align:center}
+.inv *{box-sizing:border-box}
+.inv h1,.inv h2,.inv h3,.inv p{margin:0}
+.inv section{position:relative;text-align:center}
+.inv img{display:block;max-width:100%}
+
+/* fotos */
+.inv .foto{position:relative;width:100%;background:linear-gradient(135deg,#8fa36b,#4f6a3a 60%,#2f4425);overflow:hidden;margin:0}
+.inv .foto img{width:100%;height:100%;object-fit:cover}
+.inv .foto:not(.tiene)::after{content:"Foto";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);font-size:.85rem;letter-spacing:.2em;text-transform:uppercase}
+
+/* portada */
+.inv .hero{height:min(100svh,780px);min-height:560px;color:#fff}
+.inv .hero .foto{position:absolute;inset:0;height:100%}
+.inv .hero .foto::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(to bottom,rgba(0,0,0,.35),transparent 30%,transparent 55%,rgba(0,0,0,.55))}
+.inv .hero .arriba{position:absolute;top:44px;left:0;right:0;z-index:2;font-size:1.15rem;letter-spacing:.08em}
+.inv .hero .abajo{position:absolute;bottom:34px;left:0;right:0;z-index:2}
+.inv .hero h1{font-family:var(--script);font-weight:400;font-size:3.6rem;line-height:1.05;letter-spacing:.04em;text-shadow:0 2px 12px rgba(0,0,0,.35)}
+.inv .hero .fecha{margin-top:10px;font-size:1.2rem;letter-spacing:.3em;text-transform:uppercase}
+
+/* para quién es */
+.inv .para{padding:46px 30px 4px}
+.inv .para small{display:block;font-style:italic;letter-spacing:.14em;color:#666}
+.inv .para strong{display:block;font-family:var(--script);font-weight:400;font-size:2.7rem;line-height:1.15;color:var(--c);margin-top:6px}
+.inv .para span{display:block;margin-top:6px;font-size:.88rem;letter-spacing:.08em;color:#555}
+
+/* versículo + música */
+.inv .versiculo{padding:44px 36px 24px}
+.inv .versiculo p{font-style:italic;font-size:1.02rem;line-height:1.7;letter-spacing:.06em;color:#555}
+.inv .versiculo cite{display:block;margin-top:22px;font-style:normal;font-weight:700;color:#444;letter-spacing:.06em}
+.inv .player{max-width:340px;margin:30px auto 0}
+.inv .barra{position:relative;height:2px;background:#d6d6d6;margin:0 0 26px}
+.inv .barra i{position:absolute;left:0;top:0;bottom:0;width:0;background:#222}
+.inv .barra b{position:absolute;top:-4px;left:0;width:10px;height:10px;border-radius:50%;background:#222;transform:translateX(-50%)}
+.inv .controles{display:flex;justify-content:center;align-items:center;gap:28px}
+.inv .controles button{background:none;border:0;cursor:pointer;color:#111;display:grid;place-items:center;padding:4px}
+.inv .controles svg{width:22px;height:22px;fill:currentColor}
+.inv .controles .play svg{width:38px;height:38px}
+.inv .indic{margin-top:18px;font-size:.92rem;line-height:1.5;color:#333}
+
+/* mensaje y nombres */
+.inv .intro{padding:56px 34px 10px}
+.inv .intro p{font-style:italic;font-size:1rem;line-height:1.75;letter-spacing:.05em}
+.inv .intro p+p{margin-top:18px}
+.inv .nombres{padding:44px 20px 20px}
+.inv .nombres span{display:block;font-family:var(--script);color:var(--c);font-size:3.6rem;line-height:1.1;letter-spacing:.03em}
+.inv .nombres .amp{font-size:2.4rem;margin:2px 0}
+
+/* títulos */
+.inv .titulo{font-family:var(--script);color:var(--c);font-weight:400;font-size:3rem;line-height:1.15;letter-spacing:.03em}
+
+/* calendario */
+.inv .dia{padding:36px 28px 40px}
+.inv .dia .sub{font-style:italic;letter-spacing:.14em;color:var(--c);margin-top:4px}
+.inv .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:8px 0;max-width:310px;margin:26px auto 0;font-size:.9rem}
+.inv .cal .h{font-weight:700;text-transform:uppercase;padding-bottom:6px}
+.inv .cal .d{height:34px;display:grid;place-items:center;position:relative}
+.inv .cal .hoy{color:var(--c);font-weight:700}
+.inv .cal .hoy svg{position:absolute;inset:-4px;width:calc(100% + 8px);height:calc(100% + 8px);fill:none;stroke:#222;stroke-width:1.6}
+.inv .cuenta{margin-top:40px}
+.inv .cuenta h3{font-family:var(--script);color:var(--c);font-weight:400;font-size:2.4rem}
+.inv .cuenta .caja{display:flex;justify-content:center;gap:16px;margin-top:12px}
+.inv .cuenta .caja div{min-width:58px}
+.inv .cuenta strong{display:block;font-size:1.9rem;font-weight:400;color:var(--c)}
+.inv .cuenta small{font-size:.7rem;letter-spacing:.2em;text-transform:uppercase}
+
+/* ubicación */
+.inv .ubic{padding:48px 18px 20px}
+.inv .lugar{display:flex;align-items:center;gap:16px;margin-top:26px;text-align:center}
+.inv .lugar.rev-dir{flex-direction:row-reverse}
+.inv .lugar .foto{flex:0 0 50%;aspect-ratio:4/3}
+.inv .lugar .info{flex:1;font-size:.82rem;letter-spacing:.06em;line-height:1.5;min-width:0;overflow-wrap:anywhere}
+.inv .lugar.sin-foto{justify-content:center}
+.inv .lugar.sin-foto .info{flex:0 1 320px;font-size:.9rem}
+.inv .lugar h3{font-family:var(--serif);font-size:1rem;letter-spacing:.12em;text-transform:uppercase;color:var(--c);margin-bottom:8px}
+.inv .lugar .info b{display:block;margin-top:4px}
+.inv .btn{display:inline-block;margin-top:12px;padding:8px 14px;background:var(--c);color:#fff;text-decoration:none;font-family:var(--serif);font-weight:700;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;border:0;border-radius:3px;cursor:pointer;transition:background .2s}
+.inv .btn:hover{background:var(--c-osc)}
+.inv .btn.grande{font-size:.9rem;padding:13px 26px;letter-spacing:.14em}
+.inv .btn.suave{background:transparent;color:var(--c);box-shadow:inset 0 0 0 1.5px var(--c)}
+.inv .link{background:none;border:0;color:#666;font:italic .85rem var(--serif);text-decoration:underline;cursor:pointer;margin-top:14px;padding:4px}
+
+/* vestimenta */
+.inv .vest{padding:48px 28px 30px}
+.inv .vest .tipo{margin-top:20px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.inv .vest p{margin-top:12px;font-style:italic;letter-spacing:.06em;line-height:1.6}
+.inv .colores{display:flex;justify-content:center;flex-wrap:wrap;gap:14px;margin-top:20px}
+.inv .colores i{width:34px;height:34px;border-radius:50%;border:1px solid #bbb}
+.inv .vest svg.traje{width:190px;margin:22px auto 0;display:block}
+
+/* itinerario */
+.inv .itin{padding:40px 22px 50px}
+.inv .linea{position:relative;display:grid;grid-template-columns:1fr 1fr;column-gap:40px;max-width:360px;margin:30px auto 0}
+.inv .linea::before{content:"";position:absolute;left:50%;top:6px;bottom:6px;width:2px;background:#333;transform:translateX(-50%)}
+.inv .ev{position:relative;padding:10px 0;min-height:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:.78rem;letter-spacing:.06em;font-style:italic}
+.inv .ev b{text-transform:uppercase}
+.inv .ev svg{width:44px;height:44px;fill:none;stroke:#222;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.inv .ev::after{content:"";position:absolute;top:50%;width:10px;height:10px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 0 0 1.5px var(--c);transform:translateY(-50%)}
+.inv .ev.i::after{right:-25px}
+.inv .ev.d::after{left:-25px}
+
+/* sobres / confirmación */
+.inv .simple{padding:54px 34px 10px}
+.inv .simple svg.ico{width:36px;height:36px;margin:0 auto 6px;display:block;fill:none;stroke:#222;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.inv .simple .titulo{font-size:2.6rem}
+.inv .simple p{margin-top:14px;font-style:italic;font-size:.98rem;line-height:1.7;letter-spacing:.05em}
+.inv .estado{margin-top:22px}
+.inv .estado .ok,.inv .estado .no{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:30px;font-style:normal;font-weight:700;font-size:.9rem;letter-spacing:.06em}
+.inv .estado .ok{background:#eaf1df;color:#3d5a1e}
+.inv .estado .no{background:#f3e7e7;color:#7a2e2e}
+.inv .estado svg{width:18px;height:18px}
+.inv .final{padding:50px 0 0}
+.inv .final .titulo{font-size:3.3rem;margin-bottom:26px}
+.inv .mosaico{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.inv .mosaico .foto{aspect-ratio:3/4}
+.inv .mosaico .foto:nth-child(4n+1),.inv .mosaico .foto:nth-child(4n){aspect-ratio:1/1.1}
+.inv .cierre{height:40px}
+.inv .vista-previa{background:#fff7d6;color:#7a6200;font:600 .8rem/1.3 system-ui,sans-serif;padding:8px 12px;letter-spacing:.02em}
+
+/* animación al hacer scroll */
+.inv.anim .rev{opacity:0;transform:translateY(22px);transition:opacity .9s ease,transform .9s ease}
+.inv.anim .rev.v{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.inv.anim .rev{opacity:1;transform:none;transition:none}}
+
+/* ventana emergente de confirmación (fuera de .inv) */
+.inv-modal{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:20px;background:rgba(15,15,15,.55);backdrop-filter:blur(2px);font-family:'Lora',Georgia,serif;animation:fadeIn .2s ease}
+.inv-modal .caja{width:min(100%,380px);background:#fff;border-radius:16px;padding:30px 24px 22px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:subir .25s ease}
+.inv-modal .ic{width:54px;height:54px;border-radius:50%;margin:0 auto 14px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 14%,#fff);color:var(--c)}
+.inv-modal .ic svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.inv-modal h2{margin:0;font-size:1.25rem;line-height:1.35;color:#222}
+.inv-modal .quien{margin-top:8px;font-family:'Great Vibes',cursive;font-size:1.9rem;color:var(--c);line-height:1.2}
+.inv-modal p{margin:10px 0 0;font-size:.92rem;color:#555;line-height:1.5}
+.inv-modal .cuantos{margin-top:16px;font-size:.9rem;color:#333}
+.inv-modal .paso{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:8px}
+.inv-modal .paso button{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--c);background:#fff;color:var(--c);font-size:1.3rem;line-height:1;cursor:pointer}
+.inv-modal .paso b{min-width:34px;font-size:1.5rem;color:#222}
+.inv-modal .acciones{display:flex;gap:10px;margin-top:22px}
+.inv-modal .acciones button{flex:1;padding:12px 10px;border-radius:10px;font:700 .95rem 'Lora',serif;cursor:pointer;border:1.5px solid var(--c)}
+.inv-modal .acciones .no{background:#fff;color:var(--c)}
+.inv-modal .acciones .si{background:var(--c);color:#fff}
+.inv-modal .acciones button:disabled{opacity:.6;cursor:default}
+.inv-modal .err{color:#a02727;font-size:.85rem;margin-top:12px}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes subir{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}

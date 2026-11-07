@@ -1,6 +1,18 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Invitación de boda (página pública, sin login): /boda/<nombre-de-la-pareja>
+  async rewrites() {
+    return [{ source: "/boda/:slug", destination: "/boda/app.html" }];
+  },
+  async headers() {
+    return [
+      {
+        source: "/boda/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+    ];
+  },
   images: {
     remotePatterns: [{ hostname: "i.pravatar.cc" }],
   },
