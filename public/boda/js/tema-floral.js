@@ -202,12 +202,13 @@ function render(root, cfg, guest, opts = {}) {
 }
 
 /* ---------- entrada: puertas con monograma y lazo que se suelta ---------- */
+// Arabescos en relieve (blind emboss) de cada esquina; el giro va dentro del SVG para que la luz no se invierta
+const esquina = (n, fx, fy, pos) => `<svg class="f-esq ${pos}" viewBox="0 0 200 340" aria-hidden="true"><g filter="url(#relieve)"><g transform="translate(${fx ? 200 : 0} ${fy ? 340 : 0}) scale(${fx ? -1 : 1} ${fy ? -1 : 1})">${A.floritura(n)}</g></g></svg>`;
+
 function arte(cfg, guest, pies) {
   const f = parseFecha(cfg.fecha);
   return `<div class="f-arte">
-    <div class="f-marco"></div>
-    <div class="f-flor tl">${A.ramillete(0)}</div><div class="f-flor br">${A.ramillete(1)}</div>
-    <div class="f-flor tr s4">${A.ramaOro(7)}</div><div class="f-flor bl s4">${A.ramaOro(7)}</div>
+    ${esquina(3, 0, 0, "tl")}${esquina(5, 1, 0, "tr")}${esquina(8, 0, 1, "bl")}${esquina(2, 1, 1, "br")}
     <div class="f-c-bloque">
       <div class="f-c-top">NUESTRA BODA</div>
       ${monograma(cfg, "f-c-mono")}
@@ -221,11 +222,11 @@ function arte(cfg, guest, pies) {
 function portadaLazo(root, cfg, guest) {
   const c = document.createElement("div");
   c.className = "f-cover";
-  c.innerHTML = `${A.DEFS}<div class="f-escena">
+  c.innerHTML = `${A.DEFS}${A.DEFS_REAL}<div class="f-escena">
     <div class="f-puerta izq">${arte(cfg, guest)}</div>
     <div class="f-puerta der">${arte(cfg, guest)}</div>
     <div class="f-cinta"></div>
-    <button class="f-lazo" aria-label="Abrir la invitación">${A.lazo()}</button>
+    <button class="f-lazo" aria-label="Abrir la invitación">${A.lazoSatin()}</button>
   </div>`;
   document.body.appendChild(c);
   const prev = document.body.style.overflow;

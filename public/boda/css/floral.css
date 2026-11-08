@@ -264,3 +264,77 @@
   .f-c-ico svg{width:38px}
   .f-c-cupos{top:76.5%}
 }
+
+/* =====================================================================
+   ENTRADA REALISTA: papel con grano, relieve y lazo de satín
+   (sustituye los estilos "planos" anteriores de la entrada)
+   ===================================================================== */
+.f-cover{background:#BDAF94;color:#3F362A}
+.f-cover.abre{background:transparent}
+
+/* puertas: papel de algodón con grano y sombreado de grosor */
+.f-puerta{
+  background-color:#F7F0E0;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' seed='11'/><feColorMatrix values='0 0 0 0 .42  0 0 0 0 .33  0 0 0 0 .18  0 0 0 .24 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    linear-gradient(100deg,#FBF6E9 0%,#F6EEDB 55%,#EFE5CF 100%);
+  background-size:300px 300px,100% 100%;
+  background-blend-mode:multiply,normal}
+.f-puerta.izq{box-shadow:inset -12px 0 16px -10px rgba(95,70,30,.5),inset 7px 0 10px -8px rgba(95,70,30,.22),inset -1px 0 0 rgba(95,70,30,.35)}
+.f-puerta.der{box-shadow:inset 12px 0 16px -10px rgba(95,70,30,.5),inset -7px 0 10px -8px rgba(95,70,30,.22),inset 1px 0 0 rgba(95,70,30,.35);background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' seed='23'/><feColorMatrix values='0 0 0 0 .42  0 0 0 0 .33  0 0 0 0 .18  0 0 0 .24 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    linear-gradient(260deg,#FBF6E9 0%,#F6EEDB 55%,#EFE5CF 100%)}
+.f-puerta::after{background:linear-gradient(90deg,rgba(80,58,24,0),rgba(80,58,24,.5))}
+.f-puerta.der::after{background:linear-gradient(270deg,rgba(80,58,24,0),rgba(80,58,24,.5))}
+
+/* arabescos en relieve */
+.f-arte .f-esq{position:absolute;width:min(34vw,136px);height:auto;overflow:visible;pointer-events:none;z-index:1}
+.f-arte .f-esq.tl{top:3%;left:-16px}.f-arte .f-esq.tr{top:3%;right:-16px}
+.f-arte .f-esq.bl{bottom:3%;left:-16px}.f-arte .f-esq.br{bottom:3%;right:-16px}
+
+/* cinta de satín que rodea la invitación */
+.f-cinta{height:clamp(52px,9.4vh,76px);
+  background:linear-gradient(180deg,#E0D3BA 0%,#F7F0E1 14%,#FFFEFA 38%,#F6EEDD 70%,#E2D5BB 100%);
+  box-shadow:0 11px 18px rgba(80,58,24,.32),0 2px 3px rgba(80,58,24,.25),inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 0 rgba(120,96,56,.3)}
+
+/* lazo de satín */
+.f-lazo{width:min(82vw,330px,46vh);filter:none;transform:translate(-50%,-37%);animation:lz-respira 3s ease-in-out infinite}
+.f-lazo svg{width:100%}
+@keyframes lz-respira{0%,100%{transform:translate(-50%,-37%) scale(1)}50%{transform:translate(-50%,-37%) scale(1.03)}}
+@keyframes lz-cae{
+  0%{transform:translate(-50%,-37%) rotate(0) scale(1)}
+  10%{transform:translate(-50%,-37%) rotate(-7deg) scale(1.05)}
+  22%{transform:translate(-50%,-37%) rotate(6deg) scale(1.04)}
+  34%{transform:translate(-50%,-35%) rotate(-3deg) scale(1.02)}
+  100%{transform:translate(-40%,92vh) rotate(26deg) scale(.9);opacity:.2}}
+.f-lazo .lz-cola{animation:none}
+
+/* textos de la entrada: tinta marrón sobre papel */
+.f-c-top{color:#4A3F30}
+.f-c-fecha{color:#7A6540}
+.f-c-pista,.f-c-cupos span{color:#4A3F30}
+.f-c-cupos b{background:rgba(255,252,244,.7);border-color:#B79B5E;color:#3F362A}
+
+/* reparto vertical de la entrada (lazo más arriba para no tapar los textos) */
+.f-cinta,.f-lazo{top:47%}
+.f-lazo{width:min(74vw,300px,40vh)}
+.f-c-bloque{top:4.5%;gap:1.1vh}
+.f-c-mono{width:min(38vw,22vh,170px)}
+.f-c-pista{top:73.5%;font-size:clamp(.6rem,2.6vw,.76rem)}
+.f-c-pista svg{top:-38px;width:48px}
+.f-c-cupos{top:81.5%;gap:2px}
+.f-c-cupos b{min-width:42px;height:42px;font-size:1.5rem;border-radius:9px}
+.f-c-ico svg{width:34px}
+.f-c-cupos span{font-size:clamp(.58rem,2.5vw,.72rem)}
+.f-arte .f-esq.bl,.f-arte .f-esq.br{bottom:2%}
+@media (max-height:720px){.f-c-cupos{top:80%}.f-c-pista{top:72%}}
+
+/* flores de la invitación: más suaves y menos "dibujo" */
+.inv.floral .f-flor{opacity:.92}
+.inv.floral .f-flor svg{filter:drop-shadow(0 7px 9px rgba(70,52,22,.16)) saturate(.88)}
+
+/* flores de la página: más pequeñas y discretas */
+.inv.floral .f-flor{width:152px}
+.inv.floral .f-flor.s2{width:120px}.inv.floral .f-flor.s3{width:114px}
+.inv.floral .f-flor.tl{top:-30px;left:-50px}.inv.floral .f-flor.tr{top:-26px;right:-52px}
+.inv.floral .f-flor.bl{bottom:-30px;left:-52px}.inv.floral .f-flor.br{bottom:-30px;right:-50px}
