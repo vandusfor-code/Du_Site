@@ -1,6 +1,6 @@
 // Dibuja la invitación a partir de la configuración guardada.
 import { rpc } from "./api.js";
-import { esc, pad, parseFecha, fmtFechaLarga, fmtFechaCorta, fmtHora, urlSegura, resolverFoto, PALETAS, ICONOS, COLORES_VEST } from "./util.js";
+import { esc, pad, parseFecha, fmtFechaLarga, fmtFechaCorta, fmtHora, urlSegura, resolverFoto, paleta, fuentePrincipal, fuenteSecundaria, ICONOS, COLORES_VEST } from "./util.js";
 
 const IC_CHECK = `<svg viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg>`;
 const IC_SOBRE = `<svg class="ico" viewBox="0 0 24 24"><rect x="2.500" y="5" width="19" height="14" rx="1.500" fill="#222"/><path d="M3 6l9 7 9-7" stroke="#fff"/></svg>`;
@@ -55,23 +55,26 @@ function petalos(n = 16) {
 export function renderInvitacion(root, cfg, guest, opts = {}) {
   const f = parseFecha(cfg.fecha);
   const fo = cfg.fotos || {};
-  const colorMain = (PALETAS[cfg.color] || PALETAS.verde).c;
+  const colorMain = paleta(cfg.color).c;
+  const fp = fuentePrincipal(cfg.tipoPrincipal), fs2 = fuenteSecundaria(cfg.tipoSecundaria);
   const rec = cfg.recepcion.mismo ? null : cfg.recepcion;
   const nota = textoColores(cfg.vestimenta.colores);
 
   const itin = (cfg.itinerario || []).filter(x => x.t && x.t.trim()).map((x, i) =>
-    `<div class="ev ${i % 2 ? "d" : "i"} rev" data-a="${i % 2 ? "right" : "left"}" style="grid-column:${i % 2 ? 2 : 1};grid-row:${i + 1};transition-delay:${(i * 0.18).toFixed(2)}s">${(ICONOS[x.ic] || ICONOS.estrella).svg}<b>${esc(x.t)}</b>${x.h ? `<span>Hora: ${fmtHora(x.h)}</span>` : ""}</div>`
+    `<div class="ev ${i % 2 ? "d" : "i"} rev" data-a="${i % 2 ? "right" : "left"}" style="grid-column:${i % 2 ? 2 : 1};grid-row:${i + 1};transition-delay:${(i * 0.18).toFixed(2)}s">${(ICONOS[x.ic] || ICONOS.estrella).svg}<b>${esc(x.t)}</b>${x.h ? `<span>Hora: ${fmtHora(x.h)}</span>` : ""}${urlSegura(x.mapa) ? `<a class="ev-mapa" href="${esc(urlSegura(x.mapa))}" target="_blank" rel="noopener">Ver ubicación</a>` : ""}</div>`
   ).join("");
 
   const mensaje = (cfg.mensaje || "").split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
   const mosaico = (fo.final || []).filter(Boolean);
 
-  root.className = "inv anim";
+  root.className = "inv anim" + (fp.script ? "" : " tipo-serif");
+  root.style.setProperty("--script", fp.css);
+  root.style.setProperty("--serif", fs2.css);
   root.style.setProperty("--c", colorMain);
   root.style.setProperty("--c-osc", `color-mix(in srgb, ${colorMain} 80%, #000)`);
 
   root.innerHTML = `
-  ${opts.preview ? `<div class="vista-previa">Vista previa: así verá tu invitación quien la reciba. Los botones de confirmación no guardan nada aquí, y la portada de bienvenida (sobre) solo se ve en la invitación real.</div>` : ""}
+  ${opts.preview ? `<div class="vista-previa">Vista previa: así verá tu invitación quien la reciba. Los botones de confirmación no guardan nada aquí.</div>` : ""}
   <section class="hero">
     ${foto(cfg.portada, "Portada")}
     ${petalos(16)}
@@ -146,7 +149,7 @@ export function renderInvitacion(root, cfg, guest, opts = {}) {
     <h2 class="titulo">¡Te esperamos!</h2>
     ${mosaico.length ? `<div class="mosaico">${mosaico.map((s, i) => foto(s, "Foto", `style="transition-delay:${(i * 0.14).toFixed(2)}s"`, true)).join("")}</div>` : ""}
   </section>
-  <div class="cierre"></div>
+  <footer class="credito"><span>Diseño por</span><b>Duvan Ramos</b></footer>
   ${cfg.cancion ? `<button class="fab" id="fab" aria-label="Música">${IC_NOTA}</button>` : ""}`;
 
   root.querySelectorAll("[data-roto]").forEach(rasgar);
@@ -156,18 +159,19 @@ export function renderInvitacion(root, cfg, guest, opts = {}) {
   paralaje(root);
   revelar(root);
 
-  // Portada de bienvenida (solo en la invitación real): al abrir empieza la música y las animaciones
-  if (opts.preview) { root.classList.add("listo"); return; }
-  portadaBienvenida(root, cfg, guest, colorMain);
+  // Portada de bienvenida: al abrir empieza la música y las animaciones. Devuelve una función para quitarla.
+  return portadaBienvenida(root, cfg, guest, colorMain, fp, fs2);
 }
 
 /* ---------- portada de bienvenida ---------- */
-function portadaBienvenida(root, cfg, guest, color) {
+function portadaBienvenida(root, cfg, guest, color, fp, fs2) {
   const f = parseFecha(cfg.fecha);
   const bg = resolverFoto(cfg.portada);
   const o = document.createElement("div");
-  o.className = "inv-intro";
+  o.className = "inv-intro" + (fp.script ? "" : " tipo-serif");
   o.style.setProperty("--c", color);
+  o.style.setProperty("--script", fp.css);
+  o.style.setProperty("--serif", fs2.css);
   if (bg) o.style.backgroundImage = `url("${bg}")`;
   o.innerHTML = `${petalos(18)}<div class="in-card">
     <div class="in-top">Estás invitado a la boda de</div>
@@ -180,6 +184,7 @@ function portadaBienvenida(root, cfg, guest, color) {
   document.body.appendChild(o);
   const prev = document.body.style.overflow;
   document.body.style.overflow = "hidden";
+  const quitar = () => { document.body.style.overflow = prev; o.remove(); };
   $abrir(o.querySelector(".in-open"), () => {
     document.body.style.overflow = prev;
     o.classList.add("abre");
@@ -188,6 +193,7 @@ function portadaBienvenida(root, cfg, guest, color) {
     if (a) a.play().catch(() => {});
     setTimeout(() => o.remove(), 1300);
   });
+  return quitar;
 }
 const $abrir = (btn, fn) => btn.addEventListener("click", fn, { once: true });
 
@@ -217,7 +223,9 @@ function abrirModal({ tipo, cfg, guest, opts, onDone }) {
   let n = guest && guest.asistentes ? guest.asistentes : pases;
   const m = document.createElement("div");
   m.className = "inv-modal";
-  m.style.setProperty("--c", (PALETAS[cfg.color] || PALETAS.verde).c);
+  m.style.setProperty("--c", paleta(cfg.color).c);
+  m.style.setProperty("--script", fuentePrincipal(cfg.tipoPrincipal).css);
+  m.style.setProperty("--serif", fuenteSecundaria(cfg.tipoSecundaria).css);
   document.body.appendChild(m);
   const cerrar = () => { m.remove(); document.removeEventListener("keydown", esc_); };
   const esc_ = e => { if (e.key === "Escape") cerrar(); };

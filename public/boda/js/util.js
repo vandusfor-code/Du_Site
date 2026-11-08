@@ -25,15 +25,31 @@ export const esEjemplo = u => typeof u === "string" && u.startsWith("ejemplo:");
 export const resolverFoto = u => (esEjemplo(u) ? new URL("../ejemplos/" + u.slice(8) + ".svg", import.meta.url).href : u);
 export const urlSegura = u => /^https?:\/\//i.test((u || "").trim()) ? u.trim() : "";
 
-// Colores principales que puede elegir la persona que llena la invitación.
+// Paletas de la invitación (color principal de títulos, botones y detalles).
 export const PALETAS = {
-  verde:  { n: "Verde oliva", c: "#53582f" },
-  azul:   { n: "Azul",        c: "#3f5a7a" },
-  vino:   { n: "Vino",        c: "#7a2e3b" },
-  rosa:   { n: "Rosa",        c: "#b5707f" },
-  dorado: { n: "Dorado",      c: "#8a6d2f" },
-  grafito:{ n: "Grafito",     c: "#3b3b3b" }
+  olivo:      { n: "Olivo",      c: "#53582f" },
+  arena:      { n: "Arena",      c: "#a88f66" },
+  terracota:  { n: "Terracota",  c: "#a96d4a" },
+  vino:       { n: "Vino",       c: "#71383d" },
+  noche:      { n: "Azul noche", c: "#273448" }
 };
+// Claves de versiones anteriores → paleta equivalente
+const PALETA_ANTERIOR = { verde: "olivo", azul: "noche", rosa: "terracota", dorado: "arena", grafito: "noche" };
+export const paleta = k => PALETAS[k] || PALETAS[PALETA_ANTERIOR[k]] || PALETAS.olivo;
+
+// Tipografías que se pueden elegir (se cargan desde Google Fonts)
+export const FUENTES_PRINCIPAL = {
+  great:     { n: "Great Vibes",        css: "'Great Vibes','Brush Script MT',cursive", script: true },
+  cormorant: { n: "Cormorant Garamond", css: "'Cormorant Garamond',Georgia,serif",            script: false },
+  playfair:  { n: "Playfair Display",   css: "'Playfair Display',Georgia,serif",              script: false }
+};
+export const FUENTES_SECUNDARIA = {
+  lora:      { n: "Lora",               css: "'Lora',Georgia,serif" },
+  manrope:   { n: "Manrope",            css: "'Manrope',system-ui,sans-serif" },
+  cormorant: { n: "Cormorant Garamond", css: "'Cormorant Garamond',Georgia,serif" }
+};
+export const fuentePrincipal = k => FUENTES_PRINCIPAL[k] || FUENTES_PRINCIPAL.great;
+export const fuenteSecundaria = k => FUENTES_SECUNDARIA[k] || FUENTES_SECUNDARIA.lora;
 
 export const COLORES_VEST = [
   { n: "Blanco", c: "#ffffff" }, { n: "Beige", c: "#e3cfb4" }, { n: "Verde oliva", c: "#6b7340" },
@@ -61,14 +77,14 @@ export const CANCIONES = [
 ];
 
 export const DEFAULT_CONFIG = {
-  novio: "", novia: "", fecha: "", color: "verde",
+  novio: "", novia: "", fecha: "2026-12-08", color: "olivo", tipoPrincipal: "great", tipoSecundaria: "lora",
   versiculo: "Tres cosas permanecerán para siempre: la fe, la esperanza y el amor. Pero la más grande de ellas es el amor.",
   cita: "1 Corintios 13:13",
   mensaje: "Hoy unimos nuestras vidas ante Dios, convencidos de que el amor que nos une se fortalece con su presencia.\n\nComo un cordón de tres dobleces, deseamos construir un hogar donde Él sea el centro de nuestra unión.",
   portada: "ejemplo:portada",
   // Una foto opcional por apartado de la invitación + galería final (por defecto, ilustraciones de ejemplo)
   fotos: { mensaje: "ejemplo:mensaje", calendario: "ejemplo:anillos", vestimenta: "ejemplo:vestimenta", itinerario: "ejemplo:itinerario", final: ["ejemplo:final1", "ejemplo:final2", "ejemplo:final3", "ejemplo:final4"] },
-  cancion: "",
+  cancion: "", cancionNombre: "",
   ceremonia: { nombre: "", dir: "", hora: "", mapa: "", foto: "ejemplo:iglesia" },
   recepcion: { mismo: false, nombre: "", dir: "", hora: "", mapa: "", foto: "ejemplo:salon" },
   // Por defecto se pide evitar negro, morado y blanco (se pueden cambiar en el formulario)
