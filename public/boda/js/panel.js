@@ -4,6 +4,7 @@
 import { rpc, subirArchivo, comprimirImagen } from "./api.js";
 import { esc, DEFAULT_CONFIG, CANCIONES, esEjemplo, resolverFoto, mezclar, clonar, getPath, setPath, PALETAS, FUENTES_PRINCIPAL, FUENTES_SECUNDARIA, COLORES_VEST, TIPOS_VEST, ICONOS, urlSegura, MESES, parseFecha } from "./util.js";
 import { renderInvitacion } from "./invitacion.js";
+import "./tema-floral.js";   // tema blanco y dorado (se activa con cfg.tema)
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -221,7 +222,7 @@ export async function iniciarPanel(root, key) {
     const u = cfg.portada;
     return `<div class="cover ${u ? "" : "vacia"}">${u ? `<img src="${esc(resolverFoto(u))}" alt="Portada">` : `<span>Aún no hay foto de portada</span>`}${u && esEjemplo(u) ? `<span class="ej">Ejemplo</span>` : ""}
       <label class="btn-foto">${I.camara}<span>${u ? (esEjemplo(u) ? "Subir tu foto" : "Cambiar foto") : "Subir foto"}</span><input type="file" accept="image/*" hidden data-up="portada"></label></div>
-      <div class="cover-nota"><span>En la invitación se muestra a pantalla completa, en vertical.</span>${u ? `<button type="button" class="lnk mal" data-rm="portada">${esEjemplo(u) ? "Quitar el ejemplo" : "Quitar"}</button>` : ""}</div>`;
+      <div class="cover-nota"><span>${cfg.tema === "floral" ? "En la invitación aparece enmarcada en arco, sobre los nombres. Las fotos de ejemplo no se muestran en este diseño." : "En la invitación se muestra a pantalla completa, en vertical."}</span>${u ? `<button type="button" class="lnk mal" data-rm="portada">${esEjemplo(u) ? "Quitar el ejemplo" : "Quitar"}</button>` : ""}</div>`;
   };
 
   const musicaHTML = () => {
@@ -281,7 +282,9 @@ export async function iniciarPanel(root, key) {
 
       ${sec("portada", I.imagen, "Portada", "Es la primera imagen que verán tus invitados.", portadaHTML())}
 
-      ${sec("estilo", I.paleta, "Estilo de la invitación", "Define la paleta de colores y la tipografía.", `
+      ${cfg.tema === "floral"
+        ? sec("estilo", I.paleta, "Estilo de la invitación", "Esta invitación usa el diseño Blanco y dorado, con flores.", `<p class="hint" style="margin:0">El color y las tipografías ya vienen definidos para combinar con el monograma de la pareja, así que aquí no hay nada que cambiar.</p>`)
+        : sec("estilo", I.paleta, "Estilo de la invitación", "Define la paleta de colores y la tipografía.", `
         <div class="pal" role="radiogroup" aria-label="Paleta de colores">${Object.entries(PALETAS).map(([k, v]) => `<button type="button" role="radio" aria-checked="${cfg.color === k}" data-color="${k}" class="${cfg.color === k ? "on" : ""}"><i style="background:${v.c}">${cfg.color === k ? I.check : ""}</i><span>${v.n}</span></button>`).join("")}</div>
         <div class="fila fila-sel">${selector("tipoPrincipal", "Tipografía principal", FUENTES_PRINCIPAL)}${selector("tipoSecundaria", "Tipografía secundaria", FUENTES_SECUNDARIA)}</div>`)}
 

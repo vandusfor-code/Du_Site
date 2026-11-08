@@ -2,6 +2,7 @@
 import { rpc } from "./api.js";
 import { mezclar, DEFAULT_CONFIG, esc } from "./util.js";
 import { renderInvitacion } from "./invitacion.js";
+import "./tema-floral.js";   // tema blanco y dorado (se activa con cfg.tema)
 import { iniciarPanel } from "./panel.js";
 
 const app = document.getElementById("app");

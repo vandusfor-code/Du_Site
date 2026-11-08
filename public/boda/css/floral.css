@@ -1,0 +1,266 @@
+/* =====================================================================
+   TEMA "FLORAL" · blanco y dorado con flores
+   Solo se aplica a invitaciones con cfg.tema = "floral" (clase .floral).
+   ===================================================================== */
+[hidden]{display:none!important}
+.inv.floral{--oro:#A8843B;--oro-c:#C9A55C;--oro-l:#E8D49A;--txt:#2B2723;--mut:#6F665A;
+  background-color:#FBF8F3;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><g fill='none' stroke='%23C9A55C' stroke-opacity='.16' stroke-width='1' stroke-linecap='round'><path d='M30 190C70 150 110 100 190 40'/><path d='M62 150q-18-8-20-30q22 4 20 30zM96 112q-18-8-20-30q22 4 20 30zM132 78q-18-8-20-30q22 4 20 30z'/><path d='M84 144q18-4 28-22q-24-4-28 22zM120 108q18-4 28-22q-24-4-28 22zM156 74q18-4 28-22q-24-4-28 22z'/></g></svg>");
+  background-size:220px 220px;color:var(--txt);font-family:var(--serif);font-weight:500}
+.inv.floral .f-sec{position:relative;padding:34px 22px}
+
+/* ---------- papeles rasgados ---------- */
+.inv.floral .f-papel{position:relative;z-index:2;filter:drop-shadow(0 8px 14px rgba(70,52,22,.16))}
+.inv.floral .f-papel-in{position:relative;background:#fff;padding:34px 24px 36px;background-image:radial-gradient(rgba(201,165,92,.07) 1px,transparent 1px);background-size:6px 6px}
+.inv.floral .f-h{margin:0;font-family:var(--serif);font-weight:500;font-size:1.8rem;letter-spacing:.12em;line-height:1.15;color:var(--txt)}
+.inv.floral .f-h-grande{font-size:2.6rem;letter-spacing:.18em}
+.inv.floral .f-nota{margin:14px 0 0;font-size:1.12rem;line-height:1.5}
+
+/* ---------- flores ---------- */
+.inv.floral .f-flor{position:absolute;z-index:4;width:200px;pointer-events:none;--r:0deg;animation:f-sway 7s ease-in-out infinite}
+.inv.floral .f-flor svg{display:block;width:100%;height:auto;overflow:visible;filter:drop-shadow(0 6px 8px rgba(70,52,22,.18))}
+.inv.floral .f-flor.s2{width:158px}.inv.floral .f-flor.s3{width:150px}.inv.floral .f-flor.s4{width:140px;opacity:.95}
+.inv.floral .f-flor.tl{top:-40px;left:-62px}
+.inv.floral .f-flor.tr{top:-34px;right:-64px;--r:12deg}
+.inv.floral .f-flor.bl{bottom:-40px;left:-64px;--r:-10deg}
+.inv.floral .f-flor.br{bottom:-40px;right:-62px;--r:6deg}
+@keyframes f-sway{0%,100%{transform:rotate(var(--r)) translateY(0)}50%{transform:rotate(calc(var(--r) + 2.5deg)) translateY(-5px)}}
+
+/* ---------- portada de la invitación: nombres ---------- */
+.inv.floral .f-hero{position:relative;padding:62px 26px 56px}
+.inv.floral .f-hero>.f-papel{margin-top:0}
+.inv.floral .f-mono-sm{display:block;width:104px;margin:0 auto 12px}
+.inv.floral .f-mono-txt{display:flex;align-items:center;justify-content:center;gap:12px;font-size:3.2rem;font-weight:500;color:var(--oro);width:auto!important}
+.inv.floral .f-mono-txt i{width:1.5px;height:2.6rem;background:var(--oro-c)}
+.inv.floral .f-cita{margin:6px 0 0;font-style:italic;font-size:1.08rem;line-height:1.55}
+.inv.floral .f-cita span{font-style:normal;font-size:.95rem;color:var(--mut)}
+.inv.floral .f-honor{margin:22px 0 4px;font-size:.78rem;letter-spacing:.22em;font-weight:600}
+.inv.floral .f-nombres{margin:6px 0 4px;font-family:var(--script);font-weight:400;font-size:clamp(3.1rem,15vw,4.3rem);line-height:1}
+.inv.floral .f-nombres span{display:block}
+.inv.floral .f-nombres i{display:block;font-style:normal;font-size:.55em;color:var(--oro);line-height:1.1}
+.inv.floral .f-para{margin:14px 0 0;font-style:italic;font-size:.98rem;color:var(--mut)}
+.inv.floral .f-para b{display:block;font-style:normal;font-family:var(--script);font-weight:400;font-size:2rem;color:var(--oro);line-height:1.15}
+.inv.floral .f-arco{position:relative;z-index:1;width:min(78%,300px);aspect-ratio:3/4;margin:0 auto -38px;border-radius:999px 999px 14px 14px;overflow:hidden;border:2px solid var(--oro-c);box-shadow:0 0 0 6px #fff,0 0 0 7.5px var(--oro-c),0 12px 22px rgba(70,52,22,.18)}
+.inv.floral .f-arco img{width:100%;height:100%;object-fit:cover;display:block}
+.inv.floral .f-arco-portada{margin-bottom:-30px}
+
+/* medallón dorado "añádelo a tu calendario" */
+.inv.floral .f-cart-wrap{position:relative;z-index:6;width:178px;height:196px;margin:-30px 4px 0 auto}
+.inv.floral .f-cartucho{position:relative;display:block;width:178px;height:122px;border:0;background:none;padding:0;cursor:pointer;font-family:inherit;transition:transform .25s}
+.inv.floral button.f-cartucho:hover{transform:translateY(-2px) rotate(-1deg)}
+.inv.floral .f-cart-bg{position:absolute;inset:0;filter:drop-shadow(0 6px 8px rgba(70,52,22,.2))}
+.inv.floral .f-cart-bg svg{width:100%;height:100%;display:block}
+.inv.floral .f-cart-t{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:.8rem;letter-spacing:.2em;line-height:1.55;color:var(--oro);font-weight:700}
+.inv.floral .f-borla{position:absolute;left:50%;top:112px;width:32px;transform:translateX(-50%);filter:drop-shadow(0 4px 5px rgba(70,52,22,.25));transform-origin:50% 0;animation:f-borla 4.5s ease-in-out infinite}
+@keyframes f-borla{0%,100%{transform:translateX(-50%) rotate(-3deg)}50%{transform:translateX(-50%) rotate(3deg)}}
+.inv.floral .f-calmenu{position:absolute;right:0;bottom:calc(100% - 6px);z-index:8;display:flex;flex-direction:column;min-width:190px;background:#fff;border:1px solid var(--oro-c);border-radius:10px;padding:6px;box-shadow:0 10px 24px rgba(70,52,22,.2);animation:a-fade .2s ease}
+.inv.floral .f-calmenu a,.inv.floral .f-calmenu button{display:block;width:100%;text-align:left;padding:11px 12px;border:0;background:none;border-radius:6px;color:var(--txt);font:600 .95rem var(--serif);text-decoration:none;cursor:pointer}
+.inv.floral .f-calmenu a:hover,.inv.floral .f-calmenu button:hover{background:rgba(201,165,92,.15)}
+.inv.floral .f-cart-vest{width:178px;margin:0 auto -34px 6px}
+
+/* ---------- reproductor ---------- */
+.inv.floral .f-sec-player{padding-top:10px;padding-bottom:20px}
+.inv.floral .f-papel-player .f-papel-in{padding:26px 22px 28px}
+.inv.floral .player{margin:0 auto;max-width:330px}
+.inv.floral .player .indic{margin:0 0 22px;font-size:1.12rem;color:var(--txt)}
+.inv.floral .barra{background:#E6DCC8;margin:0 0 24px}
+.inv.floral .barra i,.inv.floral .barra b{background:var(--oro)}
+.inv.floral .controles .play{color:var(--oro)}
+.inv.floral .eq i{background:var(--oro)}
+.inv.floral .fab{background:linear-gradient(135deg,#D9BC74,#A8843B);color:#fff}
+
+/* ---------- fecha, calendario y cuenta regresiva ---------- */
+.inv.floral .f-fecha{padding-top:30px}
+.inv.floral .f-cita-2{font-size:1.1rem}
+.inv.floral .f-mes{margin-top:26px;font-size:1.15rem;letter-spacing:.42em;font-weight:500}
+.inv.floral .f-fecha-fila{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;margin:8px 0 0}
+.inv.floral .f-lado{display:grid;place-items:center;padding:13px 0;border-top:1.5px solid var(--oro-c);border-bottom:1.5px solid var(--oro-c);font-size:1.02rem;letter-spacing:.14em}
+.inv.floral .f-dia{font-size:5.2rem;line-height:1;font-weight:500;padding:0 4px}
+.inv.floral .f-gran{margin-top:28px;font-family:var(--script);font-size:2.6rem;color:var(--oro);line-height:1.1}
+.inv.floral .f-mes-anio{margin-top:2px;font-size:1.95rem;letter-spacing:.04em;font-weight:500}
+.inv.floral .cal{max-width:320px;gap:10px 0;margin-top:22px}
+.inv.floral .cal .h{font-weight:500;font-size:.78rem;letter-spacing:.08em}
+.inv.floral .cal .d{font-size:.95rem;height:36px}
+.inv.floral .cal .hoy{color:var(--oro);font-weight:700}
+.inv.floral .cal .hoy svg{stroke:var(--oro)}
+.inv.floral .f-papel-fecha.v .cal .hoy svg path{animation:a-draw 1.8s .6s ease forwards}
+.inv.floral .f-papel-fecha.v .cal .hoy svg{animation:a-beat 2.2s 2.6s ease-in-out infinite}
+.inv.floral .f-cuenta{padding:38px 8px 40px}
+.inv.floral .f-digitos{display:flex;justify-content:center;align-items:flex-start;gap:4px;margin-top:10px}
+.inv.floral .f-digitos>div{min-width:0;flex:0 1 auto}
+.inv.floral .f-digitos b{display:block;font-size:clamp(2.5rem,11.5vw,3.6rem);font-weight:500;line-height:1.05;font-variant-numeric:tabular-nums;color:var(--txt)}
+.inv.floral .f-digitos small{display:block;margin-top:4px;font-size:.62rem;letter-spacing:.12em;font-weight:600;color:var(--mut)}
+.inv.floral .f-digitos>i{font-style:normal;font-size:clamp(2.2rem,10vw,3.2rem);line-height:1.1;color:var(--oro)}
+.inv.floral .f-digitos b.pop{animation:a-pop .45s ease}
+
+/* ---------- ceremonia / recepción ---------- */
+.inv.floral .f-lugares{padding-top:46px}
+.inv.floral .f-lugar-blk{margin-bottom:38px}
+.inv.floral .f-lugar-fila{display:flex;align-items:center;justify-content:center;gap:16px;margin:18px 0 12px}
+.inv.floral .f-hora{font-size:1.55rem;font-weight:600;text-align:right;line-height:1.2}
+.inv.floral .f-vlinea{width:2.5px;align-self:stretch;min-height:64px;background:var(--oro)}
+.inv.floral .f-lugar-t{text-align:left;min-width:0;overflow-wrap:anywhere}
+.inv.floral .f-lugar-t b{display:block;font-family:var(--script);font-weight:400;font-size:2.1rem;line-height:1.1}
+.inv.floral .f-lugar-t small{display:block;margin-top:4px;font-style:italic;font-size:1rem;color:var(--mut);line-height:1.35}
+.inv.floral .f-btn{display:inline-block;margin-top:8px;padding:11px 28px;border:1.5px solid var(--oro-c);border-radius:8px;color:var(--txt);text-decoration:underline;text-underline-offset:4px;font-size:1.08rem;font-weight:600;transition:background .2s}
+.inv.floral .f-btn:hover{background:rgba(201,165,92,.14)}
+
+/* ---------- itinerario ---------- */
+.inv.floral .f-itin{position:relative;padding:34px 22px 40px}
+.inv.floral .f-papel-itin .f-papel-in{padding:34px 14px 40px}
+.inv.floral .f-papel-itin .f-papel-in::after{content:"";position:absolute;inset:12px;border:1px solid var(--oro-c);opacity:.65;pointer-events:none}
+.inv.floral .linea{max-width:340px;margin:26px auto 0;column-gap:34px}
+.inv.floral .linea::before{background:linear-gradient(var(--oro-c),var(--oro))}
+.inv.floral .ev{flex-direction:row;gap:10px;min-height:88px;text-align:left;font-style:normal;letter-spacing:0;font-size:1rem;padding:8px 0}
+.inv.floral .ev.i{justify-content:flex-end;text-align:right}
+.inv.floral .ev.d{justify-content:flex-start}
+.inv.floral .ev::after{display:none}
+.inv.floral .nodo{position:absolute;top:50%;width:11px;height:11px;border-radius:50%;background:#fff;border:2px solid var(--oro);transform:translateY(-50%)}
+.inv.floral .ev.i .nodo{right:-22.5px}
+.inv.floral .ev.d .nodo{left:-22.5px}
+.inv.floral .ev-ico svg{width:42px;height:42px;fill:none;stroke:var(--oro);stroke-width:1.5}
+.inv.floral .ev-txt{display:block;min-width:0}
+.inv.floral .ev-txt em{display:block;font-style:normal;font-size:.9rem;letter-spacing:.1em;color:var(--mut)}
+.inv.floral .ev-txt b{display:block;font-size:.9rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;line-height:1.3}
+.inv.floral .ev-mapa{display:inline-block;margin-top:3px;font-size:.78rem;color:var(--oro);text-decoration:underline;text-underline-offset:3px;font-weight:700;letter-spacing:.04em}
+
+/* ---------- vestimenta y regalo ---------- */
+.inv.floral .f-vest{padding-top:46px}
+.inv.floral .f-papel-vest .f-papel-in{padding:46px 22px 30px}
+.inv.floral .f-tipo{font-size:1.75rem;letter-spacing:.2em;font-weight:500}
+.inv.floral .colores{margin-top:18px}
+.inv.floral .colores i{border:1px solid rgba(201,165,92,.6);box-shadow:0 2px 4px rgba(70,52,22,.15)}
+.inv.floral .f-ico-regalo{width:46px;margin:0 auto 10px}
+.inv.floral .f-ico-regalo svg{display:block;width:100%}
+
+/* ---------- confirmación ---------- */
+.inv.floral .f-confirmar{padding-top:40px;padding-bottom:50px}
+.inv.floral .f-cupos-txt{margin:10px 0 0;font-size:1.02rem;color:var(--mut)}
+.inv.floral .f-cupos-txt b{color:var(--oro);font-size:1.25rem}
+.inv.floral .estado{margin-top:20px}
+.inv.floral .btn.grande{background:transparent;color:var(--txt);border:1.5px solid var(--oro-c);border-radius:8px;font-family:var(--serif);font-weight:700;font-size:1.12rem;letter-spacing:.04em;text-transform:none;text-decoration:underline;text-underline-offset:4px;padding:12px 30px}
+.inv.floral .btn.grande:hover{background:rgba(201,165,92,.15)}
+.inv.floral .link{color:var(--mut);font-family:var(--serif);font-size:1rem}
+.inv.floral .estado .ok{background:#F6EFDD;color:#6B5320}
+.inv.floral .estado .no{background:#F3EAEA;color:#7a2e2e}
+.inv.floral .f-sello{position:relative;z-index:6;width:92px;margin:-34px auto 0;filter:drop-shadow(0 7px 8px rgba(80,55,15,.35));animation:a-pop .7s both}
+
+/* ---------- final ---------- */
+.inv.floral .f-final{padding:44px 0 10px}
+.inv.floral .f-te-esperamos{margin:0 0 22px;font-family:var(--script);font-weight:400;font-size:clamp(3rem,14vw,4rem);line-height:1.1;color:var(--txt)}
+.inv.floral .mosaico{padding:0 14px}
+.inv.floral .mosaico .foto{border:1px solid var(--oro-c);padding:5px;background:#fff;box-shadow:0 6px 14px rgba(70,52,22,.14)}
+.inv.floral .mosaico .foto img{border-radius:2px}
+.inv.floral .f-rama{width:150px;margin:22px auto 0}
+.inv.floral .f-rama svg{display:block;width:100%}
+.inv.floral .credito{border-top-color:rgba(201,165,92,.35)}
+.inv.floral .credito b{color:var(--oro)}
+
+/* ---------- entrada: puertas + lazo ---------- */
+.f-cover{position:fixed;inset:0;z-index:9990;perspective:1600px;perspective-origin:50% 50%;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;font-family:'Cormorant Garamond',Georgia,serif;color:#2B2723}
+.f-cover *{box-sizing:border-box}
+.f-escena{position:absolute;inset:0;transform-style:preserve-3d}
+.f-puerta{position:absolute;top:0;bottom:0;width:50%;overflow:hidden;will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  background-color:#FAF6EE;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><g fill='none' stroke='%23FFFFFF' stroke-opacity='.9' stroke-width='1.6' stroke-linecap='round' transform='translate(1.5 1.5)'><path d='M24 128C46 98 70 64 122 26'/><path d='M50 98q-16-8-18-26q20 4 18 26zM76 70q-16-8-18-26q20 4 18 26zM104 46q-16-8-18-26q20 4 18 26z'/></g><g fill='none' stroke='%23C9A55C' stroke-opacity='.5' stroke-width='1' stroke-linecap='round'><path d='M24 128C46 98 70 64 122 26'/><path d='M50 98q-16-8-18-26q20 4 18 26zM76 70q-16-8-18-26q20 4 18 26zM104 46q-16-8-18-26q20 4 18 26z'/><path d='M68 104q16-4 26-20q-22-4-26 20zM96 76q16-4 26-20q-22-4-26 20z'/></g></svg>");
+  background-size:150px 150px;transition:transform 1.6s cubic-bezier(.65,0,.2,1)}
+.f-puerta::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 1.6s ease}
+.f-puerta.izq{left:0;transform-origin:left center;box-shadow:inset -1.5px 0 0 rgba(201,165,92,.65)}
+.f-puerta.izq::after{background:linear-gradient(90deg,rgba(90,65,25,.0),rgba(90,65,25,.45))}
+.f-puerta.der{right:0;transform-origin:right center;box-shadow:inset 1.5px 0 0 rgba(201,165,92,.65)}
+.f-puerta.der::after{background:linear-gradient(270deg,rgba(90,65,25,.0),rgba(90,65,25,.45))}
+.f-arte{position:absolute;top:0;height:100%;width:200%}
+.f-puerta.izq .f-arte{left:0}
+.f-puerta.der .f-arte{left:-100%}
+.f-marco{position:absolute;inset:14px;border:1px solid rgba(201,165,92,.65)}
+.f-marco::after{content:"";position:absolute;inset:5px;border:1px solid rgba(201,165,92,.35)}
+.f-arte .f-flor{width:min(54vw,230px);z-index:2}
+.f-arte .f-flor.tl{top:-34px;left:-46px}.f-arte .f-flor.br{bottom:-34px;right:-46px}
+.f-arte .f-flor.tr{top:12px;right:6px;width:min(34vw,140px);opacity:.9}.f-arte .f-flor.bl{bottom:12px;left:6px;width:min(34vw,140px);opacity:.9}
+.f-c-bloque{position:absolute;top:6.5%;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:1.4vh}
+.f-c-top{letter-spacing:.42em;font-size:clamp(.8rem,3.4vw,1rem);font-weight:600;padding-left:.42em}
+.f-c-mono{display:block;width:min(46vw,27vh,220px);height:auto}
+.f-c-mono.f-mono-txt{display:flex;align-items:center;justify-content:center;gap:12px;font-size:3.4rem;color:#A8843B;width:auto}
+.f-c-mono.f-mono-txt i{width:1.5px;height:3rem;background:#C9A55C}
+.f-c-fecha{letter-spacing:.34em;font-size:clamp(.82rem,3.4vw,1rem);font-weight:600;color:#8C6B2E;padding-left:.34em}
+.f-c-pista{position:absolute;top:70%;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;letter-spacing:.2em;font-size:clamp(.66rem,2.9vw,.82rem);font-weight:700;line-height:1.6}
+.f-c-pista svg{position:absolute;left:calc(50% - min(38vw,150px));top:-46px;width:56px;opacity:.95;transform:scaleX(1)}
+.f-c-cupos{position:absolute;top:80%;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center}
+.f-c-cupos span{letter-spacing:.2em;font-size:clamp(.66rem,2.9vw,.82rem);font-weight:700}
+.f-c-cupos b{display:grid;place-items:center;min-width:54px;height:54px;padding:0 10px;border:1.5px solid #C9A55C;border-radius:12px;font-size:1.9rem;font-weight:600;background:rgba(255,255,255,.6)}
+.f-c-ico svg{width:46px;display:block}
+
+.f-cinta{position:absolute;left:0;right:0;top:56%;height:44px;transform:translateY(-50%);z-index:4;
+  background:linear-gradient(#FFFFFF,#F3E9DA);box-shadow:inset 0 1.5px 0 rgba(201,165,92,.95),inset 0 -1.5px 0 rgba(201,165,92,.95),0 7px 12px rgba(80,60,25,.2)}
+.f-lazo{position:absolute;left:50%;top:56%;width:min(68vw,270px);transform:translate(-50%,-50%);z-index:5;padding:0;border:0;background:none;cursor:pointer;filter:drop-shadow(0 12px 14px rgba(80,60,25,.3));animation:lz-respira 2.8s ease-in-out infinite}
+.f-lazo svg{display:block;width:100%;height:auto;overflow:visible}
+.f-lazo .lz-cola{animation:lz-cola 2.8s ease-in-out infinite}
+.f-lazo .lz-cola.izq{transform-origin:150px 122px}
+.f-lazo .lz-cola.der{transform-origin:170px 122px;animation-delay:.3s}
+@keyframes lz-respira{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.045)}}
+@keyframes lz-cola{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
+
+/* 1) el lazo se suelta y cae */
+.f-cover.suelta{cursor:default}
+.f-cover.suelta .f-lazo{pointer-events:none;animation:lz-cae 1.5s cubic-bezier(.5,0,.85,.45) forwards}
+.f-cover.suelta .f-cinta{animation:cinta-cae 1.3s .38s cubic-bezier(.5,0,.9,.5) forwards}
+@keyframes lz-cae{
+  0%{transform:translate(-50%,-50%) rotate(0) scale(1)}
+  10%{transform:translate(-50%,-50%) rotate(-8deg) scale(1.07)}
+  22%{transform:translate(-50%,-50%) rotate(7deg) scale(1.05)}
+  34%{transform:translate(-50%,-48%) rotate(-4deg) scale(1.03)}
+  100%{transform:translate(-42%,95vh) rotate(28deg) scale(.88);opacity:.15}}
+@keyframes cinta-cae{0%{transform:translateY(-50%)}100%{transform:translateY(90vh) rotate(2.5deg)}}
+/* 2) las puertas se abren */
+.f-cover.abre .f-puerta.izq{transform:rotateY(-112deg)}
+.f-cover.abre .f-puerta.der{transform:rotateY(112deg)}
+.f-cover.abre .f-puerta::after{opacity:1}
+.f-cover.abre{pointer-events:none}
+
+/* ---------- el contenido espera a que se abra la entrada ---------- */
+.inv.floral .f-hero .f-papel,.inv.floral .f-hero .f-cart-wrap,.inv.floral .f-hero .f-arco{transition-delay:0s}
+@media (prefers-reduced-motion:reduce){
+  .inv.floral .f-flor,.inv.floral .f-borla,.f-lazo,.f-lazo .lz-cola{animation:none}
+  .f-puerta{transition-duration:.2s}
+}
+
+/* flores dentro de la entrada (fuera de .inv, por eso se definen aparte) */
+.f-arte .f-flor{position:absolute;pointer-events:none;--r:0deg;animation:f-sway 7s ease-in-out infinite}
+.f-arte .f-flor svg{display:block;width:100%;height:auto;overflow:visible;filter:drop-shadow(0 6px 8px rgba(70,52,22,.18))}
+.f-arte .f-flor.tr{--r:12deg}.f-arte .f-flor.bl{--r:-10deg}.f-arte .f-flor.br{--r:6deg}
+
+/* los textos de la entrada quedan por encima de las flores */
+.f-arte .f-flor{z-index:1;width:min(46vw,190px)}
+.f-arte .f-flor.tl{top:-58px;left:-64px}
+.f-arte .f-flor.br{bottom:-60px;right:-66px}
+.f-arte .f-flor.tr,.f-arte .f-flor.bl{width:min(30vw,120px)}
+.f-c-bloque,.f-c-pista,.f-c-cupos{z-index:3}
+.f-marco{z-index:0}
+
+/* itinerario: dos columnas iguales aunque el texto sea largo */
+.inv.floral .linea{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.inv.floral .ev-txt{overflow-wrap:anywhere}
+.inv.floral .ev{min-width:0}
+
+/* itinerario: textos más compactos para que no se partan las palabras */
+.inv.floral .linea{max-width:360px;column-gap:30px}
+.inv.floral .f-papel-itin .f-papel-in{padding:34px 8px 40px}
+.inv.floral .ev{gap:8px}
+.inv.floral .ev-ico svg{width:36px;height:36px}
+.inv.floral .ev-txt{overflow-wrap:break-word;word-break:normal}
+.inv.floral .ev-txt b{letter-spacing:.07em;font-size:.84rem}
+.inv.floral .ev-txt em{letter-spacing:.06em}
+.inv.floral .ev.i .nodo{right:-20.5px}.inv.floral .ev.d .nodo{left:-20.5px}
+
+/* ajuste vertical de la entrada para pantallas bajas */
+.f-cinta,.f-lazo{top:53.5%}
+.f-lazo{width:min(64vw,250px,38vh)}
+.f-c-pista{top:67.5%}
+.f-c-cupos{top:77.5%}
+@media (max-height:720px){
+  .f-c-bloque{top:5.5%;gap:1vh}
+  .f-c-mono{width:min(42vw,25vh,200px)}
+  .f-c-cupos b{min-width:46px;height:46px;font-size:1.6rem;border-radius:10px}
+  .f-c-ico svg{width:38px}
+  .f-c-cupos{top:76.5%}
+}

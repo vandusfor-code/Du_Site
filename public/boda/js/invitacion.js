@@ -51,8 +51,14 @@ function petalos(n = 16) {
     `<i style="left:${(r() * 100).toFixed(1)}%;--dx:${((r() - 0.5) * 180).toFixed(0)}px;--s:${(0.6 + r() * 0.9).toFixed(2)};animation-duration:${(9 + r() * 8).toFixed(1)}s;animation-delay:${(-r() * 14).toFixed(1)}s"></i>`).join("")}</div>`;
 }
 
+/* ---------- temas ---------- */
+// Un tema distinto (p. ej. "floral") se registra desde su propio archivo y se elige con cfg.tema.
+const TEMAS = {};
+export const registrarTema = (nombre, fn) => { TEMAS[nombre] = fn; };
+
 /* ---------- construcción ---------- */
 export function renderInvitacion(root, cfg, guest, opts = {}) {
+  if (cfg.tema && TEMAS[cfg.tema]) return TEMAS[cfg.tema](root, cfg, guest, opts);
   const f = parseFecha(cfg.fecha);
   const fo = cfg.fotos || {};
   const colorMain = paleta(cfg.color).c;
@@ -198,7 +204,7 @@ function portadaBienvenida(root, cfg, guest, color, fp, fs2) {
 const $abrir = (btn, fn) => btn.addEventListener("click", fn, { once: true });
 
 /* ---------- confirmación ---------- */
-function pintarEstado(root, cfg, guest, opts) {
+export function pintarEstado(root, cfg, guest, opts) {
   const box = root.querySelector("#estado");
   if (!box) return;
   if (!guest) { // vista previa sin invitado concreto
@@ -223,9 +229,10 @@ function abrirModal({ tipo, cfg, guest, opts, onDone }) {
   let n = guest && guest.asistentes ? guest.asistentes : pases;
   const m = document.createElement("div");
   m.className = "inv-modal";
-  m.style.setProperty("--c", paleta(cfg.color).c);
-  m.style.setProperty("--script", fuentePrincipal(cfg.tipoPrincipal).css);
-  m.style.setProperty("--serif", fuenteSecundaria(cfg.tipoSecundaria).css);
+  const dorado = cfg.tema === "floral";
+  m.style.setProperty("--c", dorado ? "#A8843B" : paleta(cfg.color).c);
+  m.style.setProperty("--script", dorado ? "'Pinyon Script','Great Vibes',cursive" : fuentePrincipal(cfg.tipoPrincipal).css);
+  m.style.setProperty("--serif", dorado ? "'Cormorant Garamond',Georgia,serif" : fuenteSecundaria(cfg.tipoSecundaria).css);
   document.body.appendChild(m);
   const cerrar = () => { m.remove(); document.removeEventListener("keydown", esc_); };
   const esc_ = e => { if (e.key === "Escape") cerrar(); };
@@ -272,7 +279,7 @@ function abrirModal({ tipo, cfg, guest, opts, onDone }) {
 }
 
 /* ---------- detalles visuales ---------- */
-function rasgar(el) {
+export function rasgar(el) {
   const pts = [], n = 34, j = () => Math.random() * 2.8;
   for (let i = 0; i <= n; i++) pts.push(`${(i / n * 100).toFixed(2)}% ${(j() + 0.5).toFixed(2)}%`);
   for (let i = n; i >= 0; i--) pts.push(`${(i / n * 100).toFixed(2)}% ${(100 - j() - 0.5).toFixed(2)}%`);
@@ -280,7 +287,7 @@ function rasgar(el) {
 }
 
 let timer;
-function cuentaRegresiva(root, f, hora) {
+export function cuentaRegresiva(root, f, hora) {
   const [hh, mm] = /^\d{1,2}:\d{2}/.test(hora || "") ? hora.split(":").map(Number) : [0, 0];
   const meta = new Date(f.Y, f.M - 1, f.D, hh, mm).getTime();
   const set = (id, v) => {
@@ -298,7 +305,7 @@ function cuentaRegresiva(root, f, hora) {
   clearInterval(timer); tick(); timer = setInterval(() => { if (!root.isConnected) clearInterval(timer); else tick(); }, 1000);
 }
 
-function musica(root) {
+export function musica(root) {
   const a = root.querySelector("#audio"), b = root.querySelector("#play"), p = root.querySelector("#ico-play");
   const prog = root.querySelector("#prog"), bola = root.querySelector("#bola"), pl = root.querySelector("#player"), fab = root.querySelector("#fab");
   const PLAY = "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-2 14V8l6 4z";
@@ -324,7 +331,7 @@ function paralaje(root) {
   sc.addEventListener("scroll", al, { passive: true });
 }
 
-function revelar(root) {
+export function revelar(root) {
   const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("v"); io.unobserve(e.target); } }), { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
   root.querySelectorAll(".rev").forEach(el => io.observe(el));
 }
