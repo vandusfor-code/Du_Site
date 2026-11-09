@@ -1,5 +1,5 @@
 import "server-only";
-import { readRange, appendRow, updateRange, asegurarHoja, parseSheetDate, formatSheetDate, hoyEnBogota, serieDesdeFechas, type SerieItem } from "@/lib/sheets";
+import { readRange, appendRow, updateRange, asegurarHoja, parseSheetDate, formatSheetDate, hoyEnBogota, serieDesdeFechas, eliminarFilaPorValor, type SerieItem } from "@/lib/sheets";
 import {
   diasHabilesTranscurridos,
   evaluarSla,
@@ -920,4 +920,51 @@ export async function obtenerRadicacionesSerie(): Promise<{ dias: RadicacionDia[
   const data = await readRange(id, "GESTIONES!A2:A", { unformatted: true });
   const fechas = data.map((row) => parseSheetDate(row[0]));
   return serieDesdeFechas(fechas, 5, 5);
+}
+
+/* ===================== */
+/* LISTADO + ELIMINAR (panel Admin/Coordinación) */
+/* ===================== */
+
+export interface RegistroRadicacion {
+  fecha: string;
+  fechaTs: number;
+  asesora: string;
+  radicado: string;
+  estado: string; // "Exitosa" | "Devuelta" | "Sin gestión"
+  observacion: string;
+}
+
+function fechaCortaRad(d: Date): string {
+  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+}
+
+// Lista los registros INDIVIDUALES de radicación (hoja GESTIONES), del más
+// reciente al más antiguo. Para el panel de Admin/Coordinación (ver y eliminar).
+export async function listarRegistrosRadicacion(limite = 1000): Promise<RegistroRadicacion[]> {
+  const id = sheetId();
+  const data = await readRange(id, "GESTIONES", { unformatted: true });
+  const out: RegistroRadicacion[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const radicado = texto(data[i], 3).trim();
+    if (!radicado) continue;
+    const fecha = parseSheetDate(data[i][0]);
+    const est = normalize(data[i][4]);
+    const estado = est === "no" ? "Exitosa" : est === "si" || est === "sí" ? "Devuelta" : "Sin gestión";
+    out.push({
+      fecha: fecha ? fechaCortaRad(fecha) : texto(data[i], 0),
+      fechaTs: fecha ? fecha.getTime() : 0,
+      asesora: texto(data[i], 2).trim(),
+      radicado,
+      estado,
+      observacion: texto(data[i], 5).trim(),
+    });
+  }
+  out.sort((a, b) => b.fechaTs - a.fechaTs);
+  return out.slice(0, limite);
+}
+
+// Elimina un registro de radicación por su radicado (fila entera de GESTIONES).
+export async function eliminarRadicacion(radicado: string): Promise<boolean> {
+  return eliminarFilaPorValor(sheetId(), "GESTIONES", 3, radicado);
 }

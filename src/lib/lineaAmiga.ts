@@ -7,6 +7,7 @@ import {
   formatSheetDate,
   hoyEnBogota,
   serieDesdeFechas,
+  eliminarFilaPorValor,
   type SerieItem,
 } from "@/lib/sheets";
 
@@ -566,4 +567,51 @@ export async function obtenerPqrsfPorAgenteMes(mesYM: string): Promise<Map<strin
     // sin datos → mapa vacío
   }
   return out;
+}
+
+/* ===================== */
+/* LISTADO + ELIMINAR PQRSF (panel Admin/Coordinación) */
+/* ===================== */
+
+export interface RegistroPQRSF {
+  fecha: string;
+  fechaTs: number;
+  agente: string;
+  radicado: string;
+  caso: string;
+  clasificacion: string;
+  dirige: string;
+}
+
+function fechaCortaPqrsf(d: Date): string {
+  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+}
+
+// Lista los PQRSF creados individuales (hoja "PQRSF Creados"), del más reciente
+// al más antiguo. Para el panel de Admin/Coordinación (ver y eliminar).
+export async function listarRegistrosPQRSF(limite = 1000): Promise<RegistroPQRSF[]> {
+  const id = sheetId();
+  const data = await readRange(id, SHEETS.PQRSF, { unformatted: true });
+  const out: RegistroPQRSF[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const radicado = texto(data[i], 2).trim();
+    if (!radicado) continue;
+    const fecha = parseSheetDate(data[i][0]);
+    out.push({
+      fecha: fecha ? fechaCortaPqrsf(fecha) : texto(data[i], 0),
+      fechaTs: fecha ? fecha.getTime() : 0,
+      agente: texto(data[i], 1).trim(),
+      radicado,
+      caso: texto(data[i], 3).trim(),
+      clasificacion: texto(data[i], 4).trim(),
+      dirige: texto(data[i], 5).trim(),
+    });
+  }
+  out.sort((a, b) => b.fechaTs - a.fechaTs);
+  return out.slice(0, limite);
+}
+
+// Elimina un PQRSF por su radicado (fila entera de "PQRSF Creados").
+export async function eliminarPQRSF(radicado: string): Promise<boolean> {
+  return eliminarFilaPorValor(sheetId(), SHEETS.PQRSF, 2, radicado);
 }

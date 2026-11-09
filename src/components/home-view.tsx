@@ -1001,12 +1001,12 @@ function MetricasAdmin({
   return (
     <section className="metricasRow">
       {radicacionesDias && radicacionesDias.length > 0 ? (
-        <MetricBarrasDias Icon={FolderOpen} label="Radicaciones registradas (últimos días)" dias={radicacionesDias} href="/detalle-radicaciones" />
+        <MetricBarrasDias Icon={FolderOpen} label="Radicaciones registradas (últimos días)" dias={radicacionesDias} href="/gestiones?tipo=radicaciones" />
       ) : (
         <MetricCard Icon={FolderOpen} label="Radicaciones registradas (Hoy)" valor={gestiones.radicadosHoy} />
       )}
       {pqrsfDias && pqrsfDias.length > 0 ? (
-        <MetricBarrasDias Icon={MessageSquareText} label="PQRSF registrados (últimos días)" dias={pqrsfDias} />
+        <MetricBarrasDias Icon={MessageSquareText} label="PQRSF registrados (últimos días)" dias={pqrsfDias} href="/gestiones?tipo=pqrsf" />
       ) : (
         <MetricCard Icon={MessageSquareText} label="PQRSF registrados (Hoy)" valor={gestiones.pqrsfHoy} />
       )}
@@ -1020,12 +1020,12 @@ function MetricasAdmin({
         <BarrasVerticales comunicados={gestiones.pqrsfComunicados} faltantes={gestiones.pqrsfPorComunicar} />
       </article>
       {pqrsfMeses && pqrsfMeses.length > 0 ? (
-        <MetricBarrasDias Icon={MessageSquareText} label="PQRSF registrados (por mes)" dias={pqrsfMeses} />
+        <MetricBarrasDias Icon={MessageSquareText} label="PQRSF registrados (por mes)" dias={pqrsfMeses} href="/gestiones?tipo=pqrsf" />
       ) : (
         <MetricCard Icon={MessageSquareText} label="PQRSF registrados (Mes)" valor={gestiones.pqrsfMes} />
       )}
       {radicacionesMeses && radicacionesMeses.length > 0 ? (
-        <MetricBarrasDias Icon={FolderOpen} label="Radicaciones registradas (por mes)" dias={radicacionesMeses} />
+        <MetricBarrasDias Icon={FolderOpen} label="Radicaciones registradas (por mes)" dias={radicacionesMeses} href="/gestiones?tipo=radicaciones" />
       ) : (
         <MetricCard Icon={FolderOpen} label="Radicaciones registradas (Mes)" valor={gestiones.radicadosMes} />
       )}

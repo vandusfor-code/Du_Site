@@ -200,6 +200,44 @@ export async function batchUpdate(spreadsheetId: string, requests: unknown[]): P
   return sheetsFetch(path, { method: "POST", body: JSON.stringify({ requests }) });
 }
 
+// Elimina la PRIMERA fila de datos de una pestaña cuyo valor en la columna
+// `colIndex` (0-based) coincida exactamente (tras trim) con `valor`. Borra la
+// fila ENTERA (deleteDimension, no deja hueco). Devuelve true si eliminó, false
+// si no encontró el valor. Pensado para borrar un registro por su ID (radicado).
+// La fila 1 (encabezados) nunca se toca.
+export async function eliminarFilaPorValor(
+  spreadsheetId: string,
+  tab: string,
+  colIndex: number,
+  valor: string
+): Promise<boolean> {
+  const objetivo = (valor ?? "").trim();
+  if (!objetivo) return false;
+
+  const meta = await getSpreadsheetMeta<{ sheets?: { properties?: { sheetId?: number; title?: string } }[] }>(
+    spreadsheetId,
+    "sheets.properties(sheetId,title)"
+  );
+  const hoja = (meta.sheets ?? []).find((s) => (s.properties?.title ?? "").trim() === tab.trim());
+  const gid = hoja?.properties?.sheetId;
+  if (gid === undefined) throw new Error(`No se encontró la pestaña "${tab}" en el libro.`);
+
+  const filas = await readRange(spreadsheetId, tab, { unformatted: true });
+  let idx = -1; // índice 0-based de la fila dentro de la hoja (0 = encabezados)
+  for (let i = 1; i < filas.length; i++) {
+    if (String((filas[i] ?? [])[colIndex] ?? "").trim() === objetivo) {
+      idx = i;
+      break;
+    }
+  }
+  if (idx === -1) return false;
+
+  await batchUpdate(spreadsheetId, [
+    { deleteDimension: { range: { sheetId: gid, dimension: "ROWS", startIndex: idx, endIndex: idx + 1 } } },
+  ]);
+  return true;
+}
+
 // Crea la pestaña si no existe (y le pone encabezados, si se dan). Usado por
 // procesos administrativos que esperan hojas de log/estado auto-creadas.
 export async function asegurarHoja(
