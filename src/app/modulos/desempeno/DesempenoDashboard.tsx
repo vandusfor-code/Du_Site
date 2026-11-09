@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Users, BadgeCheck, AlertTriangle, DollarSign, Download, Search, SlidersHorizontal,
@@ -8,10 +8,10 @@ import {
   LogOut, Loader2, X, CalendarCheck, Save, RefreshCw,
 } from "lucide-react";
 
-import type { DashboardDesempeno, DesempenoFiltros, FilaTabla, CampoDesempeno, Area } from "@/lib/desempeno-tipos";
+import type { DashboardDesempeno, FilaTabla, CampoDesempeno, Area } from "@/lib/desempeno-tipos";
 import { AREAS_ORDEN, CAMPOS_PORCENTAJE, esCampoAutomatico } from "@/lib/desempeno-tipos";
 import { camposEditablesDe } from "@/lib/desempeno-bono";
-import { obtenerDashboardDesempenoAction, cerrarMesAction, guardarMetricasAction, borrarMetricasAction, sincronizarAutomaticasAction } from "./actions";
+import { obtenerDashboardTodasAreasAction, cerrarMesAction, guardarMetricasAction, borrarMetricasAction, sincronizarAutomaticasAction } from "./actions";
 import s from "./desempeno.module.css";
 
 const AREA_COLOR: Record<string, string> = {
@@ -25,6 +25,11 @@ const PALETA_FALLBACK = ["#7044ed", "#2f78ee", "#f6a51c", "#2fc777", "#0d9488", 
 
 function fmtDecimal(n: number): string {
   return n.toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+}
+
+// Normaliza para la búsqueda en el navegador (sin tildes, minúsculas).
+function normClient(s: string): string {
+  return (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
 function sparkPoints(values: number[]): string | null {
@@ -65,7 +70,11 @@ export default function DesempenoDashboard({
   dashboardInicial: DashboardDesempeno | null;
   errorInicial: string | null;
 }) {
-  const [data, setData] = useState(dashboardInicial);
+  // Todas las vistas de área del mes, en memoria. "" = Todos. El primer render ya
+  // trae la vista "Todos" del servidor (SSR); el resto llega con el efecto.
+  const [vistas, setVistas] = useState<Record<string, DashboardDesempeno>>(
+    dashboardInicial ? { "": dashboardInicial } : {}
+  );
   const [error] = useState(errorInicial);
   const [area, setArea] = useState("");
   const [busqueda, setBusqueda] = useState("");
@@ -77,40 +86,52 @@ export default function DesempenoDashboard({
   const [guardando, setGuardando] = useState(false);
   const [cierreOpen, setCierreOpen] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
-  const primera = useRef(true);
   const PAGE_SIZE = 10;
 
-  async function recargar(next: { area: string; busqueda: string; mes: string }) {
+  // Vista del área seleccionada. Mientras cargan todas, cae a "Todos" / al inicial.
+  const data = vistas[area] ?? vistas[""] ?? dashboardInicial;
+
+  // Recarga TODAS las áreas del mes en una sola llamada (tras guardar/cerrar/
+  // sincronizar o al cambiar de mes). Cambiar de pestaña o buscar NO llama aquí.
+  async function recargar(mesSel: string = mes) {
     setCargando(true);
     try {
-      const filtros: DesempenoFiltros = {
-        area: next.area || undefined,
-        busqueda: next.busqueda || undefined,
-        mes: next.mes || undefined,
-      };
-      const r = await obtenerDashboardDesempenoAction(filtros);
-      setData(r);
+      const r = await obtenerDashboardTodasAreasAction(mesSel || undefined);
+      setVistas(r.vistas);
     } finally {
       setCargando(false);
     }
   }
 
+  // Solo el MES va al servidor (incluido el primer render, para poblar todas las
+  // pestañas). Área y búsqueda se resuelven en el navegador, al instante.
   useEffect(() => {
-    if (primera.current) {
-      primera.current = false;
-      return;
-    }
-    setPagina(1);
     let vig = true;
-    setCargando(true);
-    const filtros: DesempenoFiltros = { area: area || undefined, busqueda: busqueda || undefined, mes: mes || undefined };
-    obtenerDashboardDesempenoAction(filtros)
-      .then((r) => vig && setData(r))
-      .finally(() => vig && setCargando(false));
+    const cargar = async () => {
+      setCargando(true);
+      try {
+        const r = await obtenerDashboardTodasAreasAction(mes || undefined);
+        if (vig) setVistas(r.vistas);
+      } finally {
+        if (vig) setCargando(false);
+      }
+    };
+    cargar();
     return () => {
       vig = false;
     };
-  }, [area, busqueda, mes]);
+  }, [mes]);
+
+  // Cambiar de pestaña o buscar es instantáneo (en el navegador) y vuelve a la
+  // página 1. No se llama al servidor.
+  function cambiarArea(a: string) {
+    setArea(a);
+    setPagina(1);
+  }
+  function cambiarBusqueda(v: string) {
+    setBusqueda(v);
+    setPagina(1);
+  }
 
   async function confirmarCierre() {
     setGuardando(true);
@@ -120,7 +141,8 @@ export default function DesempenoDashboard({
       setCierreOpen(false);
       const sig = data?.mesActivoSiguiente ? ` Mes activo ahora: ${data.mesActivoSiguiente}.` : "";
       setSnap({ tipo: "ok", msg: `Mes ${r.mesLabel} archivado y métricas manuales reiniciadas.${sig}` });
-      await recargar({ area, busqueda, mes: "" });
+      setMes("");
+      await recargar("");
     } catch (e) {
       setSnap({ tipo: "error", msg: e instanceof Error ? e.message : "Error al cerrar el mes" });
     } finally {
@@ -139,7 +161,7 @@ export default function DesempenoDashboard({
           ? `Automáticas actualizadas (auditorías y radicaciones): ${r.actualizados} celdas.`
           : "Automáticas al día — no hubo cambios este mes.",
       });
-      await recargar({ area, busqueda, mes });
+      await recargar();
     } catch (e) {
       setSnap({ tipo: "error", msg: e instanceof Error ? e.message : "Error al sincronizar" });
     } finally {
@@ -176,8 +198,11 @@ export default function DesempenoDashboard({
       ]
     : [];
 
-  // Paginación de la tabla.
-  const filasTodo = data?.tabla.filas ?? [];
+  // Paginación de la tabla. La BÚSQUEDA filtra en el navegador (instantánea).
+  const nb = normClient(busqueda);
+  const filasTodo = (data?.tabla.filas ?? []).filter(
+    (f) => !nb || normClient(f.funcionario).includes(nb) || normClient(f.usuario).includes(nb)
+  );
   const totalPaginas = Math.max(1, Math.ceil(filasTodo.length / PAGE_SIZE));
   const paginaActual = Math.min(pagina, totalPaginas);
   const inicio = (paginaActual - 1) * PAGE_SIZE;
@@ -223,7 +248,7 @@ export default function DesempenoDashboard({
             <p>Captura métricas, cumplimiento y bonificación del equipo · <b>{data?.mesActualLabel ?? "Mes en curso"}</b></p>
           </div>
           <div className={s.filters}>
-            <select className={s.select} value={mes} onChange={(e) => setMes(e.target.value)} title="Período">
+            <select className={s.select} value={mes} onChange={(e) => { setMes(e.target.value); setPagina(1); }} title="Período">
               {(data?.mesesDisponibles ?? [{ value: "", label: "Mes en curso" }]).map((m) => (
                 <option key={m.value} value={m.value}>{m.label}</option>
               ))}
@@ -277,9 +302,9 @@ export default function DesempenoDashboard({
 
         {/* Tabs de área */}
         <div className={s.tabs}>
-          <button className={area === "" ? s.tabActive : ""} onClick={() => setArea("")}>Todos</button>
+          <button className={area === "" ? s.tabActive : ""} onClick={() => cambiarArea("")}>Todos</button>
           {AREAS_ORDEN.filter((a) => !data || data.areasDisponibles.includes(a)).map((a) => (
-            <button key={a} className={area === a ? s.tabActive : ""} onClick={() => setArea(a)}>{a}</button>
+            <button key={a} className={area === a ? s.tabActive : ""} onClick={() => cambiarArea(a)}>{a}</button>
           ))}
         </div>
 
@@ -360,11 +385,11 @@ export default function DesempenoDashboard({
                 <input
                   placeholder="Buscar funcionario..."
                   defaultValue={busqueda}
-                  onKeyDown={(e) => { if (e.key === "Enter") setBusqueda((e.target as HTMLInputElement).value); }}
-                  onBlur={(e) => setBusqueda(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") cambiarBusqueda((e.target as HTMLInputElement).value); }}
+                  onBlur={(e) => cambiarBusqueda(e.target.value)}
                 />
               </label>
-              <button onClick={() => { setArea(""); setBusqueda(""); }}><SlidersHorizontal size={15} />Limpiar</button>
+              <button onClick={() => { setArea(""); cambiarBusqueda(""); }}><SlidersHorizontal size={15} />Limpiar</button>
               {cargando && <Loader2 size={15} className={s.spin} />}
             </div>
           </div>
@@ -420,7 +445,7 @@ export default function DesempenoDashboard({
           labels={data.labels}
           editable={!data.esHistorico}
           onClose={() => setDetalle(null)}
-          onSaved={async () => { setDetalle(null); await recargar({ area, busqueda, mes }); }}
+          onSaved={async () => { setDetalle(null); await recargar(); }}
         />
       )}
 

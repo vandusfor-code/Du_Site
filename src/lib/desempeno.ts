@@ -290,11 +290,25 @@ function agregar(funcs: FuncionarioDesempeno[]) {
   return { total, penc, pec, pencProm, bonos };
 }
 
-export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}): Promise<DashboardDesempeno> {
-  const fArea = (filtros.area ?? "").trim();
-  const fMes = (filtros.mes ?? "").trim();
-  const fBusqueda = norm(filtros.busqueda ?? "");
+// Datos BASE de un período: la parte COSTOSA (leer hojas de Google + Supabase),
+// que NO depende del área ni de la búsqueda. Se construye UNA vez por mes y luego
+// se arman todas las vistas de área en memoria (baratas). Así el front filtra las
+// pestañas al instante sin volver a leer Google en cada clic.
+interface BaseDesempeno {
+  fMes: string;
+  esHistorico: boolean;
+  todos: FuncionarioDesempeno[];
+  desconocidos: number;
+  mesesHist: string[];
+  histPorMes: Map<string, FuncionarioDesempeno[]>;
+  mesKeyActivo: string;
+  mmActivo: number;
+  mesActivoNombre: string;
+  mesActivoSiguiente: string;
+  mesesDisponibles: { value: string; label: string }[];
+}
 
+async function construirBaseDesempeno(fMes: string): Promise<BaseDesempeno> {
   // Histórico NATIVO (Supabase): meses cerrados y sus funcionarios.
   const mesesHist = await obtenerMesesHistorico();
   const histPorMes = new Map<string, FuncionarioDesempeno[]>();
@@ -385,6 +399,29 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     }
   }
 
+  // Opciones del selector de mes. El "en curso" lleva el NOMBRE del mes activo
+  // (p. ej. "Octubre 2026") para que no se vea como un genérico "Mes en curso".
+  const mesesDisponibles = [
+    { value: "", label: `${mesLabel(mesKeyActivo)} (en curso)` },
+    ...mesesHist.slice().reverse().map((m) => ({ value: m, label: mesLabel(m) })),
+  ];
+  const mesActivoSiguiente = MESES_NOMBRE[mmActivo % 12] ?? "";
+
+  return {
+    fMes, esHistorico, todos, desconocidos, mesesHist, histPorMes,
+    mesKeyActivo, mmActivo, mesActivoNombre, mesActivoSiguiente, mesesDisponibles,
+  };
+}
+
+// Arma la vista (KPIs, indicadores, ranking, bonificación, tabla, tendencias)
+// para un área/búsqueda a partir de la BASE ya construida. Es PURO y barato
+// (no lee hojas): se puede llamar para cada área en memoria.
+function construirVista(base: BaseDesempeno, fArea: string, fBusqueda: string): DashboardDesempeno {
+  const {
+    todos, desconocidos, mesesHist, histPorMes, esHistorico, fMes,
+    mesKeyActivo, mesActivoNombre, mesActivoSiguiente, mesesDisponibles,
+  } = base;
+
   const filtrados = todos.filter((f) => {
     if (fArea && f.area !== fArea) return false;
     if (fBusqueda && !norm(f.funcionario).includes(fBusqueda) && !norm(f.usuario).includes(fBusqueda)) return false;
@@ -446,15 +483,6 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
   const sb = serieVista.map((p) => p.bonos);
   const hayHistorico = serieVista.length >= 2;
 
-  // Opciones del selector de mes.
-  const mesesDisponibles = [
-    { value: "", label: "Mes en curso" },
-    ...mesesHist.slice().reverse().map((m) => ({ value: m, label: mesLabel(m) })),
-  ];
-
-  // Mes al que pasaría al cerrar.
-  const mesActivoSiguiente = MESES_NOMBRE[mmActivo % 12] ?? "";
-
   return {
     kpi: {
       funcionariosActivos: agg.total,
@@ -474,11 +502,32 @@ export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}):
     labels: LABELS,
     bloquesDesconocidos: desconocidos,
     esHistorico,
-    mesActualLabel: esHistorico ? mesLabel(fMes) : "Mes en curso",
+    // El período vivo muestra el NOMBRE del mes activo (p. ej. "Octubre 2026").
+    mesActualLabel: esHistorico ? mesLabel(fMes) : mesLabel(mesKeyActivo),
     mesesDisponibles,
     mesActivoNombre,
     mesActivoSiguiente,
   };
+}
+
+// Vista de un solo filtro (área/búsqueda/mes). Se mantiene para guardados,
+// cierres y compatibilidad; construye la base y arma esa única vista.
+export async function obtenerDashboardDesempeno(filtros: DesempenoFiltros = {}): Promise<DashboardDesempeno> {
+  const base = await construirBaseDesempeno((filtros.mes ?? "").trim());
+  return construirVista(base, (filtros.area ?? "").trim(), norm(filtros.busqueda ?? ""));
+}
+
+// TODAS las vistas de área de un mes en UNA sola llamada (lee las hojas una vez).
+// El front guarda este mapa y cambia de pestaña al instante sin ir al servidor;
+// solo vuelve a llamar cuando cambia el MES. La clave "" es "Todos".
+export async function obtenerDashboardTodasAreas(
+  mes?: string
+): Promise<{ areas: string[]; vistas: Record<string, DashboardDesempeno> }> {
+  const base = await construirBaseDesempeno((mes ?? "").trim());
+  const areas = ["", ...AREAS_ORDEN.filter((a) => base.todos.some((f) => f.area === a))];
+  const vistas: Record<string, DashboardDesempeno> = {};
+  for (const a of areas) vistas[a] = construirVista(base, a, "");
+  return { areas, vistas };
 }
 
 /* ===================== */

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { esAdminOCoordinadora } from "@/lib/auth-helpers";
 import {
   obtenerDashboardDesempeno,
+  obtenerDashboardTodasAreas,
   cerrarMes,
   guardarMetricasDesempeno,
   borrarMetricasDesempeno,
@@ -27,6 +28,15 @@ async function requireGestion() {
 export async function obtenerDashboardDesempenoAction(filtros: DesempenoFiltros): Promise<DashboardDesempeno> {
   await requireGestion();
   return obtenerDashboardDesempeno(filtros);
+}
+
+// Trae TODAS las vistas de área de un mes en una sola llamada (para que el front
+// cambie de pestaña al instante). Clave "" = Todos.
+export async function obtenerDashboardTodasAreasAction(
+  mes?: string
+): Promise<{ areas: string[]; vistas: Record<string, DashboardDesempeno> }> {
+  await requireGestion();
+  return obtenerDashboardTodasAreas(mes);
 }
 
 export async function cerrarMesAction(): Promise<ResultadoCierre> {
