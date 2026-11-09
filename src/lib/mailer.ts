@@ -33,6 +33,25 @@ export async function enviarCorreoMasivo(
   );
 }
 
+// Envía un correo (a uno o varios destinatarios en el mismo mensaje) con un
+// archivo adjunto. Usado por el reporte diario (PDF de gestiones).
+export async function enviarCorreoConAdjunto(
+  destinatarios: string[],
+  asunto: string,
+  html: string,
+  adjunto: { filename: string; content: Buffer; contentType?: string }
+): Promise<void> {
+  const transport = getTransport();
+  const from = process.env.MAIL_FROM || process.env.SMTP_USER;
+  await transport.sendMail({
+    from,
+    to: destinatarios.join(","),
+    subject: asunto,
+    html,
+    attachments: [{ filename: adjunto.filename, content: adjunto.content, contentType: adjunto.contentType ?? "application/pdf" }],
+  });
+}
+
 export interface ResultadoEnvioIndividual {
   // true solo si el SMTP confirmó aceptar ESE destinatario puntual (no basta
   // con que sendMail() no haya lanzado una excepción — un servidor puede

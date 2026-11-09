@@ -53,6 +53,12 @@ async function getAccessToken(): Promise<string> {
   return token;
 }
 
+// Token de la cuenta de servicio (p. ej. para exportar un PDF de la hoja vía la
+// URL de export de Google Docs). Mismo token/scope que usan las lecturas.
+export async function getGoogleAccessToken(): Promise<string> {
+  return getAccessToken();
+}
+
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
 
 interface HttpError extends Error {
