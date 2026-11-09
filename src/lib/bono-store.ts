@@ -182,6 +182,28 @@ export async function obtenerHistorico(mes: string): Promise<FilaHistoricoBono[]
   }
 }
 
+// Filas del histórico de un asesor (por código), de todos los meses cerrados,
+// del más reciente al más antiguo. Para la vista "Mi bono" de la asesora.
+export async function obtenerBonoHistoricoAsesor(asesor: string): Promise<FilaHistoricoBono[]> {
+  const code = (asesor ?? "").trim();
+  if (!code) return [];
+  try {
+    const sb = getSupabase();
+    const { data, error } = await sb
+      .from(TABLA_HISTORICO)
+      .select("mes,asesor,nombre,area,datos")
+      .ilike("asesor", code) // coincidencia exacta, sin distinguir mayúsculas
+      .order("mes", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((r) => ({
+      mes: String(r.mes), asesor: String(r.asesor), nombre: String(r.nombre ?? ""),
+      area: String(r.area ?? ""), datos: (r.datos ?? {}) as Record<string, string>,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function obtenerMesesHistorico(): Promise<string[]> {
   try {
     const sb = getSupabase();

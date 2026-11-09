@@ -32,6 +32,8 @@ import type { Modulo, ModuloId } from "@/lib/modulos";
 import type { GestionesMes, PqrsfDia } from "@/lib/lineaAmiga";
 import type { RadicacionDia } from "@/lib/radicaciones";
 import { MODULO_VISUALS } from "@/components/module-icons";
+import { MiBonoCard } from "@/components/mi-bono";
+import type { MiBono } from "@/lib/mi-bono";
 import { useModuleSound } from "@/lib/use-module-sound";
 import "./home-view.css";
 
@@ -228,6 +230,7 @@ export function HomeView({
   tareas,
   data,
   banner,
+  miBono,
 }: {
   nombre: string;
   usuario: string;
@@ -246,6 +249,7 @@ export function HomeView({
   tareas: TareaPendiente[];
   data: HomeData | null;
   banner: { titulo: string; imagenUrl: string | null } | null;
+  miBono: MiBono | null;
 }) {
   const router = useRouter();
   const [bannerActual, setBannerActual] = useState(banner);
@@ -350,6 +354,7 @@ export function HomeView({
 
       <div className="shell">
         <section className="left">
+          <MiBonoCard miBono={miBono} />
           <div className="intro">
             <div className="welcome">
               <span className="date">{fechaLarga}</span>

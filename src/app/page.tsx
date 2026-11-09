@@ -9,6 +9,7 @@ import { getNotificaciones as obtenerNotificacionesLineaAmiga, obtenerGestionesM
 import { resolverAsesoraId } from "@/lib/documentacion-identidad";
 import { obtenerPendientesDocumentacion } from "@/lib/documentacion-editor";
 import { obtenerBannerHome, type BannerHome } from "@/lib/home-config";
+import { obtenerMiBono } from "@/lib/mi-bono";
 
 const TRACKABLE = ["metricas", "quiz", "radicaciones", "linea-amiga"] as const;
 const RANGO_PRIORIDAD = { Alta: 0, Media: 1, Baja: 2 } as const;
@@ -100,6 +101,7 @@ export default async function Home() {
         tareas={[]}
         data={null}
         banner={null}
+        miBono={null}
       />
     );
   }
@@ -116,7 +118,7 @@ export default async function Home() {
   // hace UNA sola lectura de Consolidado (antes eran dos llamadas separadas,
   // cada una releyendo la hoja completa) y alimenta tanto Pendientes como
   // el resumen — menos presión sobre la cuota compartida de Sheets.
-  const [auditoriasYConteoR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, gestionesMesR, cronogramaR, bannerR, serieRadR, seriePqrsfR] =
+  const [auditoriasYConteoR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, gestionesMesR, cronogramaR, bannerR, serieRadR, seriePqrsfR, miBonoR] =
     await Promise.allSettled([
       tieneMetricas ? obtenerAuditoriasYConteoAnterior(usuario) : Promise.resolve({ auditorias: [], conteoMesAnterior: 0 }),
       has("quiz") ? obtenerPanelCursos(usuario) : Promise.resolve(null),
@@ -128,7 +130,12 @@ export default async function Home() {
       obtenerBannerHome(),
       tieneAccesoIndicadoresGestion ? obtenerRadicacionesSerie() : Promise.resolve(null),
       tieneAccesoIndicadoresGestion ? obtenerPqrsfSerie() : Promise.resolve(null),
+      // "Mi bono": si hay un mes CERRADO con el bono de esta persona, se muestra
+      // la tarjeta de celebración en el inicio. Barato (una consulta a Supabase).
+      obtenerMiBono(usuario, nombre),
     ]);
+
+  const miBono = miBonoR.status === "fulfilled" ? miBonoR.value : null;
 
   const banner: BannerHome | null = bannerR.status === "fulfilled" ? bannerR.value : null;
 
@@ -313,6 +320,7 @@ export default async function Home() {
       tareas={listaTareas}
       data={data}
       banner={banner}
+      miBono={miBono}
     />
   );
 }

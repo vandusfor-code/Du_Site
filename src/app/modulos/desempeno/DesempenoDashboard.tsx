@@ -139,8 +139,8 @@ export default function DesempenoDashboard({
     try {
       const r = await cerrarMesAction();
       setCierreOpen(false);
-      const sig = data?.mesActivoSiguiente ? ` Mes activo ahora: ${data.mesActivoSiguiente}.` : "";
-      setSnap({ tipo: "ok", msg: `Mes ${r.mesLabel} archivado y métricas manuales reiniciadas.${sig}` });
+      const sig = data?.mesActivoSiguiente ? ` Ahora el mes activo es ${data.mesActivoSiguiente} (automático).` : "";
+      setSnap({ tipo: "ok", msg: `¡Perfecto! Mes de ${r.mesLabel} cerrado. 🎉 Ya puedes avisarles a las asesoras que pueden ver su bono en su inicio.${sig}` });
       setMes("");
       await recargar("");
     } catch (e) {
