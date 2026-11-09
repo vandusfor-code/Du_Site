@@ -338,3 +338,11 @@
 .inv.floral .f-flor.s2{width:120px}.inv.floral .f-flor.s3{width:114px}
 .inv.floral .f-flor.tl{top:-30px;left:-50px}.inv.floral .f-flor.tr{top:-26px;right:-52px}
 .inv.floral .f-flor.bl{bottom:-30px;left:-52px}.inv.floral .f-flor.br{bottom:-30px;right:-50px}
+
+/* el versículo en su propia hoja */
+.inv.floral .f-verso{padding:14px 26px 8px}
+.inv.floral .f-papel-verso .f-papel-in{padding:26px 26px 30px}
+.inv.floral .f-verso .f-cita{margin:0;font-size:1.15rem;line-height:1.6}
+.inv.floral .f-orn{width:104px;margin:0 auto 10px}
+.inv.floral .f-orn svg{display:block;width:100%}
+.inv.floral .f-hero{padding-bottom:40px}

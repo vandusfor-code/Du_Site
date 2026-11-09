@@ -114,7 +114,6 @@ function render(root, cfg, guest, opts = {}) {
     ${flor(0, "tl")}${flor(1, "br s2")}
     ${portada ? `<div class="f-arco f-arco-portada rev" data-a="zoom"><img src="${esc(portada)}" alt="Portada"></div>` : ""}
     ${papel(`${monograma(cfg, "f-mono-sm")}
-      ${cfg.versiculo ? `<p class="f-cita">“${esc(cfg.versiculo)}”${cfg.cita ? `<br><span>— ${esc(cfg.cita)}</span>` : ""}</p>` : ""}
       <p class="f-honor">TENEMOS EL HONOR DE INVITARTE A NUESTRA BODA</p>
       <h1 class="f-nombres"><span>${esc(cfg.novio)}</span><i>&amp;</i><span>${esc(cfg.novia)}</span></h1>
       ${guest ? `<p class="f-para">Invitación para<br><b>${esc(guest.nombre)}</b></p>` : ""}`, "f-papel-nombres")}
@@ -124,6 +123,8 @@ function render(root, cfg, guest, opts = {}) {
       <div class="f-calmenu" hidden><a data-g href="${esc(urlGoogle(cal))}" target="_blank" rel="noopener">Google Calendar</a><button data-ics>Apple / Outlook (.ics)</button></div>
     </div>` : ""}
   </section>
+
+  ${cfg.versiculo ? `<section class="f-sec f-verso">${papel(`<div class="f-orn">${A.ramaOro(5)}</div><p class="f-cita">“${esc(cfg.versiculo)}”${cfg.cita ? `<br><span>— ${esc(cfg.cita)}</span>` : ""}</p>`, "f-papel-verso")}</section>` : ""}
 
   ${cfg.cancion ? `<section class="f-sec f-sec-player">${papel(`
     <div class="player" id="player">
