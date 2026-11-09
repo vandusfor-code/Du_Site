@@ -108,10 +108,10 @@ export default async function Home() {
 
   const has = (id: string) => moduloIds.includes(id);
   const tieneMetricas = has("metricas");
-  // Las 5 tarjetas de indicadores (radicaciones/PQRSF) eran exclusivas de
-  // esAdmin. Se extiende a quien tenga el módulo "linea-amiga" SIN tocar
-  // esAdmin ni el Rol — es un permiso adicional, no una redefinición de Admin.
-  const tieneAccesoIndicadoresGestion = esAdmin || has("linea-amiga");
+  // Las 5 tarjetas de indicadores (radicaciones/PQRSF) las ven Admin, la
+  // Coordinadora (gestiona el equipo) y quien tenga el módulo "linea-amiga".
+  // Es un permiso adicional, NO una redefinición de Admin ni del Rol.
+  const tieneAccesoIndicadoresGestion = esAdmin || rolHome === "coordinadora" || has("linea-amiga");
 
   // TODAS las lecturas externas del Home en un solo batch paralelo, cada una
   // gateada por el módulo real del usuario. obtenerAuditoriasYConteoAnterior
@@ -125,7 +125,7 @@ export default async function Home() {
       has("radicaciones") ? obtenerNotificacionesRadicaciones(nombre) : Promise.resolve([]),
       has("linea-amiga") ? obtenerNotificacionesLineaAmiga(nombre) : Promise.resolve([]),
       has("documentacion") ? resolverAsesoraId(usuario).then((id) => obtenerPendientesDocumentacion(id)) : Promise.resolve([]),
-      has("linea-amiga") || esAdmin ? obtenerGestionesMes() : Promise.resolve(null),
+      tieneAccesoIndicadoresGestion ? obtenerGestionesMes() : Promise.resolve(null),
       tieneMetricas ? obtenerCronograma(nombre) : Promise.resolve([]),
       obtenerBannerHome(),
       tieneAccesoIndicadoresGestion ? obtenerRadicacionesSerie() : Promise.resolve(null),
