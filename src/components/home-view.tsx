@@ -1010,7 +1010,7 @@ function MetricasAdmin({
       ) : (
         <MetricCard Icon={MessageSquareText} label="PQRSF registrados (Hoy)" valor={gestiones.pqrsfHoy} />
       )}
-      <article className="metricCard">
+      <Link href="/gestiones?tipo=por-comunicar" className="metricCard metricCardLink" title="Ver listado de PQRSF por comunicar">
         <div className="metricHead">
           <div className="statIcon violet">
             <BookOpen size={20} />
@@ -1018,7 +1018,7 @@ function MetricasAdmin({
           <span className="metricLabel">PQRSF por comunicar vs faltantes (Hoy)</span>
         </div>
         <BarrasVerticales comunicados={gestiones.pqrsfComunicados} faltantes={gestiones.pqrsfPorComunicar} />
-      </article>
+      </Link>
       {pqrsfMeses && pqrsfMeses.length > 0 ? (
         <MetricBarrasDias Icon={MessageSquareText} label="PQRSF registrados (por mes)" dias={pqrsfMeses} href="/gestiones?tipo=pqrsf" />
       ) : (

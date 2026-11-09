@@ -1,6 +1,6 @@
 import "server-only";
 import * as XLSX from "xlsx";
-import { valuesAppend, getSpreadsheetMeta, batchUpdate, readRange, hoyEnBogota } from "@/lib/sheets";
+import { valuesAppend, getSpreadsheetMeta, batchUpdate, readRange, hoyEnBogota, eliminarFilaPorValor } from "@/lib/sheets";
 
 // ============================================================
 // PQRSF Por comunicar (Registro): importa un .xls/.xlsx descargado del sistema
@@ -212,4 +212,60 @@ export async function importarPqrsfComunicar(buffer: Buffer): Promise<ResultadoI
   }
 
   return { ok: true, encontrados: registros.length, registrados: nuevos.length, omitidos, duplicados };
+}
+
+/* ===================== */
+/* LISTADO + ELIMINAR (panel Admin/Coordinación) */
+/* ===================== */
+
+export interface RegistroComunicar {
+  fecha: string;
+  fechaTs: number;
+  radicado: string;
+  nombre: string;
+  empresa: string;
+  telefono: string;
+  estado: string;
+  comunicado: boolean;
+}
+
+// Serial de fecha (Google Sheets/Excel) → "dd/mm/yyyy".
+function fechaDesdeSerial(serial: number): string {
+  if (!serial) return "";
+  const d = new Date(Date.UTC(1899, 11, 30) + Math.round(serial) * 86400000);
+  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+}
+
+// Lista los registros de "PQRSF por comunicar" (pestaña PQRSF). Comunicado =
+// la columna J "ESTADO" tiene valor; vacía = aún por comunicar (faltante).
+// Del más reciente (RECIBIDO PEOPLE) al más antiguo.
+export async function listarRegistrosComunicar(limite = 1500): Promise<RegistroComunicar[]> {
+  const id = sheetId();
+  const data = await readRange(id, TAB, { unformatted: true });
+  const out: RegistroComunicar[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const fila = data[i] ?? [];
+    const radicado = (fila[2] ?? "").toString().trim();
+    if (!radicado) continue;
+    const recibido = Number(fila[1]) || 0; // B RECIBIDO PEOPLE (serial)
+    const cofrem = Number(fila[3]) || 0; // D FECHA COFREM (serial)
+    const estado = (fila[9] ?? "").toString().trim(); // J ESTADO
+    out.push({
+      fecha: cofrem ? fechaDesdeSerial(cofrem) : recibido ? fechaDesdeSerial(recibido) : "",
+      fechaTs: recibido || cofrem,
+      radicado,
+      nombre: (fila[5] ?? "").toString().trim(), // F NOMBRE
+      empresa: (fila[8] ?? "").toString().trim(), // I EMPRESA
+      telefono: (fila[6] ?? "").toString().trim(), // G TELEFONO
+      estado,
+      comunicado: estado !== "",
+    });
+  }
+  out.sort((a, b) => b.fechaTs - a.fechaTs);
+  return out.slice(0, limite);
+}
+
+// Elimina un registro de "PQRSF por comunicar" por su radicado (col C).
+export async function eliminarComunicar(radicado: string): Promise<boolean> {
+  return eliminarFilaPorValor(sheetId(), TAB, 2, radicado);
 }
