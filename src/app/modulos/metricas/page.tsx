@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { requireModulo } from "@/lib/auth-helpers";
+import { redirect } from "next/navigation";
+import { requireModulo, esCoordinadora } from "@/lib/auth-helpers";
 import { obtenerMetricas } from "@/lib/metricas";
 import MetricasDashboard from "./MetricasDashboard";
 
@@ -9,6 +10,8 @@ export default async function MetricasPage({
   searchParams: Promise<{ seccion?: string; id?: string }>;
 }) {
   const session = await requireModulo("metricas");
+  // La Coordinadora no audita ni ve auditorías/métricas.
+  if (esCoordinadora(session)) redirect("/");
   const { seccion, id } = await searchParams;
 
   let datos;

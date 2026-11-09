@@ -11,7 +11,13 @@ export default async function TodosLosModulosPage() {
   if (!session?.user) redirect("/login");
 
   // Solo los módulos realmente autorizados por la sesión. Nunca se listan otros.
-  const modulos = modulosPermitidos(session.user.modulos ?? []);
+  let modulos = modulosPermitidos(session.user.modulos ?? []);
+  // La Coordinadora no audita ni ve auditorías: se le ocultan esos módulos.
+  const rol = (session.user.rol ?? "").toString().trim().toLowerCase();
+  if (rol === "coordinadora") {
+    const ocultos = new Set(["admin", "metricas"]);
+    modulos = modulos.filter((m) => !ocultos.has(m.id));
+  }
 
   return (
     <div className={s.page}>

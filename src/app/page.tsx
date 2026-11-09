@@ -87,6 +87,14 @@ export default async function Home() {
       if (m && !modulos.some((x) => x.id === mid)) modulos.push(m);
     }
   }
+  // La Coordinadora NO audita ni ve auditorías: se le ocultan esos módulos
+  // (Auditorías = "admin", Métricas = "metricas") aunque los tenga asignados.
+  if (rolHome === "coordinadora") {
+    const ocultosCoord = new Set<string>(["admin", "metricas"]);
+    for (let i = modulos.length - 1; i >= 0; i--) {
+      if (ocultosCoord.has(modulos[i].id)) modulos.splice(i, 1);
+    }
+  }
 
   if (!usuario) {
     return (
@@ -107,7 +115,9 @@ export default async function Home() {
   }
 
   const has = (id: string) => moduloIds.includes(id);
-  const tieneMetricas = has("metricas");
+  // La Coordinadora no ve nada de auditorías (ni pendientes de "firmar
+  // compromiso", ni resumen de compromisos, ni cronograma de auditoría).
+  const tieneMetricas = has("metricas") && rolHome !== "coordinadora";
   // Las 5 tarjetas de indicadores (radicaciones/PQRSF) las ven Admin, la
   // Coordinadora (gestiona el equipo) y quien tenga el módulo "linea-amiga".
   // Es un permiso adicional, NO una redefinición de Admin ni del Rol.

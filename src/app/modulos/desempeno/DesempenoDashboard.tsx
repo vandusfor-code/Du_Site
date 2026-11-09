@@ -228,7 +228,10 @@ export default function DesempenoDashboard({
           <b>Du Site</b>
         </div>
         <nav className={s.nav}>
-          <Link href="/admin" className={s.navItem}><ClipboardCheck size={19} /><span>Auditorías</span></Link>
+          {/* Auditorías es solo para Admin: la Coordinadora no audita. */}
+          {esAdmin && (
+            <Link href="/admin" className={s.navItem}><ClipboardCheck size={19} /><span>Auditorías</span></Link>
+          )}
           <span className={s.navActive}><BarChart3 size={19} /><span>Bonos</span></span>
         </nav>
         <div className={s.sidebarBottom}>
