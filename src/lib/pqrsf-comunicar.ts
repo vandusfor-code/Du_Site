@@ -164,10 +164,10 @@ export async function importarPqrsfComunicar(buffer: Buffer): Promise<ResultadoI
     r.radicado, // C RADICADO
     r.fechaCofremSerial ?? "", // D FECHA COFREM
     "", // E HORA
-    r.nombre, // F NOMBRE
+    limpiarTexto(r.nombre), // F NOMBRE
     r.telefono, // G TELEFONO
     r.correo, // H CORREO ELECTRONICO
-    r.empresa, // I EMPRESA
+    limpiarTexto(r.empresa), // I EMPRESA
     "", // J ESTADO
     "", // K CANAL CONTACTO
     "", // L EFECTIVIDAD
@@ -229,6 +229,13 @@ export interface RegistroComunicar {
   comunicado: boolean;
 }
 
+// Limpia el carácter de reemplazo U+FFFD (�) que quedó de importaciones viejas
+// con codificación equivocada: en los nombres/empresas colombianos corresponde
+// siempre a la Ñ (ORDO�EZ → ORDOÑEZ, PATI�O → PATIÑO).
+function limpiarTexto(s: string): string {
+  return (s ?? "").replace(/�/g, "Ñ");
+}
+
 // Serial de fecha (Google Sheets/Excel) → "dd/mm/yyyy".
 function fechaDesdeSerial(serial: number): string {
   if (!serial) return "";
@@ -254,8 +261,8 @@ export async function listarRegistrosComunicar(limite = 1500): Promise<RegistroC
       fecha: cofrem ? fechaDesdeSerial(cofrem) : recibido ? fechaDesdeSerial(recibido) : "",
       fechaTs: recibido || cofrem,
       radicado,
-      nombre: (fila[5] ?? "").toString().trim(), // F NOMBRE
-      empresa: (fila[8] ?? "").toString().trim(), // I EMPRESA
+      nombre: limpiarTexto((fila[5] ?? "").toString().trim()), // F NOMBRE
+      empresa: limpiarTexto((fila[8] ?? "").toString().trim()), // I EMPRESA
       telefono: (fila[6] ?? "").toString().trim(), // G TELEFONO
       estado,
       comunicado: estado !== "",
