@@ -652,6 +652,7 @@ export interface MetricasRadMes {
   sncRecibidos: number;
   sncSolucionados: number;
   correccion: number;
+  sncActivas: number; // SNC aún ABIERTAS (Registrada / Enviada a corrección) = pendientes. Son las que afectan el bono; las Solucionadas NO.
 }
 
 export async function obtenerMetricasRadicacionMes(mesYM: string): Promise<Map<string, MetricasRadMes>> {
@@ -663,7 +664,7 @@ export async function obtenerMetricasRadicacionMes(mesYM: string): Promise<Map<s
   const bump = (nombre: string, k: keyof MetricasRadMes, n = 1) => {
     const key = normalize(nombre);
     if (!key) return;
-    const cur = out.get(key) ?? { radicados: 0, devueltos: 0, sncRecibidos: 0, sncSolucionados: 0, correccion: 0 };
+    const cur = out.get(key) ?? { radicados: 0, devueltos: 0, sncRecibidos: 0, sncSolucionados: 0, correccion: 0, sncActivas: 0 };
     cur[k] += n;
     out.set(key, cur);
   };
@@ -698,6 +699,9 @@ export async function obtenerMetricasRadicacionMes(mesYM: string): Promise<Map<s
       const estado = normalizarEstadoSNC(s[i][4]);
       if (estado === "Solucionada") bump(nombre, "sncSolucionados");
       else if (estado === "Enviada a corrección") bump(nombre, "correccion");
+      // Pendientes (abiertas): Registrada o Enviada a corrección. Estas sí
+      // afectan el bono; las Solucionadas/Canceladas/No corresponde NO.
+      if (esEstadoActivo(estado)) bump(nombre, "sncActivas");
     }
   } catch {
     // sin datos de SNC → se queda en 0

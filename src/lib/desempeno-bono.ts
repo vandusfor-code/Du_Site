@@ -57,6 +57,17 @@ export const REGLAS_BONO: Record<Area, ReglaBono[]> = {
     { campo: "precision", umbral: 98, monto: 60000, origen: "manual" },
     { campo: "adherencia", umbral: 100, monto: 60000, origen: "manual" },
   ],
+  // Joselyn (G. Empleo + Radicación): su tabla combina calidad de llamada
+  // (Satisfacción/PEC/PENC) con radicación (RADICADOS/SNC) + Adherencia. Suma
+  // $300.000. Igual a REGLAS_ESPECIALES["J.MENDOZA382"].
+  "G. Empleo / Radicación": [
+    { campo: "satisfaccion", umbral: 95, monto: 40000, origen: "manual" },
+    { campo: "pec", umbral: 98, monto: 70000, origen: "auto" },
+    { campo: "penc", umbral: 95, monto: 50000, origen: "auto" },
+    { campo: "radicadosPct", umbral: 95, monto: 40000, origen: "auto" },
+    { campo: "adherencia", umbral: 100, monto: 60000, origen: "manual" },
+    { campo: "snc", umbral: 95, monto: 40000, origen: "auto" },
+  ],
   // G. Empleo Cofrem: en la hoja solo lleva PEC/PENC/Auditorías. Regla tentativa
   // (PEC 50% + PENC 50%); a confirmar con el usuario por resultado, no por fórmula.
   "G. Empleo Cofrem": [

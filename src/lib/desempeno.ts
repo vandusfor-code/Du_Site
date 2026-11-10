@@ -251,6 +251,7 @@ const INDICADORES_POR_AREA: Record<Area, CampoDesempeno[]> = {
   "G. Empleo": ["satisfaccion", "pec", "penc", "productividad", "adherencia"],
   "Encuestas": ["calidadLlamada", "pec", "penc", "productividad", "adherencia", "precision", "errorRespuesta"],
   "Radicación": ["productividad", "radicadosPct", "snc", "precision", "adherencia"],
+  "G. Empleo / Radicación": ["satisfaccion", "pec", "penc", "radicadosPct", "snc", "adherencia"],
   "G. Empleo Cofrem": ["pec", "penc"],
 };
 const COLUMNAS_POR_AREA: Record<Area, CampoDesempeno[]> = {
@@ -258,6 +259,7 @@ const COLUMNAS_POR_AREA: Record<Area, CampoDesempeno[]> = {
   "G. Empleo": ["satisfaccion", "pec", "penc", "productividad", "adherencia", "bono"],
   "Encuestas": ["calidadLlamada", "pec", "penc", "productividad", "adherencia", "precision", "errorRespuesta", "bono"],
   "Radicación": ["productividad", "radicadosPct", "snc", "precision", "adherencia", "bono", "sncRecibidos", "cantidadRadicados", "correccion", "sncSolucionados"],
+  "G. Empleo / Radicación": ["satisfaccion", "pec", "penc", "radicadosPct", "snc", "adherencia", "bono", "cantidadRadicados", "sncRecibidos", "sncSolucionados", "correccion"],
   "G. Empleo Cofrem": ["pec", "penc", "auditorias"],
 };
 
@@ -339,6 +341,11 @@ async function construirBaseDesempeno(fMes: string): Promise<BaseDesempeno> {
       vistosCodigo.add(k);
       return true;
     });
+    // Joselyn (J.MENDOZA382) está en G. Empleo + Radicación → categoría propia,
+    // para que salga aparte con sus métricas (no mezclada en "Radicación").
+    for (const f of todos) {
+      if (f.usuario.trim().toUpperCase() === "J.MENDOZA382") f.area = "G. Empleo / Radicación";
+    }
     // AUTO desde los módulos: PQRSF creados (Línea amiga) y radicados/SNC
     // (Radicaciones), por mes, cruzados por nombre. Luego lo capturado en la
     // plataforma (Supabase) MANDA sobre el auto. El bono se calcula NATIVO.
@@ -373,7 +380,11 @@ async function construirBaseDesempeno(fMes: string): Promise<BaseDesempeno> {
         f.valores.sncSolucionados = String(r.sncSolucionados);
         f.valores.correccion = String(r.correccion);
         if (r.radicados > 0) {
-          f.valores.snc = `${Math.round((1 - r.sncRecibidos / r.radicados) * 1000) / 10}%`;
+          // SNC%: solo penalizan las SNC ABIERTAS (Registrada / Enviada a
+          // corrección). Las Solucionadas NO afectan — la asesora las corrigió.
+          f.valores.snc = `${Math.round((1 - r.sncActivas / r.radicados) * 1000) / 10}%`;
+          // Radicados%: por los devueltos por error (col E). NO se toca por
+          // corrección: eso no es culpa de la asesora.
           f.valores.radicadosPct = `${Math.round((1 - r.devueltos / r.radicados) * 1000) / 10}%`;
         }
       }

@@ -19,6 +19,7 @@ const AREA_COLOR: Record<string, string> = {
   "G. Empleo": "#2f78ee",
   "Encuestas": "#f6a51c",
   "Radicación": "#2fc777",
+  "G. Empleo / Radicación": "#0ea5e9",
   "G. Empleo Cofrem": "#0d9488",
 };
 const PALETA_FALLBACK = ["#7044ed", "#2f78ee", "#f6a51c", "#2fc777", "#0d9488", "#db2777", "#778196"];

@@ -6,6 +6,7 @@ export const AREAS_ORDEN = [
   "G. Empleo",
   "Encuestas",
   "Radicación",
+  "G. Empleo / Radicación", // Joselyn: está en las dos, categoría propia
   "G. Empleo Cofrem",
 ] as const;
 export type Area = (typeof AREAS_ORDEN)[number];
@@ -51,6 +52,8 @@ export const CAMPOS_EDITABLES_POR_AREA: Record<Area, CampoDesempeno[]> = {
   "G. Empleo": ["satisfaccion", "pec", "penc", "productividad", "adherencia"],
   "Encuestas": ["calidadLlamada", "pec", "penc", "productividad", "adherencia", "precision", "errorRespuesta"],
   "Radicación": ["productividad", "radicadosPct", "snc", "precision", "adherencia", "sncRecibidos", "cantidadRadicados", "correccion", "sncSolucionados"],
+  // Joselyn (G. Empleo + Radicación): calidad de llamada + radicación.
+  "G. Empleo / Radicación": ["satisfaccion", "pec", "penc", "radicadosPct", "snc", "adherencia", "sncRecibidos", "cantidadRadicados", "correccion", "sncSolucionados"],
   "G. Empleo Cofrem": ["pec", "penc", "auditorias"],
 };
 
