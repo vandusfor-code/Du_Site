@@ -5,6 +5,7 @@ import { esAdminOCoordinadora } from "@/lib/auth-helpers";
 import {
   obtenerDashboardDesempeno,
   obtenerDashboardTodasAreas,
+  generarExcelBonos,
   cerrarMes,
   guardarMetricasDesempeno,
   borrarMetricasDesempeno,
@@ -42,6 +43,13 @@ export async function obtenerDashboardTodasAreasAction(
 export async function cerrarMesAction(): Promise<ResultadoCierre> {
   await requireGestion();
   return cerrarMes();
+}
+
+// Genera el Excel de bonos del mes (Usuario, Funcionaria, Bono Ganado) para que
+// Admin/Coordinación lo descarguen. Devuelve el archivo en base64.
+export async function descargarBonosExcelAction(mes?: string): Promise<{ filename: string; base64: string }> {
+  await requireGestion();
+  return generarExcelBonos(mes);
 }
 
 // Trae las automáticas (PEC/PENC/#auditorías) del mes en curso desde las

@@ -11,7 +11,7 @@ import {
 import type { DashboardDesempeno, FilaTabla, CampoDesempeno, Area } from "@/lib/desempeno-tipos";
 import { AREAS_ORDEN, CAMPOS_PORCENTAJE, esCampoAutomatico } from "@/lib/desempeno-tipos";
 import { camposEditablesDe } from "@/lib/desempeno-bono";
-import { obtenerDashboardTodasAreasAction, cerrarMesAction, guardarMetricasAction, borrarMetricasAction, sincronizarAutomaticasAction } from "./actions";
+import { obtenerDashboardTodasAreasAction, cerrarMesAction, guardarMetricasAction, borrarMetricasAction, sincronizarAutomaticasAction, descargarBonosExcelAction } from "./actions";
 import s from "./desempeno.module.css";
 
 const AREA_COLOR: Record<string, string> = {
@@ -87,6 +87,7 @@ export default function DesempenoDashboard({
   const [guardando, setGuardando] = useState(false);
   const [cierreOpen, setCierreOpen] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
+  const [descargando, setDescargando] = useState(false);
   const PAGE_SIZE = 10;
 
   // Vista del área seleccionada. Mientras cargan todas, cae a "Todos" / al inicial.
@@ -170,23 +171,28 @@ export default function DesempenoDashboard({
     }
   }
 
-  function exportar() {
-    if (!data) return;
-    const cols = data.tabla.columnas;
-    const cab = ["Funcionario", "Área", ...cols.map((c) => data.labels[c] ?? c)];
-    const filas = data.tabla.filas.map((f) => [
-      f.funcionario,
-      f.area,
-      ...cols.map((c) => (f.valores[c] ?? "").replace(/;/g, ",")),
-    ]);
-    const csv = [cab, ...filas].map((r) => r.join(";")).join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `desempeno${area ? "-" + area.replace(/[^\w]+/g, "-") : ""}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // Descarga el Excel de bonos del mes seleccionado (Usuario, Funcionaria, Bono
+  // Ganado). El archivo se genera en el servidor y llega en base64.
+  async function exportar() {
+    setDescargando(true);
+    setSnap(null);
+    try {
+      const { filename, base64 } = await descargarBonosExcelAction(mes || undefined);
+      const bytes = atob(base64);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      const blob = new Blob([arr], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setSnap({ tipo: "error", msg: "No se pudo generar el Excel de bonos." });
+    } finally {
+      setDescargando(false);
+    }
   }
 
   const k = data?.kpi;
@@ -263,7 +269,9 @@ export default function DesempenoDashboard({
             <button onClick={() => setCierreOpen(true)} disabled={guardando || data?.esHistorico} title="Cerrar un mes: lo archiva y reinicia las métricas">
               <CalendarCheck size={15} /> Cerrar mes
             </button>
-            <button className={s.primary} onClick={exportar}><Download size={15} />Exportar</button>
+            <button className={s.primary} onClick={exportar} disabled={descargando} title="Descargar el historial de bonos del mes en Excel (Usuario, Funcionaria, Bono Ganado)">
+              {descargando ? <Loader2 size={15} className={s.spin} /> : <Download size={15} />} Descargar Excel
+            </button>
           </div>
         </header>
 

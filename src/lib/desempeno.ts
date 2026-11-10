@@ -1,4 +1,5 @@
 import "server-only";
+import * as XLSX from "xlsx";
 import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate } from "@/lib/sheets";
 import { obtenerMetricasRadicacionMes, type MetricasRadMes } from "@/lib/radicaciones";
 import { obtenerPqrsfPorAgenteMes } from "@/lib/lineaAmiga";
@@ -539,6 +540,29 @@ export async function obtenerDashboardTodasAreas(
   const vistas: Record<string, DashboardDesempeno> = {};
   for (const a of areas) vistas[a] = construirVista(base, a, "");
   return { areas, vistas };
+}
+
+// Genera el Excel (.xlsx) del historial de bonos de un mes: Usuario, Funcionaria,
+// Bono Ganado (todas las áreas). Devuelve el archivo en base64 para descargar.
+export async function generarExcelBonos(mes?: string): Promise<{ filename: string; base64: string }> {
+  const base = await construirBaseDesempeno((mes ?? "").trim());
+  const vista = construirVista(base, "", ""); // todos los funcionarios
+
+  const filas = [...vista.tabla.filas].sort((a, b) => a.usuario.localeCompare(b.usuario, "es"));
+  const aoa: (string | number)[][] = [["Usuario", "Funcionaria", "Bono Ganado"]];
+  for (const f of filas) {
+    const bono = parseInt(String(f.valores.bono ?? "").replace(/[^\d]/g, ""), 10) || 0;
+    aoa.push([f.usuario, f.funcionario, bono]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [{ wch: 16 }, { wch: 36 }, { wch: 14 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Bonos");
+  const base64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" }) as string;
+
+  const etiqueta = base.esHistorico ? mesLabel(base.fMes) : mesLabel(base.mesKeyActivo);
+  return { filename: `Bonos ${etiqueta}.xlsx`, base64 };
 }
 
 /* ===================== */
