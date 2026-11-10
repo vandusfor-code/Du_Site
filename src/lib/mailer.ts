@@ -3,10 +3,13 @@ import nodemailer from "nodemailer";
 import dns from "node:dns";
 
 // Render no tiene ruta IPv6 a Gmail: sin esto, Node resuelve smtp.gmail.com por
-// IPv6 y el envío falla con "connect ENETUNREACH ...:587". Forzar IPv4 primero.
+// IPv6 y el envío falla con "connect ENETUNREACH ...:587". Preferir IPv4.
 dns.setDefaultResultOrder("ipv4first");
 
-function getTransport() {
+// Cache de la IPv4 resuelta (evita resolver en cada envío).
+let ipCache: { host: string; ip: string; ts: number } | null = null;
+
+async function getTransport() {
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT;
   const user = process.env.SMTP_USER;
@@ -18,13 +21,32 @@ function getTransport() {
     );
   }
 
+  // Resolvemos la IPv4 del host y conectamos DIRECTO a ella: así Node no intenta
+  // IPv6 (Render no tiene ruta → "connect ENETUNREACH ...:587"). El certificado
+  // se valida contra el hostname real vía tls.servername, no contra la IP.
+  let destino = host;
+  try {
+    if (ipCache && ipCache.host === host && Date.now() - ipCache.ts < 600000) {
+      destino = ipCache.ip;
+    } else {
+      const ips = await dns.promises.resolve4(host);
+      if (ips.length) {
+        destino = ips[0];
+        ipCache = { host, ip: destino, ts: Date.now() };
+      }
+    }
+  } catch {
+    // si no se puede resolver, se usa el host tal cual (último recurso)
+  }
+
   return nodemailer.createTransport({
-    host,
+    host: destino,
     port: Number(port),
     secure: Number(port) === 465,
     auth: { user, pass },
     connectionTimeout: 20000, // 20s: falla rápido en vez de colgarse
     greetingTimeout: 20000,
+    tls: { servername: host },
   });
 }
 
@@ -33,7 +55,7 @@ export async function enviarCorreoMasivo(
   asunto: string,
   html: string
 ): Promise<void> {
-  const transport = getTransport();
+  const transport = await getTransport();
   const from = process.env.MAIL_FROM || process.env.SMTP_USER;
   await Promise.all(
     destinatarios.map((to) => transport.sendMail({ from, to, subject: asunto, html }))
@@ -48,7 +70,7 @@ export async function enviarCorreoConAdjunto(
   html: string,
   adjunto: { filename: string; content: Buffer; contentType?: string }
 ): Promise<void> {
-  const transport = getTransport();
+  const transport = await getTransport();
   const from = process.env.MAIL_FROM || process.env.SMTP_USER;
   await transport.sendMail({
     from,
@@ -77,7 +99,7 @@ export async function enviarCorreoIndividual(
   asunto: string,
   html: string
 ): Promise<ResultadoEnvioIndividual> {
-  const transport = getTransport();
+  const transport = await getTransport();
   const from = process.env.MAIL_FROM || process.env.SMTP_USER;
   const info = await transport.sendMail({ from, to: destinatario, subject: asunto, html });
 
