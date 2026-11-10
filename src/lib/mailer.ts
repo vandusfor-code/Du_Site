@@ -1,5 +1,10 @@
 import "server-only";
 import nodemailer from "nodemailer";
+import dns from "node:dns";
+
+// Render no tiene ruta IPv6 a Gmail: sin esto, Node resuelve smtp.gmail.com por
+// IPv6 y el envío falla con "connect ENETUNREACH ...:587". Forzar IPv4 primero.
+dns.setDefaultResultOrder("ipv4first");
 
 function getTransport() {
   const host = process.env.SMTP_HOST;
@@ -18,9 +23,6 @@ function getTransport() {
     port: Number(port),
     secure: Number(port) === 465,
     auth: { user, pass },
-    // Render no tiene ruta IPv6 a Gmail: sin esto nodemailer resuelve smtp.gmail.com
-    // por IPv6 y falla con "connect ENETUNREACH ...:587". family:4 fuerza IPv4.
-    family: 4,
     connectionTimeout: 20000, // 20s: falla rápido en vez de colgarse
     greetingTimeout: 20000,
   });
