@@ -336,12 +336,16 @@
 .miBonoDesglose { display: flex; flex-direction: column; gap: 7px; text-align: left; margin-bottom: 22px; }
 .miBonoItem { display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 11px; background: #f7f7fb; font-size: 13px; }
 .miBonoItem.ok { background: #edfcf3; }
-.miBonoItemIcon { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: #fff; background: #c3c9d6; }
+.miBonoItem.no { background: #fff0f1; }
+.miBonoItemIcon { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: #fff; background: #c3c9d6; align-self: start; margin-top: 1px; }
 .miBonoItem.ok .miBonoItemIcon { background: #22c55e; }
-.miBonoItemLabel { font-weight: 700; color: #171331; }
+.miBonoItem.no .miBonoItemIcon { background: #e5484d; }
+.miBonoItemLabel { display: flex; flex-direction: column; gap: 2px; font-weight: 700; color: #171331; }
+.miBonoItemMotivo { font-weight: 600; font-size: 10.5px; line-height: 1.3; color: #d93142; }
 .miBonoItemValor { color: #66708a; font-weight: 600; }
+.miBonoItem.no .miBonoItemValor { color: #d93142; }
 .miBonoItemMonto { font-weight: 800; color: #171331; min-width: 62px; text-align: right; }
-.miBonoItem:not(.ok) .miBonoItemMonto { color: #c3c9d6; }
+.miBonoItem.no .miBonoItemMonto { color: #d93142; }
 .miBonoNota { margin: 0 0 14px; font-size: 11.5px; line-height: 1.45; color: #8b93a7; }
 .miBonoBtn { width: 100%; border: none; border-radius: 14px; padding: 14px; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; background: linear-gradient(120deg, #7c3aed, #6d28d9); }
 @keyframes miBonoFade { from { opacity: 0; } to { opacity: 1; } }

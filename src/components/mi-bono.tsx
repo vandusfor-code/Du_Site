@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Gift, X, Check, Minus, PartyPopper } from "lucide-react";
+import { Gift, X, Check, PartyPopper } from "lucide-react";
 import type { MiBono } from "@/lib/mi-bono";
 
 // Confeti liviano en canvas (sin librerías). Cae ~6s y se limpia solo.
@@ -111,10 +111,19 @@ function MiBonoModal({ miBono, onClose }: { miBono: MiBono; onClose: () => void 
         <div className="miBonoDesglose">
           {miBono.detalle.map((d) => (
             <div key={d.campo} className={`miBonoItem ${d.cumple ? "ok" : "no"}`}>
-              <span className="miBonoItemIcon">{d.cumple ? <Check size={14} /> : <Minus size={14} />}</span>
-              <span className="miBonoItemLabel">{d.label}</span>
+              <span className="miBonoItemIcon">{d.cumple ? <Check size={14} /> : <X size={14} />}</span>
+              <span className="miBonoItemLabel">
+                {d.label}
+                {!d.cumple && (
+                  <small className="miBonoItemMotivo">
+                    {d.valor === null
+                      ? `Sin registrar — no suma ${d.montoLabel}`
+                      : `No alcanzó el mínimo de ${d.umbral}% — no suma ${d.montoLabel}`}
+                  </small>
+                )}
+              </span>
               <span className="miBonoItemValor">{d.valor === null ? "—" : `${d.valor}%`}</span>
-              <span className="miBonoItemMonto">{d.cumple ? d.montoLabel : "—"}</span>
+              <span className="miBonoItemMonto">{d.cumple ? d.montoLabel : `−${d.montoLabel}`}</span>
             </div>
           ))}
         </div>

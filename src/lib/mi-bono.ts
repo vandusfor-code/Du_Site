@@ -38,6 +38,7 @@ const FRASES = [
 export interface MiBonoDetalle {
   campo: CampoDesempeno;
   label: string;
+  umbral: number;
   monto: number;
   montoLabel: string;
   cumple: boolean;
@@ -91,6 +92,7 @@ export async function obtenerMiBono(codigo: string, nombre?: string): Promise<Mi
   const detalle: MiBonoDetalle[] = res.detalle.map((d) => ({
     campo: d.campo,
     label: LABELS[d.campo] ?? d.campo,
+    umbral: d.umbral,
     monto: d.monto,
     montoLabel: fmtMoney(d.monto),
     cumple: d.cumple,
