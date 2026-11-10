@@ -119,6 +119,10 @@ function MiBonoModal({ miBono, onClose }: { miBono: MiBono; onClose: () => void 
           ))}
         </div>
 
+        <p className="miBonoNota">
+          Recuerda que el bono está sujeto a verificación de días no remunerados e incapacidades para el cálculo final del bono.
+        </p>
+
         <button type="button" className="miBonoBtn" onClick={onClose}>
           ¡Gracias! 💚
         </button>

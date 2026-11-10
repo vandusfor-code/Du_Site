@@ -342,6 +342,7 @@
 .miBonoItemValor { color: #66708a; font-weight: 600; }
 .miBonoItemMonto { font-weight: 800; color: #171331; min-width: 62px; text-align: right; }
 .miBonoItem:not(.ok) .miBonoItemMonto { color: #c3c9d6; }
+.miBonoNota { margin: 0 0 14px; font-size: 11.5px; line-height: 1.45; color: #8b93a7; }
 .miBonoBtn { width: 100%; border: none; border-radius: 14px; padding: 14px; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; background: linear-gradient(120deg, #7c3aed, #6d28d9); }
 @keyframes miBonoFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes miBonoPop { from { opacity: 0; transform: translateY(16px) scale(.94); } to { opacity: 1; transform: none; } }
