@@ -263,6 +263,8 @@ function abrirModal({ tipo, cfg, guest, opts, onDone }) {
       let res;
       if (opts.preview) res = { estado: conf ? "confirmado" : "declinado", asistentes: conf ? n : null };
       else res = await rpc("boda_invitado_responder", { p_codigo: opts.codigo, p_estado: conf ? "confirmado" : "declinado", p_asistentes: conf ? n : null });
+      // Avisa al celular de los novios (si activaron las notificaciones). No bloquea nada si falla.
+      if (!opts.preview) { try { fetch("/api/boda-notificar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ codigo: opts.codigo }), keepalive: true }).catch(() => {}); } catch {} }
       onDone({ estado: res.estado, asistentes: res.asistentes });
       m.innerHTML = `<div class="caja" role="dialog">
         <div class="ic"><svg viewBox="0 0 24 24">${conf ? `<path d="M5 12.500l4.500 4.500L19 7.500"/>` : `<path d="M20 12H4M10 6l-6 6 6 6"/>`}</svg></div>

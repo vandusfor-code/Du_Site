@@ -514,3 +514,22 @@
 /* crédito */
 .adm .pie-credito{border-top:0;margin-top:26px;font-size:.66rem;letter-spacing:.16em;color:#A39698}
 .adm .pie-credito b{font-family:var(--sans);font-style:normal;font-weight:700;font-size:.82rem;letter-spacing:0;color:var(--olive)}
+
+/* ---------- tarjetas "Añadir a tu móvil" y avisos ---------- */
+.adm .app-card{position:relative;display:flex;align-items:center;gap:12px;margin:0 0 10px;padding:12px 12px 12px 14px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 1px 2px rgba(80,35,45,.04)}
+.adm .app-card .kpi-ic{width:44px;height:44px;border-radius:13px;background:#F4E2E3;color:var(--olive)}
+.adm .app-card .kpi-ic svg{width:22px;height:22px}
+.adm .app-card .ac-t{flex:1;min-width:0;display:grid;gap:2px}
+.adm .app-card .ac-t b{font-size:.92rem;font-weight:700;letter-spacing:-.01em}
+.adm .app-card .ac-t small{font-size:.76rem;line-height:1.35;color:var(--txt2)}
+.adm .btn-add{flex:none;min-height:40px;padding:0 18px;border:0;border-radius:12px;background:var(--olive);color:#fff;font-weight:700;font-size:.84rem;transition:background .2s,transform .15s}
+.adm .btn-add:hover{background:#5E1F2F}
+.adm .btn-add:active{transform:scale(.97)}
+.adm .btn-add:disabled{opacity:.6}
+.adm .btn-add.suave{background:#F4E2E3;color:var(--olive)}
+.adm .btn-add.suave:hover{background:#EBD0D3}
+.adm .ac-x{flex:none;width:30px;height:30px;margin-left:-4px;border:0;border-radius:50%;background:transparent;color:var(--txt2);font-size:1.3rem;line-height:1}
+.adm .ac-x:hover{background:rgba(123,45,63,.08)}
+.adm .app-card.ok .kpi-ic{background:#E3EEDF;color:#285B35}
+.dlg-pasos{margin:0 0 4px;padding-left:20px;display:grid;gap:10px;font-size:.92rem;line-height:1.5}
+@media(max-width:350px){.adm .app-card{flex-wrap:wrap}.adm .app-card .btn-add{margin-left:58px}}

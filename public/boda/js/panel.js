@@ -4,6 +4,7 @@
 import { rpc, subirArchivo, comprimirImagen } from "./api.js";
 import { esc, DEFAULT_CONFIG, CANCIONES, esEjemplo, resolverFoto, mezclar, clonar, getPath, setPath, PALETAS, FUENTES_PRINCIPAL, FUENTES_SECUNDARIA, COLORES_VEST, TIPOS_VEST, ICONOS, urlSegura, MESES, parseFecha } from "./util.js";
 import { renderInvitacion } from "./invitacion.js";
+import { prepararApp, registrarSW, instalar, esApp, esIOS, soportaPush, activarAvisos, desactivarAvisos, sincronizarAvisos } from "./avisos.js";
 import "./tema-floral.js";   // tema blanco y dorado (se activa con cfg.tema)
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -46,6 +47,8 @@ const I = {
   flecha: svg('<path d="M9 6l6 6-6 6"/>', 20, 1.900),
   sube: svg('<path d="M7 17L17 7M9 7h8v8"/>', 12, 2),
   papelera: svg('<path d="M5 7h14M10 7V4.500h4V7M7 7l.8 12.500h8.400L17 7"/>', 18, 1.600),
+  movil: svg('<rect x="7" y="2.500" width="10" height="19" rx="2.500"/><path d="M11 18.500h2"/>', 22, 1.600),
+  campana: svg('<path d="M6 16.500V11a6 6 0 0 1 12 0v5.500l1.500 2h-15z"/><path d="M10 21h4"/>', 22, 1.600),
   nota: svg('<path d="M9 18V5.500l11-2V16"/><circle cx="6.500" cy="18" r="2.500"/><circle cx="17.500" cy="16" r="2.500"/>', 26, 1.500)
 };
 const KEBAB_V = `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.700"/><circle cx="12" cy="12" r="1.700"/><circle cx="12" cy="19" r="1.700"/></svg>`;
@@ -83,6 +86,9 @@ export async function iniciarPanel(root, key) {
   let guardadoAlgunaVez = !!(data.config && data.config.novio);
   let tab = guardadoAlgunaVez ? "resumen" : "datos";
   let cdTimer = null;
+  const av = { sub: false };                         // ¿este dispositivo ya recibe avisos?
+  const INSTALA_KEY = "boda-instala-cerrada";
+  const instalaCerrada = () => { try { return Date.now() - Number(localStorage.getItem(INSTALA_KEY) || 0) < 7 * 864e5; } catch { return false; } };
   // Foto de la última visita: sirve para mostrar "+N" en las tarjetas del resumen
   const visKey = "boda-visto-" + eventoId;
   let previo = null;
@@ -450,6 +456,16 @@ export async function iniciarPanel(root, key) {
     const v = [Math.floor(r / 86400), Math.floor((r % 86400) / 3600), Math.floor((r % 3600) / 60), r % 60];
     $$("[data-cd]", el).forEach((e, i) => (e.textContent = i === 0 ? v[0] : String(v[i]).padStart(2, "0")));
   }
+  function tarjetasApp() {
+    const out = [];
+    if (!esApp() && !instalaCerrada()) out.push(`<div class="app-card"><span class="kpi-ic">${I.movil}</span><div class="ac-t"><b>Añadir a tu móvil</b><small>Acceso en un toque a tus invitados y RSVP.</small></div><button class="btn-add" data-instalar>Añadir</button><button class="ac-x" data-cerrar-instala aria-label="Cerrar">×</button></div>`);
+    if (soportaPush() && Notification.permission !== "denied") {
+      out.push(av.sub
+        ? `<div class="app-card ok"><span class="kpi-ic">${I.campana}</span><div class="ac-t"><b>Avisos activados</b><small>Te avisamos al celular cuando alguien responda.</small></div><button class="btn-add suave" data-avisos-off>Desactivar</button></div>`
+        : `<div class="app-card"><span class="kpi-ic">${I.campana}</span><div class="ac-t"><b>Activa los avisos</b><small>Recibe una notificación cuando alguien confirme.</small></div><button class="btn-add" data-avisos-on>Activar</button></div>`);
+    }
+    return out.join("");
+  }
   function pintarResumen() {
     const n = numeros(), falta = faltantes();
     const ult = invitados.filter(i => i.respondido).sort((a, b) => new Date(b.respondido) - new Date(a.respondido))[0];
@@ -468,6 +484,7 @@ export async function iniciarPanel(root, key) {
     main.innerHTML = `<div class="vista">
       ${cabecera("RESUMEN", cfg.novia || cfg.novio ? `${esc(cfg.novia || "…")} <i>&amp;</i> ${esc(cfg.novio || "…")}` : `<span class="ph">Tu boda</span>`, "Así van las respuestas de tus invitados.", cortos() ? "una-linea" : "")}
       <div class="dash">
+        ${tarjetasApp()}
         ${avisoResp}
         <div class="kpis">
           ${tarjetaN("k-hero", I.sobre, n.tot, "Invitaciones creadas", n.resp + " respuestas recibidas", "tot")}
@@ -599,6 +616,10 @@ export async function iniciarPanel(root, key) {
     const t = e.target.closest("button, a, label");
     if (!t) return;
     const d = t.dataset;
+    if (d.instalar !== undefined) return accionInstalar();
+    if (d.cerrarInstala !== undefined) { try { localStorage.setItem(INSTALA_KEY, String(Date.now())); } catch {} return pintar(); }
+    if (d.avisosOn !== undefined) return accionAvisos(true, t);
+    if (d.avisosOff !== undefined) return accionAvisos(false, t);
     if (d.tab) return irTab(d.tab);
     if (d.gotab) return irTab(d.gotab);
     if (t.id === "b-prev" || d.preview !== undefined) return vistaPrevia();
@@ -649,6 +670,28 @@ export async function iniciarPanel(root, key) {
     }
   });
 
+  async function accionInstalar() {
+    const r = await instalar();
+    if (r === "ok") { toast("Listo: búscala en tu pantalla de inicio"); return pintar(); }
+    if (r === "cancelado") return;
+    const pasos = esIOS()
+      ? ["Toca el botón <b>Compartir</b> (el cuadro con una flecha hacia arriba) en Safari.", "Elige <b>Añadir a pantalla de inicio</b>.", "Abre la app desde su icono y toca <b>Activar</b> en los avisos."]
+      : ["Abre el menú del navegador (<b>⋮</b>).", "Toca <b>Instalar app</b> o <b>Añadir a la pantalla de inicio</b>.", "Abre la app desde su icono."];
+    dialogo("Añadir a tu móvil", `<ol class="dlg-pasos">${pasos.map(p => `<li>${p}</li>`).join("")}</ol>`, [{ t: "Entendido", cls: "pri" }]);
+  }
+  async function accionAvisos(activar, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = "…"; }
+    if (activar) {
+      const r = await activarAvisos(key, eventoId);
+      if (r === "ok") { av.sub = true; toast("Avisos activados"); }
+      else if (r === "denegado") dialogo("Avisos bloqueados", `<p class="dlg-p">Tu navegador no nos dejó enviarte avisos. Para activarlos, toca el candado de la barra de direcciones, entra a <b>Notificaciones</b> y elige <b>Permitir</b>.</p>`, [{ t: "Entendido", cls: "pri" }]);
+      else toast("No se pudieron activar los avisos. Inténtalo de nuevo.", true);
+    } else {
+      await desactivarAvisos(key); av.sub = false; toast("Avisos desactivados");
+    }
+    pintar();
+  }
+
   async function crear(items, uno) {
     const validos = items.filter(i => i.nombre && i.nombre.trim());
     if (!validos.length) { toast("Escribe el nombre del invitado", true); $("#in-nombre")?.focus(); return; }
@@ -690,4 +733,8 @@ export async function iniciarPanel(root, key) {
 
   { const n0 = numeros(); try { localStorage.setItem(visKey, JSON.stringify({ tot: n0.tot, resp: n0.resp, pend: n0.pend, conf: n0.conf, dec: n0.dec, pers: n0.pers, ts: Date.now() })); } catch {} }
   pintar();
+
+  // App instalable + avisos: no bloquea nada si el navegador no lo soporta
+  prepararApp(cfg.novia || cfg.novio ? `Boda ${[cfg.novia, cfg.novio].filter(Boolean).join(" y ")}` : "Mi boda");
+  registrarSW().then(() => sincronizarAvisos(key, eventoId)).then(ok => { if (ok) { av.sub = true; if (tab === "resumen") pintar(); } });
 }
