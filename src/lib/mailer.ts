@@ -1,53 +1,63 @@
 import "server-only";
-import nodemailer from "nodemailer";
-import dns from "node:dns";
 
-// Render no tiene ruta IPv6 a Gmail: sin esto, Node resuelve smtp.gmail.com por
-// IPv6 y el envío falla con "connect ENETUNREACH ...:587". Preferir IPv4.
-dns.setDefaultResultOrder("ipv4first");
+// ============================================================
+// Envío de correo vía RESEND (API HTTP, puerto 443). Reemplaza el SMTP: Render
+// (plan free) bloquea toda salida SMTP (25/465/587 → "connect ENETUNREACH" /
+// "Connection timeout"). Resend sí funciona porque va por HTTPS.
+//   RESEND_API_KEY  → clave de la API (secreta, en Render).
+//   RESEND_FROM     → remitente, p. ej. "Du Site <reportes@duacademy.site>"
+//                     (el dominio debe estar verificado en Resend).
+// ============================================================
 
-// Cache de la IPv4 resuelta (evita resolver en cada envío).
-let ipCache: { host: string; ip: string; ts: number } | null = null;
+const RESEND_API = "https://api.resend.com/emails";
 
-async function getTransport() {
-  const host = process.env.SMTP_HOST;
-  const port = process.env.SMTP_PORT;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+function remitente(): string {
+  return process.env.RESEND_FROM || "Du Site <onboarding@resend.dev>";
+}
 
-  if (!host || !port || !user || !pass) {
-    throw new Error(
-      "Faltan las variables SMTP_HOST, SMTP_PORT, SMTP_USER o SMTP_PASS para enviar correos"
-    );
+function apiKey(): string {
+  const k = process.env.RESEND_API_KEY;
+  if (!k) throw new Error("Falta la variable RESEND_API_KEY para enviar correos");
+  return k;
+}
+
+interface Adjunto {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
+// Hace UN envío por la API de Resend. Devuelve el id (éxito) o el error.
+async function enviarResend(
+  to: string[],
+  subject: string,
+  html: string,
+  adjuntos?: Adjunto[]
+): Promise<{ id: string | null; error: string | null }> {
+  const body: Record<string, unknown> = { from: remitente(), to, subject, html };
+  if (adjuntos && adjuntos.length) {
+    body.attachments = adjuntos.map((a) => ({
+      filename: a.filename,
+      content: a.content.toString("base64"),
+    }));
   }
 
-  // Resolvemos la IPv4 del host y conectamos DIRECTO a ella: así Node no intenta
-  // IPv6 (Render no tiene ruta → "connect ENETUNREACH ...:587"). El certificado
-  // se valida contra el hostname real vía tls.servername, no contra la IP.
-  let destino = host;
+  let res: Response;
   try {
-    if (ipCache && ipCache.host === host && Date.now() - ipCache.ts < 600000) {
-      destino = ipCache.ip;
-    } else {
-      const ips = await dns.promises.resolve4(host);
-      if (ips.length) {
-        destino = ips[0];
-        ipCache = { host, ip: destino, ts: Date.now() };
-      }
-    }
-  } catch {
-    // si no se puede resolver, se usa el host tal cual (último recurso)
+    res = await fetch(RESEND_API, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey()}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    return { id: null, error: e instanceof Error ? e.message : "No se pudo conectar con Resend" };
   }
 
-  return nodemailer.createTransport({
-    host: destino,
-    port: Number(port),
-    secure: Number(port) === 465,
-    auth: { user, pass },
-    connectionTimeout: 20000, // 20s: falla rápido en vez de colgarse
-    greetingTimeout: 20000,
-    tls: { servername: host },
-  });
+  const data = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
+  if (!res.ok) {
+    return { id: null, error: data.message || `Resend respondió HTTP ${res.status}` };
+  }
+  return { id: data.id ?? null, error: null };
 }
 
 export async function enviarCorreoMasivo(
@@ -55,11 +65,11 @@ export async function enviarCorreoMasivo(
   asunto: string,
   html: string
 ): Promise<void> {
-  const transport = await getTransport();
-  const from = process.env.MAIL_FROM || process.env.SMTP_USER;
-  await Promise.all(
-    destinatarios.map((to) => transport.sendMail({ from, to, subject: asunto, html }))
-  );
+  // Un envío por destinatario (no se revela la lista entre ellos).
+  for (const to of destinatarios) {
+    const r = await enviarResend([to], asunto, html);
+    if (r.error) throw new Error(r.error);
+  }
 }
 
 // Envía un correo (a uno o varios destinatarios en el mismo mensaje) con un
@@ -70,48 +80,27 @@ export async function enviarCorreoConAdjunto(
   html: string,
   adjunto: { filename: string; content: Buffer; contentType?: string }
 ): Promise<void> {
-  const transport = await getTransport();
-  const from = process.env.MAIL_FROM || process.env.SMTP_USER;
-  await transport.sendMail({
-    from,
-    to: destinatarios.join(","),
-    subject: asunto,
-    html,
-    attachments: [{ filename: adjunto.filename, content: adjunto.content, contentType: adjunto.contentType ?? "application/pdf" }],
-  });
+  const r = await enviarResend(destinatarios, asunto, html, [adjunto]);
+  if (r.error) throw new Error(r.error);
 }
 
 export interface ResultadoEnvioIndividual {
-  // true solo si el SMTP confirmó aceptar ESE destinatario puntual (no basta
-  // con que sendMail() no haya lanzado una excepción — un servidor puede
-  // "aceptar la conexión" y aun así rechazar la dirección en `rejected`).
   aceptado: boolean;
   messageId: string | null;
   respuestaServidor: string | null;
 }
 
-// Mismo transporte que enviarCorreoMasivo() — no es un sistema de correo
-// nuevo, es la variante de UN destinatario que sí expone lo necesario para
-// confirmar aceptación real (ver SentMessageInfo en
-// @types/nodemailer/lib/smtp-transport). enviarCorreoMasivo() no se toca.
+// Variante de UN destinatario que confirma la aceptación (Resend devuelve un id
+// cuando aceptó el envío).
 export async function enviarCorreoIndividual(
   destinatario: string,
   asunto: string,
   html: string
 ): Promise<ResultadoEnvioIndividual> {
-  const transport = await getTransport();
-  const from = process.env.MAIL_FROM || process.env.SMTP_USER;
-  const info = await transport.sendMail({ from, to: destinatario, subject: asunto, html });
-
-  const objetivo = destinatario.trim().toLowerCase();
-  const aceptado = info.accepted.some((a) => {
-    const direccion = typeof a === "string" ? a : a.address;
-    return direccion.trim().toLowerCase() === objetivo;
-  });
-
+  const r = await enviarResend([destinatario], asunto, html);
   return {
-    aceptado,
-    messageId: info.messageId ?? null,
-    respuestaServidor: info.response ?? null,
+    aceptado: !r.error && !!r.id,
+    messageId: r.id,
+    respuestaServidor: r.error,
   };
 }
