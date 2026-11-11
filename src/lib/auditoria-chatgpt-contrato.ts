@@ -184,11 +184,16 @@ function resultadoError(codigo: CodigoDiagnostico, campo: string, mensaje: strin
 //   4. Comillas dobles SIN ESCAPAR dentro del texto — la causa del error
 //      "Expected ',' or '}' after property value": p. ej. una evidencia como
 //      «el agente dijo "buenos días"» cierra la cadena antes de tiempo.
+//   5. Bloque TRUNCADO: ChatGPT corta la respuesta y deja sin cerrar la(s)
+//      última(s) llave(s)/corchete(s) — o incluso una cadena a medias.
 //
-// Esta función hace UN recorrido carácter a carácter y repara esos cuatro
-// casos de forma determinística. NO ejecuta nada ni adivina valores: solo
-// endereza la sintaxis para que JSON.parse pueda leer el mismo contenido.
-// Es un ÚLTIMO RECURSO: solo se invoca cuando el parseo directo falla.
+// Esta función hace UN recorrido carácter a carácter llevando la profundidad
+// real de llaves/corchetes (fuera de cadenas) y repara esos casos de forma
+// determinística: termina cuando la raíz se cierra (descartando prosa
+// posterior) y, si el texto se acabó con estructuras abiertas, las cierra. NO
+// ejecuta nada ni adivina valores: solo endereza la sintaxis para que
+// JSON.parse pueda leer el mismo contenido. Es un ÚLTIMO RECURSO: solo se
+// invoca cuando el parseo directo falla.
 // ============================================================
 export function repararJsonChatGPT(entrada: string): string {
   let s = (entrada ?? "").replace(/^﻿/, "").trim();
@@ -197,13 +202,15 @@ export function repararJsonChatGPT(entrada: string): string {
   const cerco = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (cerco) s = cerco[1].trim();
 
-  // 2. Recortar a lo que hay entre la primera "{" y la última "}".
+  // 2. Empezar desde la primera "{" (descarta prosa anterior). El final se
+  //    decide por la profundidad real, no por la última "}" (que en un bloque
+  //    truncado puede ser la de un objeto interno, no la raíz).
   const ini = s.indexOf("{");
-  const fin = s.lastIndexOf("}");
-  if (ini !== -1 && fin > ini) s = s.slice(ini, fin + 1);
+  if (ini > 0) s = s.slice(ini);
 
   const out: string[] = [];
   let enString = false;
+  const pila: string[] = []; // llaves/corchetes abiertos fuera de cadena
   const esEspacio = (c: string) => c === " " || c === "\t" || c === "\r" || c === "\n";
 
   for (let i = 0; i < s.length; i++) {
@@ -241,6 +248,13 @@ export function repararJsonChatGPT(entrada: string): string {
 
     // Fuera de cadena:
     if (ch === '"') { enString = true; out.push('"'); continue; }
+    if (ch === "{" || ch === "[") { pila.push(ch); out.push(ch); continue; }
+    if (ch === "}" || ch === "]") {
+      if (pila.length) pila.pop();
+      out.push(ch);
+      if (pila.length === 0) break; // raíz cerrada → ignora cualquier prosa posterior
+      continue;
+    }
     if (ch === ",") {
       // 2. Coma colgante antes de "}" o "]" → omitir.
       let j = i + 1;
@@ -250,6 +264,18 @@ export function repararJsonChatGPT(entrada: string): string {
       continue;
     }
     out.push(ch);
+  }
+
+  // 5. Cierre tolerante de un bloque truncado.
+  if (enString) out.push('"'); // cadena sin cerrar
+  if (pila.length > 0) {
+    // Quitar coma/espacios colgantes del final antes de cerrar estructuras.
+    while (out.length) {
+      const ult = out[out.length - 1];
+      if (ult === "," || ult === " " || ult === "\t" || ult === "\r" || ult === "\n") out.pop();
+      else break;
+    }
+    for (let k = pila.length - 1; k >= 0; k--) out.push(pila[k] === "{" ? "}" : "]");
   }
 
   return out.join("");

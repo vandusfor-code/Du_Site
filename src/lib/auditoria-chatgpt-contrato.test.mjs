@@ -66,8 +66,9 @@ test("1. Importación válida → ok, datos mapeados, nota oficial 100/OK", () =
   assert.equal(r.evidencias.saludo, "Buenos días, habla con...");
 });
 
-test("2. JSON mal formado → error json_malformado, datos null", () => {
-  const r = parseAuditoriaChatGPT('{ "formato": "AUDITORIA_CO_V1", ');
+test("2. JSON irreparable (sintaxis sin arreglo posible) → error json_malformado, datos null", () => {
+  // Dos puntos seguidos no es un defecto que la reparación invente valores para arreglar.
+  const r = parseAuditoriaChatGPT('{ "formato": "AUDITORIA_CO_V1" : : }');
   assert.equal(r.ok, false);
   assert.equal(r.datos, null);
   assert.equal(erroresDe(r)[0].codigo, "json_malformado");
@@ -351,6 +352,39 @@ test("33. El prompt deja claro el 'No aplica' para llamadas cortas/cortadas (enc
   assert.match(p, /interacciones que NO se desarrollan|se cortan/i);
   assert.match(p, /el usuario colg/i);
   assert.match(p, /No aplica/);
+});
+
+test("33b. Bloque TRUNCADO sin la } final (caso real) → se cierra y se interpreta", () => {
+  // Réplica del defecto real: ChatGPT cortó la salida sin cerrar el objeto raíz.
+  // Evidencias con comillas simples (como pide el prompt), sin } final.
+  const truncado = `{
+  "formato": "AUDITORIA_CO_V1",
+  "version": 1,
+  "criterios": {
+    "saludo": { "resultado": "No cumple", "evidencia": "no pregunta el nombre" },
+    "empatia": { "resultado": "No cumple", "evidencia": "no reconoce la urgencia" },
+    "sonrisa": { "resultado": "Cumple", "evidencia": "dice 'con mucho gusto le colaboro'" },
+    "claridad": { "resultado": "No cumple", "evidencia": "explicacion confusa" },
+    "encuesta": { "resultado": "Cumple", "evidencia": "dice 'le dejo una breve encuesta'" },
+    "informacion": { "resultado": "Cumple", "evidencia": "indica el formato y los tiempos" },
+    "proceso": { "resultado": "Cumple", "evidencia": "orienta el tramite paso a paso" },
+    "cierre": { "resultado": "No cumple", "evidencia": "no menciona su nombre al despedirse" }
+  },
+  "puntaje_tuteo": "Tuteo real",
+  "observacion": "orienta sobre la actualizacion de datos",
+  "hallazgos": "falta empatia y claridad; usa tuteo",
+  "puntos_mejora": "mantener el usted y despedirse con el nombre",
+  "nota_propuesta": 75,
+  "clasificacion_propuesta": "Requiere mejora"`;
+  assert.throws(() => JSON.parse(truncado)); // sin la } final, falla directo
+  const r = parseAuditoriaChatGPT(truncado);
+  assert.equal(r.ok, true, JSON.stringify(erroresDe(r)));
+  assert.equal(r.datos.saludo, "No cumple");
+  assert.equal(r.datos.encuesta, "Cumple");
+  assert.equal(r.datos.cierre, "No cumple");
+  // 2 Cumple de 6 que puntúan (sonrisa, encuesta) → 4 incumplimientos → PENC.
+  assert.equal(r.notaCalculada.tipoNota, "PENC");
+  assert.ok(advertenciasDe(r).some((d) => d.codigo === "json_reparado"));
 });
 
 test("34. 'No aplica' en encuesta Y cierre por llamada cortada → ok, se excluyen de la nota", () => {
