@@ -12,6 +12,7 @@ import Terminal from "./Terminal";
 import { useCuenta, useRsvp } from "./hooks";
 import { Musica, Silencio, Terminal as IcTerminal } from "./icons";
 import { despertar, setSonido, sonidoActivo, sfx } from "./audio";
+import { iniciar as iniciarMusica, preparar as prepararMusica } from "./musica";
 
 const Mundo = dynamic(() => import("./Mundo"), { ssr: false });
 
@@ -52,6 +53,23 @@ export default function Invitacion(props: InvProps) {
     setAlta(equipoPotente());
     setSnd(sonidoActivo());
   }, []);
+
+  // la canción (si hay) se deja lista; empieza a sonar cuando el invitado desliza después de la compilación
+  useEffect(() => {
+    if (cfg.cancion) prepararMusica(cfg.cancion);
+  }, [cfg.cancion]);
+  useEffect(() => {
+    if (fase !== "pagina" || !cfg.cancion) return;
+    const h = () => {
+      if (window.scrollY > 40) {
+        window.removeEventListener("scroll", h);
+        iniciarMusica();
+      }
+    };
+    window.addEventListener("scroll", h, { passive: true });
+    h();
+    return () => window.removeEventListener("scroll", h);
+  }, [fase, cfg.cancion]);
 
   // bloquear scroll mientras dura la portada y la compilación
   useEffect(() => {

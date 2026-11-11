@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CumpleCfg } from "./config";
 import { Chevron, Codigo, Musica, Silencio } from "./icons";
 import { despertar, setSonido, sonidoActivo } from "./audio";
+import { desbloquear } from "./musica";
 
 const CoverScene = dynamic(() => import("./CoverScene"), { ssr: false });
 
@@ -48,6 +49,7 @@ export default function Portada({ cfg, onAbierto }: { cfg: CumpleCfg; onAbierto:
 
   const empezar = () => {
     despertar();
+    desbloquear();
     // iOS pide permiso explícito para el giroscopio (debe ir dentro de un toque)
     const DO = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
     if (DO && typeof DO.requestPermission === "function") DO.requestPermission().catch(() => {});

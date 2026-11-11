@@ -170,6 +170,24 @@ export default function Admin({ adminKey }: { adminKey: string }) {
     e.target.value = "";
   };
 
+  const subirCancion = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    if (f.size > 8 * 1024 * 1024) return aviso("La canción pesa más de 8 MB. Comprímela e inténtalo de nuevo.", true);
+    if (!/audio\/(mpeg|mp4|x-m4a)|\.(mp3|m4a)$/i.test(f.type + f.name)) return aviso("Sube un archivo MP3 o M4A", true);
+    const m4a = /m4a|mp4/i.test(f.type + f.name);
+    aviso("Subiendo canción…");
+    try {
+      const url = await subirArchivo(new Blob([f], { type: m4a ? "audio/mp4" : "audio/mpeg" }), "cumple", m4a ? "m4a" : "mp3");
+      setCfg((c) => ({ ...c, cancion: url, cancionNombre: f.name.replace(/\.[^.]+$/, "").slice(0, 80) }));
+      setDirty(true);
+      aviso("Canción lista: recuerda guardar los cambios");
+    } catch (err) {
+      aviso("No se pudo subir: " + ((err as Error).message || "error"), true);
+    }
+  };
+
   /* ---------- modal ---------- */
   const pedir = (m: Omit<NonNullable<typeof modal>, "res">) => new Promise<Record<string, string> | null>((res) => setModal({ ...m, res }));
 
@@ -443,6 +461,21 @@ export default function Admin({ adminKey }: { adminKey: string }) {
                 </div>
               ))}
               <button className="ad-btn sec" onClick={() => { setCfg((c) => ({ ...c, llevar: [...c.llevar, { ic: "otro", t: "", d: "" }] })); setDirty(true); }}>+ Agregar</button>
+            </section>
+
+            <section className="ad-sec">
+              <h2>Música <small>opcional</small></h2>
+              {cfg.cancion ? (
+                <div className="ad-cancion">
+                  <b>{cfg.cancionNombre || "Tu canción"}</b>
+                  <audio controls src={cfg.cancion} preload="none" />
+                  <button className="ad-lnk mal" onClick={() => { setCfg((c) => ({ ...c, cancion: "", cancionNombre: "" })); setDirty(true); }}>Quitar canción</button>
+                </div>
+              ) : (
+                <p className="ad-sub" style={{ margin: "0 0 12px" }}>Aún no hay canción: la invitación se verá solo con los efectos de sonido.</p>
+              )}
+              <label>{cfg.cancion ? "Cambiar canción (MP3)" : "Subir canción (MP3)"}<input type="file" accept="audio/mpeg,audio/mp4,.mp3,.m4a" onChange={subirCancion} /></label>
+              <p className="ad-sub">Máximo 8 MB. Empieza a sonar cuando el invitado desliza después de la compilación; los efectos (terminal, clics, confeti) siguen sonando de fondo. El invitado puede silenciarla con el botón de sonido.</p>
             </section>
 
             <section className="ad-sec">

@@ -8,7 +8,8 @@ import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PalmCluster, Hibiscus } from "./Foliage";
 import { glifoTextura, papelBump, selloTexturas, cartaTextura, PantallaCodigo, etiquetaTextura, glowTextura } from "./textures";
-import { sfx } from "./audio";
+import { despertar, sfx } from "./audio";
+import { desbloquear } from "./musica";
 
 export interface CoverProps {
   letra: string;
@@ -322,6 +323,8 @@ function Escena({ p }: { p: CoverProps }) {
                 position={[0, 0, 0.1]}
                 onPointerDown={(e) => {
                   e.stopPropagation();
+                  despertar();
+                  desbloquear();
                   st.current.sostiene = true;
                 }}
                 onPointerUp={() => (st.current.sostiene = false)}

@@ -26,8 +26,14 @@ function ac(): Ctx | null {
 }
 
 export const sonidoActivo = () => activo;
+const oyentes = new Set<(v: boolean) => void>();
+export const alCambiarSonido = (f: (v: boolean) => void) => {
+  oyentes.add(f);
+  return () => void oyentes.delete(f);
+};
 export function setSonido(v: boolean) {
   activo = v;
+  oyentes.forEach((f) => f(v));
   try {
     localStorage.setItem(KEY, v ? "1" : "0");
   } catch {}

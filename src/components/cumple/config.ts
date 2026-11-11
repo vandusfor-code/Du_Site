@@ -35,6 +35,7 @@ export interface CumpleCfg {
   finalTexto: string;
   finalCodigo: string;
   cancion: string;
+  cancionNombre: string;
   compila: string[];
 }
 
@@ -68,6 +69,7 @@ export const DEFAULTS: CumpleCfg = {
   finalTexto: "Será una noche para celebrar la vida, los logros, los amigos y todo lo que viene en este nuevo capítulo.",
   finalCodigo: "Buena compañía, risas y grandes historias",
   cancion: "",
+  cancionNombre: "",
   compila: [
     "Compilando birthday.exe...",
     "Cargando modo *costeño*...",
