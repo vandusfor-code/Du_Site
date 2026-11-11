@@ -6,6 +6,7 @@ const serif = Fraunces({ subsets: ["latin"], style: ["normal", "italic"], axes: 
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--cm-mono", display: "swap" });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.duacademy.site"),
   title: "THE NEXT CHAPTER · Cumpleaños de Duvan",
   description: "Una invitación interactiva para celebrar una nueva vuelta al sol.",
   robots: { index: false, follow: false },
