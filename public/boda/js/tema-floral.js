@@ -225,26 +225,31 @@ function portadaLazo(root, cfg, guest) {
   c.setAttribute("role", "button");
   c.setAttribute("tabindex", "0");
   c.setAttribute("aria-label", "Abrir la invitación");
+  // el lienzo con el lazo es una pieza aparte (recorte de la foto) para poder caer solo
+  const lienzo = new URL("../img/lazo-lienzo.webp", import.meta.url).href;
   c.innerHTML = `<div class="f-escena">
     <div class="f-puerta izq">${arte(cfg, guest)}</div>
     <div class="f-puerta der">${arte(cfg, guest)}</div>
-  </div>`;
+  </div>
+  <div class="f-lienzo" aria-hidden="true"><div class="f-lienzo-in"><img alt="" src="${lienzo}" draggable="false"></div></div>`;
   document.body.appendChild(c);
   const prev = document.body.style.overflow;
   document.body.style.overflow = "hidden";
   const quitar = () => { document.body.style.overflow = prev; c.remove(); };
   let abierto = false;
-  const t = reducido() ? [0, 150, 600, 800] : [850, 850, 2300, 3200];
+  // [cae el lienzo, se abren las puertas, se libera el scroll, se retira la portada]
+  const t = reducido() ? [0, 150, 500, 700] : [650, 1750, 3400, 4300];
   const abrir = () => {
     if (abierto) return;
     abierto = true;
-    c.classList.add("suelta");                       // pequeño tirón: el lazo se afloja
-    setTimeout(() => {                               // las puertas se abren
+    c.classList.add("suelta");                       // el nudo se afloja
+    setTimeout(() => c.classList.add("cae"), t[0]);  // el lienzo cae con suavidad
+    setTimeout(() => {                               // y se abre la segunda pantalla
       c.classList.add("abre");
       root.classList.add("listo");
       const a = root.querySelector("#audio");
       if (a) a.play().catch(() => {});
-    }, t[0]);
+    }, t[1]);
     setTimeout(() => { document.body.style.overflow = prev; }, t[2]);
     setTimeout(() => c.remove(), t[3]);
   };
