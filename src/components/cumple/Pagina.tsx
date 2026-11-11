@@ -172,7 +172,7 @@ function Anfitrion({ cfg }: { cfg: CumpleCfg }) {
             <K c="const" /> cumpleaños = {"{"}
           </>,
           <>
-            &nbsp;&nbsp;version: <S c={String(cfg.edad)} />,
+            &nbsp;&nbsp;version: <S c={cfg.version} />,
           </>,
           <>
             &nbsp;&nbsp;motivo: <S c={cfg.motivo} />,

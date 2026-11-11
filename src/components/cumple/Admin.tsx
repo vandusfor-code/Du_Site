@@ -391,7 +391,6 @@ export default function Admin({ adminKey }: { adminKey: string }) {
               <label>Nombre completo<input value={cfg.anfitrion} onChange={(e) => set("anfitrion", e.target.value)} /></label>
               <div className="dos">
                 <label>Nombre corto<input value={cfg.corto} onChange={(e) => set("corto", e.target.value)} /></label>
-                <label>Versión (tu edad)<input type="number" min={1} max={120} value={cfg.edad} onChange={(e) => set("edad", Number(e.target.value) || 0)} /></label>
               </div>
               <div className="dos">
                 <label>Versión<input value={cfg.version} onChange={(e) => set("version", e.target.value)} /></label>
