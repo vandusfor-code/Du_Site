@@ -228,10 +228,12 @@ export default function AuditoriaChatGPTForm({
     setEstado("importar");
   }
 
-  // Nueva auditoría tras guardar: conserva asesor y fecha; limpia el ID (cada
-  // interacción tiene uno distinto) para no chocar con la protección de duplicados.
+  // Nueva auditoría tras guardar, TODO DE CERO: limpia asesor, ID, fecha (hoy) y
+  // el bloque, para arrancar una auditoría nueva desde el principio.
   function nuevaAuditoria() {
+    setAsesorSel("");
     setIdGestionManual("");
+    setFechaSel(hoyBogotaISO());
     volverAImportar();
   }
 
@@ -241,10 +243,11 @@ export default function AuditoriaChatGPTForm({
       <section className={`${styles.panel} ${styles.manualForm}`}>
         <h2><CheckCircle2 size={18} /> Auditoría ChatGPT</h2>
         <div className={styles.gptSuccess}>
-          <CheckCircle2 size={34} />
-          <p>{guardadoMsg || "Auditoría guardada correctamente."}</p>
+          <CheckCircle2 size={44} />
+          <h3 style={{ margin: "8px 0 2px", fontSize: 20 }}>¡Auditoría guardada! ✅</h3>
+          <p>{guardadoMsg || "La auditoría se registró correctamente."}</p>
           <button className={styles.primary} onClick={nuevaAuditoria}>
-            <ClipboardList size={16} /> Importar otra auditoría
+            <ClipboardList size={16} /> Hacer otra auditoría (empezar de cero)
           </button>
         </div>
       </section>
