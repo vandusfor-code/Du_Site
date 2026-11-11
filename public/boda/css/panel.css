@@ -454,3 +454,63 @@
 .adm .savebar{transform:translateY(calc(100% + 130px))}
 .adm .savebar.on{transform:none}
 .adm .savebar-in{border-radius:18px 18px 0 0}
+
+/* =====================================================================
+   PANEL · sistema tipográfico único (Plus Jakarta Sans), sobrio y limpio
+   Sin cursivas decorativas, sin ramas ni adornos: jerarquía por peso y tamaño.
+   ===================================================================== */
+.adm,.dlg,#toast,.prev-wrap,.centro{
+  --serif:'Plus Jakarta Sans','Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --sans:'Plus Jakarta Sans','Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --txt:#201A1C; --txt2:#756A6D; --line:#EFE4E0;
+}
+.adm{font-feature-settings:"ss01","cv11";letter-spacing:-.005em}
+
+/* barra superior */
+.adm .top-in{height:60px}
+.adm .mono{font-family:var(--sans);font-weight:800;font-size:1.05rem;letter-spacing:-.02em;color:var(--olive);padding:6px 10px;border-radius:10px;background:#F4E2E3}
+.adm .mono i{font-style:normal;font-weight:700;margin:0 2px;color:var(--olive-s);font-size:1em}
+.adm .vsep{display:none}
+.adm .tag{font-family:var(--sans);font-style:normal;font-weight:600;font-size:.9rem;color:var(--txt2)}
+.adm .pill{height:40px;font-weight:600;font-size:.84rem;border-color:var(--line);background:#fff}
+
+/* titulares de cada pestaña: compactos, sin adornos */
+.adm .edhead{padding:22px 20px 18px}
+.adm .edhead .rama{display:none}
+.adm .regla{display:none}
+.adm .eyebrow{font-size:.68rem;font-weight:700;letter-spacing:.14em;color:var(--olive-s)}
+.adm .edhead h1{margin:6px 0 4px;font-family:var(--sans);font-weight:800;font-size:clamp(1.6rem,7.4vw,2.05rem);line-height:1.12;letter-spacing:-.03em;max-width:none}
+.adm .edhead h1.una-linea{white-space:normal}
+.adm .edhead h1 i{font-style:normal;font-weight:600;color:var(--olive-s);margin:0 .1em}
+.adm .edhead p{font-size:.92rem;line-height:1.5;max-width:none;color:var(--txt2)}
+
+/* tarjetas de sección */
+.adm .sec{margin:0 14px 12px;padding:18px 16px 20px;background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:0 1px 2px rgba(80,35,45,.04)}
+.adm .sec-h{gap:12px;align-items:center;margin-bottom:16px}
+.adm .sec-ic{width:42px;height:42px;margin:0;border-radius:13px;background:#F6E8E8;color:var(--olive)}
+.adm .sec-ic svg{width:22px;height:22px}
+.adm .sec h2{font-family:var(--sans);font-style:normal;font-weight:700;font-size:1.05rem;letter-spacing:-.015em;line-height:1.2}
+.adm .sec-h p{margin:2px 0 0;font-size:.8rem;line-height:1.4}
+.adm .f>span{font-weight:600;font-size:.78rem;color:var(--txt);letter-spacing:0}
+.adm input[type=text],.adm input[type=url],.adm input[type=time],.adm input[type=number],.adm textarea,.adm select,.adm .fecha-f{border-radius:12px;border-color:var(--champ);background:#FFFDFC;font-weight:500;font-size:.96rem}
+.adm .btn-main{border-radius:16px;min-height:54px;font-weight:700;letter-spacing:0}
+.adm .btn{font-weight:700;letter-spacing:0}
+
+/* listas */
+.adm .lista-t{font-family:var(--sans);font-style:normal;font-weight:700;font-size:1.05rem;letter-spacing:-.015em;margin:24px 20px 8px}
+.adm .lista-t em{font-weight:700;padding:2px 8px;border-radius:999px;background:#F4E2E3;color:var(--olive);font-size:.72rem}
+.adm .ti .nom{font-family:var(--sans);font-weight:700;font-size:1rem;letter-spacing:-.01em;line-height:1.25}
+.adm .ti .meta{font-size:.78rem}
+.adm .vista>.lista{background:#fff;border:1px solid var(--line);border-radius:20px;padding:4px 16px}
+.adm .stat b{font-family:var(--sans);font-weight:800}
+
+/* resumen */
+.adm .kpi{border-radius:20px}
+.adm .kpi b{font-weight:800;letter-spacing:-.04em}
+.adm .cuenta h3{font-size:.64rem;letter-spacing:.16em}
+.adm .cd-row b{font-weight:800;letter-spacing:-.02em;border-radius:12px}
+.adm .rec h3{font-size:.95rem;letter-spacing:-.01em}
+
+/* crédito */
+.adm .pie-credito{border-top:0;margin-top:26px;font-size:.66rem;letter-spacing:.16em;color:#A39698}
+.adm .pie-credito b{font-family:var(--sans);font-style:normal;font-weight:700;font-size:.82rem;letter-spacing:0;color:var(--olive)}

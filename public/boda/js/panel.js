@@ -461,8 +461,8 @@ export async function iniciarPanel(root, key) {
     const estado = !guardadoAlgunaVez ? ["En preparación", "gotab"] : falta.length ? [`Faltan ${falta.length} ${falta.length === 1 ? "dato" : "datos"}`, "gotab"] : ["Lista para enviar", "preview"];
     const t = objetivo();
     const cuenta = t == null ? "" : t - Date.now() <= 0
-      ? `<div class="cuenta"><h3>♡ El gran día ya llegó ♡</h3></div>`
-      : `<div class="cuenta" id="cd"><h3>♡ Cuenta atrás para el gran día ♡</h3><div class="cd-row"><div><b data-cd>0</b><span>Días</span></div><i>:</i><div><b data-cd>00</b><span>Horas</span></div><i>:</i><div><b data-cd>00</b><span>Min</span></div><i>:</i><div><b data-cd>00</b><span>Seg</span></div></div></div>`;
+      ? `<div class="cuenta"><h3>El gran día ya llegó</h3></div>`
+      : `<div class="cuenta" id="cd"><h3>Cuenta atrás para el gran día</h3><div class="cd-row"><div><b data-cd>0</b><span>Días</span></div><i>:</i><div><b data-cd>00</b><span>Horas</span></div><i>:</i><div><b data-cd>00</b><span>Min</span></div><i>:</i><div><b data-cd>00</b><span>Seg</span></div></div></div>`;
     const pend = n.listaPend.slice(0, 4);
     const rec = i => `<div class="rec-f"><div><b>${esc(i.nombre)}</b><small>${i.visto ? "Ya abrió su invitación" : "Aún no la abre"}</small></div><a class="btn chico" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent("Hola " + i.nombre + " 💌 Te recordamos confirmar tu asistencia a la boda de " + nombreCorto() + ". Tu invitación: " + enlace(i.codigo))}">Recordar</a></div>`;
     main.innerHTML = `<div class="vista">
