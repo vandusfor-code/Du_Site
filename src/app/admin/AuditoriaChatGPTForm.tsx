@@ -52,6 +52,7 @@ export default function AuditoriaChatGPTForm({
   const [avisos, setAvisos] = useState<string[]>([]); // discrepancias JSON vs formulario
   const [guardando, setGuardando] = useState(false);
   const [guardadoMsg, setGuardadoMsg] = useState("");
+  const [guardarError, setGuardarError] = useState(""); // error del guardado, visible junto al botón
   const [copiado, setCopiado] = useState<"ok" | "error" | null>(null);
 
   // Copia el prompt universal al portapapeles. NO altera el JSON, el asesor, el
@@ -176,6 +177,7 @@ export default function AuditoriaChatGPTForm({
   async function guardar() {
     if (!datos || guardando || !puedeGuardar) return;
     setGuardando(true);
+    setGuardarError("");
     try {
       const input: AuditoriaManualInput = {
         fecha: fechaSel, // fecha de registro de Du Site (hoy Bogotá por defecto)
@@ -203,7 +205,9 @@ export default function AuditoriaChatGPTForm({
       };
       const res = await guardarAuditoriaChatGPTAction(input);
       if (!res.ok) {
-        // Error real surfaceado como dato (no lo oculta producción).
+        // Error real surfaceado como dato (no lo oculta producción): se muestra
+        // AQUÍ, junto al botón, además del banner superior.
+        setGuardarError(res.error);
         onGuardado({ tipo: "error", msg: res.error });
         return;
       }
@@ -212,7 +216,9 @@ export default function AuditoriaChatGPTForm({
       onGuardado({ tipo: "ok", msg: `Auditoría ChatGPT guardada para ${asesorSel} — Nota ${res.nota} (${res.tipoNota}).` });
     } catch (e) {
       // Conserva bloque, asesor, ID y fecha para no obligar a reescribir.
-      onGuardado({ tipo: "error", msg: e instanceof Error ? e.message : "No se pudo guardar la auditoría." });
+      const msg = e instanceof Error ? e.message : "No se pudo guardar la auditoría.";
+      setGuardarError(msg);
+      onGuardado({ tipo: "error", msg });
     } finally {
       setGuardando(false);
     }
@@ -237,20 +243,39 @@ export default function AuditoriaChatGPTForm({
     volverAImportar();
   }
 
-  // ── Estado D: Guardado ──
+  // ── Estado D: Guardado → POP-UP emergente (overlay centrado, imposible de no ver) ──
   if (estado === "guardado") {
     return (
-      <section className={`${styles.panel} ${styles.manualForm}`}>
-        <h2><CheckCircle2 size={18} /> Auditoría ChatGPT</h2>
-        <div className={styles.gptSuccess}>
-          <CheckCircle2 size={44} />
-          <h3 style={{ margin: "8px 0 2px", fontSize: 20 }}>¡Auditoría guardada! ✅</h3>
-          <p>{guardadoMsg || "La auditoría se registró correctamente."}</p>
-          <button className={styles.primary} onClick={nuevaAuditoria}>
-            <ClipboardList size={16} /> Hacer otra auditoría (empezar de cero)
+      <div
+        role="dialog"
+        aria-modal="true"
+        style={{
+          position: "fixed", inset: 0, zIndex: 2000,
+          background: "rgba(15, 23, 42, 0.55)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }}
+        onClick={nuevaAuditoria}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: "#ffffff", color: "#0f172a", borderRadius: 18,
+            padding: "30px 28px 24px", maxWidth: 440, width: "100%", textAlign: "center",
+            boxShadow: "0 24px 70px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div style={{ color: "#16a34a", display: "flex", justifyContent: "center" }}>
+            <CheckCircle2 size={60} />
+          </div>
+          <h3 style={{ margin: "12px 0 6px", fontSize: 23 }}>¡Auditoría guardada! ✅</h3>
+          <p style={{ color: "#475569", margin: "0 0 22px", lineHeight: 1.45 }}>
+            {guardadoMsg || "La auditoría se registró correctamente y ya aparece en el historial."}
+          </p>
+          <button className={styles.primary} onClick={nuevaAuditoria} style={{ width: "100%", justifyContent: "center" }}>
+            <ClipboardList size={16} /> Hacer otra auditoría
           </button>
         </div>
-      </section>
+      </div>
     );
   }
 
@@ -465,6 +490,12 @@ export default function AuditoriaChatGPTForm({
             </div>
           </div>
         </>
+      )}
+
+      {guardarError && (
+        <div className={`${styles.banner} ${styles.bannerError}`} style={{ marginTop: 12 }}>
+          <b><AlertTriangle size={15} /> No se pudo guardar:</b> {guardarError}
+        </div>
       )}
 
       <div className={styles.formActions}>
