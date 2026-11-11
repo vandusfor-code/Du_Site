@@ -301,11 +301,19 @@ export function parseAuditoriaChatGPT(raw: string): ResultadoParseo {
       json = JSON.parse(repararJsonChatGPT(bruto));
       reparado = true;
     } catch (e2) {
+      // Pista de error frecuente: pegar la TRANSCRIPCIÓN en vez del JSON.
+      if (!bruto.includes("{")) {
+        return resultadoError(
+          "json_malformado",
+          "(bloque)",
+          "Esto no parece el JSON de ChatGPT (no contiene '{'). Parece que pegaste la transcripción. Pega la RESPUESTA de ChatGPT, que empieza con '{' y termina con '}'."
+        );
+      }
       const detalle = e2 instanceof Error ? e2.message : "formato no válido";
       return resultadoError(
         "json_malformado",
         "(bloque)",
-        `No se pudo interpretar el JSON, ni siquiera tras repararlo: ${detalle}. Revisa que ChatGPT haya devuelto solo el objeto JSON.`
+        `No se pudo interpretar el JSON, ni siquiera tras repararlo: ${detalle}. Revisa que ChatGPT haya devuelto solo el objeto JSON (empieza con '{' y termina con '}').`
       );
     }
   }
