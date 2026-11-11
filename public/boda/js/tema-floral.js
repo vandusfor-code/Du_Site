@@ -110,6 +110,13 @@ function render(root, cfg, guest, opts = {}) {
   root.innerHTML = `${A.DEFS}
   ${opts.preview ? `<div class="vista-previa">Vista previa: así verá tu invitación quien la reciba. Los botones de confirmación no guardan nada aquí.</div>` : ""}
 
+  <section class="f-portal">
+    <div class="f-portal-top">NUESTRA BODA</div>
+    ${monograma(cfg, "f-portal-mono")}
+    ${f ? `<div class="f-portal-fecha">${pad(f.D)} · ${pad(f.M)} · ${f.Y}</div>` : ""}
+    <div class="f-portal-sigue"><span>Desliza</span><i></i></div>
+  </section>
+
   <section class="f-hero">
     ${flor(0, "tl")}${flor(1, "br s2")}
     ${portada ? `<div class="f-arco f-arco-portada rev" data-a="zoom"><img src="${esc(portada)}" alt="Portada"></div>` : ""}
@@ -180,7 +187,7 @@ function render(root, cfg, guest, opts = {}) {
     ${finales.length ? `<div class="mosaico">${finales.map((s, i) => `<figure class="foto tiene rev" data-a="zoom" style="transition-delay:${(i * 0.14).toFixed(2)}s"><img src="${esc(s)}" alt="Foto" loading="lazy"></figure>`).join("")}</div>` : ""}
     <div class="f-rama">${A.ramaOro(8)}</div>
   </section>
-  <footer class="credito"><span>Diseño por</span><b>Duvan Ramos</b></footer>
+  <footer class="credito"><span>Diseñado por</span><b>Duván Ramos</b></footer>
   ${cfg.cancion ? `<button class="fab" id="fab" aria-label="Música">${A.iconoNota}</button>` : ""}`;
 
   root.querySelectorAll("[data-roto]").forEach(rasgar);
@@ -202,43 +209,36 @@ function render(root, cfg, guest, opts = {}) {
   return portadaLazo(root, cfg, guest);
 }
 
-/* ---------- entrada: puertas con monograma y lazo que se suelta ---------- */
-// Arabescos en relieve (blind emboss) de cada esquina; el giro va dentro del SVG para que la luz no se invierta
-const esquina = (n, fx, fy, pos) => `<svg class="f-esq ${pos}" viewBox="0 0 200 340" aria-hidden="true"><g filter="url(#relieve)"><g transform="translate(${fx ? 200 : 0} ${fy ? 340 : 0}) scale(${fx ? -1 : 1} ${fy ? -1 : 1})">${A.floritura(n)}</g></g></svg>`;
-
-function arte(cfg, guest, pies) {
+/* ---------- entrada: panel bordado (foto real) que se abre en dos puertas ---------- */
+function arte(cfg, guest) {
   const f = parseFecha(cfg.fecha);
   return `<div class="f-arte">
-    ${esquina(3, 0, 0, "tl")}${esquina(5, 1, 0, "tr")}${esquina(8, 0, 1, "bl")}${esquina(2, 1, 1, "br")}
-    <div class="f-c-bloque">
-      <div class="f-c-top">NUESTRA BODA</div>
-      ${monograma(cfg, "f-c-mono")}
-      ${f ? `<div class="f-c-fecha">${pad(f.D)}.${pad(f.M)}.${f.Y}</div>` : ""}
-    </div>
-    <div class="f-c-pista"><svg viewBox="0 0 70 60" aria-hidden="true"><path d="M60 52C34 56 12 44 22 26C28 15 40 22 34 30C30 36 22 30 26 22" fill="none" stroke="url(#gOro)" stroke-width="1.6" stroke-dasharray="3 5" stroke-linecap="round"/><path d="M22 18l8 4-9 7z" fill="url(#gOro)"/></svg><span>TOCA EL LAZO PARA<br>ABRIR LA INVITACIÓN</span></div>
-    ${guest ? `<div class="f-c-cupos"><div class="f-c-ico">${A.iconoPersonas}</div><span>HEMOS RESERVADO</span><b>${guest.pases}</b><span>${guest.pases === 1 ? "CUPO" : "CUPOS"} PARA TI</span></div>` : ""}
+    <div class="f-foto"></div>
+    ${guest ? `<div class="f-c-cupos"><span>Hemos reservado</span><b>${guest.pases}</b><span>${guest.pases === 1 ? "cupo" : "cupos"} para ti</span></div>` : ""}
+    <div class="f-c-toca"><i></i><span>Toca la invitación para abrirla</span></div>
   </div>`;
 }
 
 function portadaLazo(root, cfg, guest) {
   const c = document.createElement("div");
   c.className = "f-cover";
-  c.innerHTML = `${A.DEFS}${A.DEFS_REAL}<div class="f-escena">
+  c.setAttribute("role", "button");
+  c.setAttribute("tabindex", "0");
+  c.setAttribute("aria-label", "Abrir la invitación");
+  c.innerHTML = `<div class="f-escena">
     <div class="f-puerta izq">${arte(cfg, guest)}</div>
     <div class="f-puerta der">${arte(cfg, guest)}</div>
-    <div class="f-cinta"></div>
-    <button class="f-lazo" aria-label="Abrir la invitación">${A.lazoSatin()}</button>
   </div>`;
   document.body.appendChild(c);
   const prev = document.body.style.overflow;
   document.body.style.overflow = "hidden";
   const quitar = () => { document.body.style.overflow = prev; c.remove(); };
   let abierto = false;
-  const t = reducido() ? [0, 150, 600, 800] : [1500, 1500, 2600, 3500];
+  const t = reducido() ? [0, 150, 600, 800] : [850, 850, 2300, 3200];
   const abrir = () => {
     if (abierto) return;
     abierto = true;
-    c.classList.add("suelta");                       // el lazo se suelta y cae
+    c.classList.add("suelta");                       // pequeño tirón: el lazo se afloja
     setTimeout(() => {                               // las puertas se abren
       c.classList.add("abre");
       root.classList.add("listo");
@@ -249,7 +249,7 @@ function portadaLazo(root, cfg, guest) {
     setTimeout(() => c.remove(), t[3]);
   };
   c.addEventListener("click", abrir);
-  c.querySelector(".f-lazo").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(); } });
+  c.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(); } });
   return quitar;
 }
 

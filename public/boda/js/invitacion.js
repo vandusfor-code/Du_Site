@@ -155,7 +155,7 @@ export function renderInvitacion(root, cfg, guest, opts = {}) {
     <h2 class="titulo">¡Te esperamos!</h2>
     ${mosaico.length ? `<div class="mosaico">${mosaico.map((s, i) => foto(s, "Foto", `style="transition-delay:${(i * 0.14).toFixed(2)}s"`, true)).join("")}</div>` : ""}
   </section>
-  <footer class="credito"><span>Diseño por</span><b>Duvan Ramos</b></footer>
+  <footer class="credito"><span>Diseñado por</span><b>Duván Ramos</b></footer>
   ${cfg.cancion ? `<button class="fab" id="fab" aria-label="Música">${IC_NOTA}</button>` : ""}`;
 
   root.querySelectorAll("[data-roto]").forEach(rasgar);

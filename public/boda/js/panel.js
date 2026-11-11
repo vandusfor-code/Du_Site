@@ -266,7 +266,7 @@ export async function iniciarPanel(root, key) {
     return f;
   }
 
-  const pie = () => `<p class="pie-credito"><span>Diseño por</span> <b>Duvan Ramos</b></p>`;
+  const pie = () => `<p class="pie-credito"><span>Diseñado por</span> <b>Duván Ramos</b></p>`;
   const cabecera = (eyebrow, titulo, sub, cls = "") => `<div class="edhead">${ramaOlivo()}<div class="eyebrow">${eyebrow}</div><h1 class="${cls}">${titulo}</h1><p>${sub}</p><div class="regla"></div></div>`;
 
   function pintarDatos() {

@@ -346,3 +346,76 @@
 .inv.floral .f-orn{width:104px;margin:0 auto 10px}
 .inv.floral .f-orn svg{display:block;width:100%}
 .inv.floral .f-hero{padding-bottom:40px}
+
+/* ===== lazo de tela (lino con bordes deshilachados y perlas), sin cinta ===== */
+.f-cinta{display:none}
+.f-cinta,.f-lazo{top:50%}
+.f-lazo{width:min(92vw,380px,52vh);transform:translate(-50%,-50%);animation:lz-respira 3.4s ease-in-out infinite;filter:none}
+.f-lazo svg{width:100%;height:auto}
+@keyframes lz-respira{0%,100%{transform:translate(-50%,-50%) rotate(-.6deg) scale(1)}50%{transform:translate(-50%,-50%) rotate(.8deg) scale(1.025)}}
+@keyframes lz-cae{
+  0%{transform:translate(-50%,-50%) rotate(0) scale(1)}
+  12%{transform:translate(-50%,-52%) rotate(-5deg) scale(1.04)}
+  28%{transform:translate(-50%,-48%) rotate(4deg) scale(1.03)}
+  42%{transform:translate(-50%,-46%) rotate(-2deg) scale(1.01)}
+  100%{transform:translate(-38%,92vh) rotate(24deg) scale(.92);opacity:.15}}
+.f-c-pista{top:70%}
+.f-c-cupos{top:79.5%}
+
+/* =====================================================================
+   ENTRADA CON FOTO REAL: panel bordado marfil con rosas, perlas y lazo de lino
+   (la imagen trae el lazo; cada mitad es una puerta que se abre en 3D)
+   ===================================================================== */
+.f-cover{background:#CBC4B5}
+.f-puerta,.f-puerta.der{background-image:none;background-color:#E7E1D3}
+.f-puerta.izq{box-shadow:inset -3px 0 4px -2px rgba(60,48,30,.35),inset 2px 0 3px -2px rgba(60,48,30,.2)}
+.f-puerta.der{box-shadow:inset 3px 0 4px -2px rgba(60,48,30,.35),inset -2px 0 3px -2px rgba(60,48,30,.2)}
+.f-foto{position:absolute;inset:0;background:url("../img/panel-marfil.webp") center/cover no-repeat}
+
+/* placa con el monograma, sobre el bordado */
+.f-c-placa{position:absolute;left:50%;top:5.5%;transform:translateX(-50%);z-index:3;width:min(46vw,176px);aspect-ratio:1;border-radius:50%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  background:rgba(252,249,243,.94);box-shadow:0 8px 22px rgba(50,40,25,.3),inset 0 0 0 1px rgba(201,165,92,.75),inset 0 0 0 5px rgba(252,249,243,.94),inset 0 0 0 6px rgba(201,165,92,.35)}
+.f-c-placa .f-c-mono{width:66%;height:auto;display:block}
+.f-c-placa .f-c-mono.f-mono-txt{width:auto;font-size:2.6rem}
+.f-c-placa .f-c-fecha{margin-top:-2px;font-size:.6rem;letter-spacing:.22em;padding-left:.22em;font-weight:700;color:#7A6540}
+
+/* cupos y "toca" en cápsulas claras (legibles sobre la foto) */
+.f-c-cupos,.f-c-toca{position:absolute;left:50%;transform:translateX(-50%);z-index:3;display:flex;align-items:center;white-space:nowrap;
+  background:rgba(252,249,243,.95);border-radius:999px;box-shadow:0 6px 18px rgba(50,40,25,.3);color:#3F362A;font-weight:700}
+.f-c-cupos{top:auto;bottom:13.5%;flex-direction:row;gap:9px;padding:8px 18px;font-size:clamp(.58rem,2.5vw,.7rem);letter-spacing:.14em;text-transform:uppercase}
+.f-c-cupos span{font-size:inherit;letter-spacing:inherit}
+.f-c-cupos b{display:grid;place-items:center;min-width:32px;height:32px;padding:0 6px;border:1.5px solid #B79B5E;border-radius:8px;background:#fff;font-size:1.15rem;letter-spacing:0;font-weight:600}
+.f-c-toca{bottom:4.5%;gap:10px;padding:12px 22px;font-size:clamp(.72rem,3.1vw,.86rem);letter-spacing:.02em}
+.f-c-toca i{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#F0DCA0,#A8843B);animation:toca-late 1.8s ease-in-out infinite}
+@keyframes toca-late{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.35);opacity:1}}
+
+/* el lazo se afloja: un pequeño tirón antes de abrir */
+.f-cover.suelta .f-puerta.izq{animation:tiron-i .8s ease}
+.f-cover.suelta .f-puerta.der{animation:tiron-d .8s ease}
+@keyframes tiron-i{0%,100%{transform:translateX(0)}28%{transform:translateX(-5px)}55%{transform:translateX(2px)}}
+@keyframes tiron-d{0%,100%{transform:translateX(0)}28%{transform:translateX(5px)}55%{transform:translateX(-2px)}}
+@media (max-height:700px){.f-c-placa{width:min(40vw,140px)}.f-c-cupos{bottom:14.5%}}
+@media (prefers-reduced-motion:reduce){.f-c-toca i,.f-cover.suelta .f-puerta{animation:none}}
+
+/* las cápsulas ocupan el ancho de su contenido (si no, el texto se sale al estar en la mitad de una puerta) */
+.f-c-cupos,.f-c-toca{width:max-content;max-width:92vw}
+
+/* =====================================================================
+   PRIMERA PANTALLA: el interior del panel (arco bordado) con el monograma
+   Aparece al abrirse las puertas. La altura sigue la proporción de la imagen.
+   ===================================================================== */
+.inv.floral .f-portal{position:relative;width:100%;aspect-ratio:845/1860;background:#E9E3D6 url("../img/panel-interior.webp") center/100% 100% no-repeat;overflow:hidden}
+.inv.floral .f-portal-top{position:absolute;left:0;right:0;top:38.6%;text-align:center;font-size:clamp(.7rem,3vw,.86rem);letter-spacing:.42em;padding-left:.42em;font-weight:700;color:#5C5142;opacity:0}
+.inv.floral .f-portal-mono{position:absolute;left:50%;top:41.8%;width:52%;height:auto;transform:translateX(-50%);opacity:0;filter:drop-shadow(0 2px 3px rgba(255,255,255,.7))}
+.inv.floral .f-portal-mono.f-mono-txt{width:auto;font-size:4.4rem;display:flex;align-items:center;gap:14px;color:#8C6B2E}
+.inv.floral .f-portal-fecha{position:absolute;left:0;right:0;top:68.4%;text-align:center;font-size:clamp(.8rem,3.4vw,1rem);letter-spacing:.36em;padding-left:.36em;font-weight:700;color:#7A6540;opacity:0}
+.inv.floral .f-portal-sigue{position:absolute;left:50%;bottom:6.5%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 20px 6px;border-radius:999px;background:rgba(252,249,243,.94);box-shadow:0 6px 16px rgba(50,40,25,.28);font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:#3F362A;opacity:0}
+.inv.floral .f-portal-sigue i{width:9px;height:9px;border-right:2px solid #A8843B;border-bottom:2px solid #A8843B;transform:rotate(45deg);margin-top:-2px;animation:a-bounce 1.8s infinite}
+.inv.floral.listo .f-portal-top{animation:a-fade 1.4s .7s both}
+.inv.floral.listo .f-portal-mono{animation:f-aparece 1.8s .9s both}
+.inv.floral.listo .f-portal-fecha{animation:a-up 1.3s 1.7s both}
+.inv.floral.listo .f-portal-sigue{animation:a-fade 1s 2.4s both}
+@keyframes f-aparece{from{opacity:0;transform:translateX(-50%) scale(.9);filter:blur(7px)}to{opacity:1;transform:translateX(-50%) scale(1);filter:drop-shadow(0 2px 3px rgba(255,255,255,.7))}}
+.inv.floral .f-hero{padding-top:34px}
+@media (prefers-reduced-motion:reduce){.inv.floral .f-portal-top,.inv.floral .f-portal-mono,.inv.floral .f-portal-fecha,.inv.floral .f-portal-sigue{opacity:1;animation:none}}

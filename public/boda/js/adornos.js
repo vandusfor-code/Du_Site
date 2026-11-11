@@ -224,3 +224,75 @@ export function lazoSatin() {
     <g filter="url(#sombraLazo)" opacity=".85">${sombra}</g>
     <g filter="url(#satin)">${todo}${nudo}</g></svg>`;
 }
+
+/* =====================================================================
+   LAZO DE TELA (lino suave con bordes deshilachados y perlas)
+   ===================================================================== */
+export const DEFS_TELA = `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <filter id="tela" x="-6%" y="-8%" width="112%" height="116%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency=".03" numOctaves="2" seed="5" result="n1"/>
+    <feDisplacementMap in="SourceGraphic" in2="n1" scale="5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+    <feTurbulence type="fractalNoise" baseFrequency="1.15 .85" numOctaves="2" seed="9" result="w"/>
+    <feColorMatrix in="w" type="matrix" values="0 0 0 0 .52  0 0 0 0 .44  0 0 0 0 .32  0 0 0 .26 0" result="wc"/>
+    <feComposite in="wc" in2="d" operator="in" result="wt"/>
+    <feMerge><feMergeNode in="d"/><feMergeNode in="wt"/></feMerge>
+  </filter>
+  <filter id="sombraTela" x="-20%" y="-20%" width="140%" height="150%"><feGaussianBlur in="SourceAlpha" stdDeviation="8"/><feOffset dx="4" dy="12"/><feComponentTransfer><feFuncA type="linear" slope=".34"/></feComponentTransfer></filter>
+  <linearGradient id="tl1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FCF9F3"/><stop offset=".45" stop-color="#F1EADB"/><stop offset="1" stop-color="#DBCEB6"/></linearGradient>
+  <linearGradient id="tl2" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F8F3E8"/><stop offset=".55" stop-color="#EFE7D6"/><stop offset="1" stop-color="#DDD0B8"/></linearGradient>
+  <radialGradient id="perla" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".55" stop-color="#F1E9DA"/><stop offset="1" stop-color="#CBBDA4"/></radialGradient>
+</defs></svg>`;
+
+/* Hilos sueltos a lo largo de un borde */
+function flecos(p1, p2, n, largo, lado, R) {
+  const dx = p2[0] - p1[0], dy = p2[1] - p1[1], L = Math.hypot(dx, dy) || 1;
+  const nx = (-dy / L) * lado, ny = (dx / L) * lado;
+  let s = "";
+  for (let i = 0; i < n; i++) {
+    const t = (i + R() * 0.6) / n, x = p1[0] + dx * t, y = p1[1] + dy * t;
+    const a = (R() - 0.5) * 0.9, c = Math.cos(a), sn = Math.sin(a);
+    const vx = nx * c - ny * sn, vy = nx * sn + ny * c, len = largo * (0.55 + R() * 0.8);
+    const ex = x + vx * len, ey = y + vy * len;
+    s += `<path d="M${r1(x)} ${r1(y)}Q${r1(x + vx * len * .5 + (R() - .5) * 3)} ${r1(y + vy * len * .5 + (R() - .5) * 3)} ${r1(ex)} ${r1(ey)}" fill="none" stroke="#EFE7D8" stroke-width="${r1(0.8 + R() * 0.7)}" stroke-linecap="round" opacity=".95"/>`;
+  }
+  return s;
+}
+const perla = (x, y, r) => `<g><circle cx="${r1(x + r * .22)}" cy="${r1(y + r * .32)}" r="${r1(r)}" fill="rgba(90,70,40,.28)"/><circle cx="${r1(x)}" cy="${r1(y)}" r="${r1(r)}" fill="url(#perla)"/><circle cx="${r1(x - r * .3)}" cy="${r1(y - r * .34)}" r="${r1(r * .27)}" fill="#fff" opacity=".95"/></g>`;
+
+/* Lazo de tela (viewBox 0 0 460 300): ala grande hacia arriba-derecha, ala izquierda y colas */
+export function lazoTela() {
+  const R = sd(7);
+  // ala derecha (grande, sube hacia arriba) · ala izquierda (más baja) · dos colas
+  const alaD = `<path d="M238 138C294 98 366 52 430 38L462 120C396 166 314 188 238 170Z" fill="url(#tl1)"/>
+    <path d="M238 138C282 122 336 96 392 70L430 38C366 52 294 98 238 138Z" fill="rgba(255,255,255,.55)"/>
+    <path d="M238 170C314 188 396 166 462 120L452 112C390 150 312 168 244 158Z" fill="rgba(120,98,64,.20)"/>
+    <path d="M262 146C312 120 364 92 416 62" fill="none" stroke="rgba(120,98,64,.22)" stroke-width="3.4"/>
+    <path d="M290 156C340 150 396 128 440 96" fill="none" stroke="rgba(120,98,64,.18)" stroke-width="2.6"/>
+    <path d="M322 110C336 136 332 158 318 176" fill="none" stroke="rgba(120,98,64,.15)" stroke-width="5" stroke-linecap="round"/>`;
+  const alaI = `<path d="M222 138C170 106 102 96 38 112L14 204C90 220 172 204 222 170Z" fill="url(#tl2)"/>
+    <path d="M222 138C172 112 110 104 62 112L38 112C102 96 170 106 222 138Z" fill="rgba(255,255,255,.5)"/>
+    <path d="M222 170C172 204 90 220 14 204L24 196C92 206 168 192 216 160Z" fill="rgba(120,98,64,.2)"/>
+    <path d="M206 146C156 124 100 116 58 126" fill="none" stroke="rgba(120,98,64,.22)" stroke-width="3.4"/>
+    <path d="M200 166C150 186 90 192 36 184" fill="none" stroke="rgba(120,98,64,.18)" stroke-width="2.6"/>
+    <path d="M128 124C116 150 120 176 138 194" fill="none" stroke="rgba(120,98,64,.14)" stroke-width="5" stroke-linecap="round"/>`;
+  const colaI = `<path d="M218 164C186 214 134 252 76 280L120 306C174 276 220 236 248 178Z" fill="url(#tl1)"/>
+    <path d="M222 182C192 222 152 256 112 280" fill="none" stroke="rgba(120,98,64,.22)" stroke-width="3"/>
+    <path d="M248 178C220 236 174 276 120 306L130 296C176 268 214 226 240 172Z" fill="rgba(120,98,64,.18)"/>`;
+  const colaD = `<path d="M242 168C266 210 296 242 330 266L360 238C326 218 292 190 264 158Z" fill="url(#tl2)"/>
+    <path d="M254 180C280 212 306 232 336 252" fill="none" stroke="rgba(120,98,64,.2)" stroke-width="2.8"/>`;
+  const nudo = `<path d="M204 124C220 114 246 114 258 124C266 144 266 166 256 182C240 190 222 190 206 182C196 164 194 142 204 124Z" fill="url(#tl1)"/>
+    <path d="M212 128C220 144 220 166 214 184M228 120C234 142 234 166 230 188M244 124C248 144 248 164 244 184" fill="none" stroke="rgba(120,98,64,.28)" stroke-width="1.8"/>`;
+  const tela = `${colaI}${colaD}${alaI}${alaD}${nudo}`;
+  const hilos = flecos([430, 38], [462, 120], 30, 13, 1, R) + flecos([462, 120], [396, 166], 14, 9, 1, R) + flecos([430, 38], [352, 70], 12, 8, -1, R)
+    + flecos([38, 112], [14, 204], 30, 13, -1, R) + flecos([14, 204], [90, 220], 12, 9, 1, R) + flecos([38, 112], [102, 100], 10, 8, -1, R)
+    + flecos([76, 280], [120, 306], 18, 12, 1, R) + flecos([330, 266], [360, 238], 12, 10, 1, R);
+  const perlas = [[230, 144, 5.6], [240, 136, 4.8], [221, 135, 4.4], [234, 158, 4.8], [246, 150, 4.4], [225, 170, 4], [213, 150, 3.8],
+    [272, 128, 2.8], [296, 116, 2.4], [322, 100, 3], [346, 92, 2.2], [372, 76, 2.6], [398, 112, 2.4], [280, 152, 2.6], [310, 150, 2.2], [340, 140, 2.8], [380, 128, 2.2], [420, 90, 2.4], [444, 112, 2],
+    [194, 136, 2.6], [166, 130, 2.8], [136, 140, 2.2], [104, 142, 2.6], [76, 152, 2.2], [48, 166, 2.4], [188, 174, 2.4], [150, 186, 2.6], [110, 196, 2.2],
+    [206, 196, 2.8], [190, 222, 2.4], [160, 244, 2.6], [128, 268, 2.2], [262, 200, 2.4], [292, 230, 2.2], [326, 248, 2]].map(p => perla(p[0], p[1], p[2])).join("");
+  const sombra = `<g filter="url(#sombraTela)"><g fill="#000">${tela.replace(/fill="[^"]*"/g, 'fill="#000"').replace(/stroke="[^"]*"/g, 'stroke="none"')}</g></g>`;
+  return `<svg viewBox="0 0 470 320" aria-hidden="true" style="overflow:visible">
+    ${sombra}
+    <g filter="url(#tela)">${tela}</g>
+    ${hilos}${perlas}</svg>`;
+}
