@@ -8,6 +8,7 @@ import {
   XCircle, Loader2, X,
 } from "lucide-react";
 import type { DashboardAuditorias, DashboardFiltros, AuditoriaHistorial, FuncionarioOpcion } from "@/lib/auditorias-admin";
+import { mesEnCursoNombre } from "@/lib/meses";
 import {
   ejecutarAuditoriasAction,
   generarResumenCortesAction,
@@ -75,7 +76,9 @@ export default function AdminDashboard({
   const [tipoAuditoria, setTipoAuditoria] = useState<"ia" | "co" | "chatgpt">("ia");
   const [subVistaChatgpt, setSubVistaChatgpt] = useState<"importar" | "envio">("importar");
 
-  const [filtros, setFiltros] = useState<DashboardFiltros>({});
+  // Vista por defecto: el MES EN CURSO (coincide con lo que precargó el servidor
+  // en page.tsx). El usuario puede cambiar a otros meses o a "Todos los meses".
+  const [filtros, setFiltros] = useState<DashboardFiltros>({ mes: mesEnCursoNombre() });
   const [cargando, setCargando] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [generando, setGenerando] = useState(false);
@@ -87,6 +90,11 @@ export default function AdminDashboard({
   const [pagina, setPagina] = useState(1);
 
   const PAGE_SIZE = 10;
+
+  // Opciones de mes para los filtros: siempre incluye el mes en curso (aunque
+  // todavía no tenga auditorías) para que sea seleccionable por defecto.
+  const mesActual = mesEnCursoNombre();
+  const mesesOpciones = Array.from(new Set([mesActual, ...(data?.meses ?? [])]));
 
   // Re-consulta el dashboard cuando cambian los filtros.
   useEffect(() => {
@@ -249,7 +257,7 @@ export default function AdminDashboard({
                 onChange={(e) => setFiltro({ mes: e.target.value || undefined })}
               >
                 <option value="">Todos los meses</option>
-                {data?.meses.map((m) => <option key={m} value={m}>{m}</option>)}
+                {mesesOpciones.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
               <div className={styles.dateButton}>
                 <CalendarDays size={16} />
@@ -432,7 +440,7 @@ export default function AdminDashboard({
             </select>
             <select className={styles.tableSelectNative} value={filtros.mes ?? ""} onChange={(e) => setFiltro({ mes: e.target.value || undefined })}>
               <option value="">Todos los meses</option>
-              {data?.meses.map((m) => <option key={m} value={m}>{m}</option>)}
+              {mesesOpciones.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
             <select className={styles.tableSelectNative} value={filtros.resultado ?? ""} onChange={(e) => setFiltro({ resultado: e.target.value || undefined })}>
               <option value="">Todos los resultados</option>
@@ -441,8 +449,8 @@ export default function AdminDashboard({
             </select>
             <button
               className={styles.filterButton}
-              onClick={() => setFiltros({})}
-              title="Limpiar filtros"
+              onClick={() => setFiltros({ mes: mesEnCursoNombre() })}
+              title="Limpiar filtros (vuelve al mes en curso)"
             >
               <SlidersHorizontal size={16} />Limpiar
             </button>

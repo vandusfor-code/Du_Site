@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth-helpers";
 import { obtenerDashboardAuditorias, obtenerFuncionariosParaSelector, type FuncionarioOpcion } from "@/lib/auditorias-admin";
+import { mesEnCursoNombre } from "@/lib/meses";
 import AdminDashboard from "./AdminDashboard";
 
 // Ejecutar auditorías puede tardar varios minutos (hasta 50 transcripciones,
@@ -12,7 +13,10 @@ export default async function AdminPage() {
   let dashboard: Awaited<ReturnType<typeof obtenerDashboardAuditorias>> | null = null;
   let error: string | null = null;
   try {
-    dashboard = await obtenerDashboardAuditorias({});
+    // Vista por defecto: el MES EN CURSO. El usuario puede cambiar a otros meses
+    // (o "Todos los meses") desde los filtros. La lista de meses del dashboard
+    // sigue trayendo todos los meses con datos para poder elegirlos.
+    dashboard = await obtenerDashboardAuditorias({ mes: mesEnCursoNombre() });
   } catch (e) {
     error = e instanceof Error ? e.message : "Error al cargar el dashboard de auditorías";
   }
