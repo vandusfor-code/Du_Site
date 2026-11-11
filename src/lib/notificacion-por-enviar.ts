@@ -2,7 +2,7 @@ import "server-only";
 import { readRange } from "./sheets";
 import { getSupabase } from "./supabase";
 import { resolverIdentidadAsesor, type FilaFuncionario, type ResultadoIdentidad } from "./identidad-ciclo";
-import { enviarCorreoIndividual } from "./mailer";
+import { enviarCorreoIndividual, FROM_CALIDAD } from "./mailer";
 import { correoNuevaAuditoria } from "./emailTemplates";
 import { buscarUsuario } from "./usuarios";
 
@@ -281,7 +281,7 @@ export async function procesarNotificacionesPendientes(soloIdGestion?: string): 
       const html = correoNuevaAuditoria(nombre, url);
 
       const { destino: destinatarioFisico, modoPrueba } = correoDeEnvio(identidad.correo);
-      const envio = await enviarCorreoIndividual(destinatarioFisico, ASUNTO_NOTIFICACION, html);
+      const envio = await enviarCorreoIndividual(destinatarioFisico, ASUNTO_NOTIFICACION, html, FROM_CALIDAD);
 
       if (!envio.aceptado) {
         fallidas++;

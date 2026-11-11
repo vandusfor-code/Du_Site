@@ -11,9 +11,15 @@ import "server-only";
 
 const RESEND_API = "https://api.resend.com/emails";
 
-function remitente(): string {
-  return process.env.RESEND_FROM || "Du Site <onboarding@resend.dev>";
+function remitente(override?: string): string {
+  return override || process.env.RESEND_FROM || "Du Site <onboarding@resend.dev>";
 }
+
+// Remitente para las notificaciones de CALIDAD (auditorías / recordatorios /
+// escalamiento). El dominio duacademy.site ya está verificado en Resend, así que
+// cualquier dirección @duacademy.site sirve. Override por env si se quiere.
+export const FROM_CALIDAD =
+  process.env.RESEND_FROM_CALIDAD || "Calidad Du Site <calidad@duacademy.site>";
 
 function apiKey(): string {
   const k = process.env.RESEND_API_KEY;
@@ -32,9 +38,10 @@ async function enviarResend(
   to: string[],
   subject: string,
   html: string,
-  adjuntos?: Adjunto[]
+  adjuntos?: Adjunto[],
+  from?: string
 ): Promise<{ id: string | null; error: string | null }> {
-  const body: Record<string, unknown> = { from: remitente(), to, subject, html };
+  const body: Record<string, unknown> = { from: remitente(from), to, subject, html };
   if (adjuntos && adjuntos.length) {
     body.attachments = adjuntos.map((a) => ({
       filename: a.filename,
@@ -63,11 +70,12 @@ async function enviarResend(
 export async function enviarCorreoMasivo(
   destinatarios: string[],
   asunto: string,
-  html: string
+  html: string,
+  from?: string
 ): Promise<void> {
   // Un envío por destinatario (no se revela la lista entre ellos).
   for (const to of destinatarios) {
-    const r = await enviarResend([to], asunto, html);
+    const r = await enviarResend([to], asunto, html, undefined, from);
     if (r.error) throw new Error(r.error);
   }
 }
@@ -78,9 +86,10 @@ export async function enviarCorreoConAdjunto(
   destinatarios: string[],
   asunto: string,
   html: string,
-  adjunto: { filename: string; content: Buffer; contentType?: string }
+  adjunto: { filename: string; content: Buffer; contentType?: string },
+  from?: string
 ): Promise<void> {
-  const r = await enviarResend(destinatarios, asunto, html, [adjunto]);
+  const r = await enviarResend(destinatarios, asunto, html, [adjunto], from);
   if (r.error) throw new Error(r.error);
 }
 
@@ -95,9 +104,10 @@ export interface ResultadoEnvioIndividual {
 export async function enviarCorreoIndividual(
   destinatario: string,
   asunto: string,
-  html: string
+  html: string,
+  from?: string
 ): Promise<ResultadoEnvioIndividual> {
-  const r = await enviarResend([destinatario], asunto, html);
+  const r = await enviarResend([destinatario], asunto, html, undefined, from);
   return {
     aceptado: !r.error && !!r.id,
     messageId: r.id,

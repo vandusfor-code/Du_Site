@@ -1,6 +1,6 @@
 import "server-only";
 import { getSupabase } from "./supabase";
-import { enviarCorreoIndividual } from "./mailer";
+import { enviarCorreoIndividual, FROM_CALIDAD } from "./mailer";
 import { correoEscalamientoCalidad, type MotivoEscalamientoCalidad } from "./emailTemplates";
 import { resolverNombreAsesor, correoDeEnvio } from "./notificacion-por-enviar";
 import { idsVencidosSinAcuse, idsVencidosSinCompromiso, idsCompromisoVencido } from "./gestion-calidad";
@@ -213,7 +213,7 @@ export async function procesarEscalamiento(soloIdGestion?: string): Promise<Resu
   // Mismo override de prueba que el resto del sistema (NOTIFICACION_CORREO_PRUEBA)
   // — nunca una segunda decisión de a quién llega físicamente el correo.
   const { destino: destinatarioFisico, modoPrueba } = correoDeEnvio(DESTINATARIO_ESCALAMIENTO);
-  const envio = await enviarCorreoIndividual(destinatarioFisico, asunto, html);
+  const envio = await enviarCorreoIndividual(destinatarioFisico, asunto, html, FROM_CALIDAD);
 
   if (!envio.aceptado) {
     throw new Error(`SMTP no confirmó aceptar el destinatario: ${envio.respuestaServidor ?? "sin respuesta"}`);

@@ -6,7 +6,7 @@ import {
   resolverNombreAsesor,
   correoDeEnvio,
 } from "./notificacion-por-enviar";
-import { enviarCorreoIndividual } from "./mailer";
+import { enviarCorreoIndividual, FROM_CALIDAD } from "./mailer";
 import { correoLoteAuditorias } from "./emailTemplates";
 import { adoptarAuditorias } from "./gestion-auditorias";
 import {
@@ -273,7 +273,7 @@ export async function enviarLoteAuditorias(fecha: string, asesora?: string): Pro
 
     let envio;
     try {
-      envio = await enviarCorreoIndividual(destino, `Tienes ${idsCoinciden.length} auditoría(s) de calidad por revisar`, html);
+      envio = await enviarCorreoIndividual(destino, `Tienes ${idsCoinciden.length} auditoría(s) de calidad por revisar`, html, FROM_CALIDAD);
     } catch (e) {
       fallidas++;
       resultados.push({ ...base, accion: "FALLO_ENVIO", detalle: e instanceof Error ? e.message : String(e) });

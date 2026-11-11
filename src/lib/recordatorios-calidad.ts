@@ -1,7 +1,7 @@
 import "server-only";
 import { getSupabase } from "./supabase";
 import { sumarDiasHabiles } from "./dias-habiles-colombia";
-import { enviarCorreoIndividual } from "./mailer";
+import { enviarCorreoIndividual, FROM_CALIDAD } from "./mailer";
 import { correoRecordatorioAcuse, correoRecordatorioCompromiso } from "./emailTemplates";
 import {
   construirUrlAuditoria,
@@ -302,7 +302,7 @@ export async function procesarRecordatoriosPendientes(soloIdGestion?: string): P
             : "Recordatorio: compromiso de mejora pendiente de registrar";
 
       const { destino: destinatarioFisico, modoPrueba } = correoDeEnvio(identidad.correo);
-      const envio = await enviarCorreoIndividual(destinatarioFisico, asunto, html);
+      const envio = await enviarCorreoIndividual(destinatarioFisico, asunto, html, FROM_CALIDAD);
 
       if (!envio.aceptado) {
         fallidos++;
