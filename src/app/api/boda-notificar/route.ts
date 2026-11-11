@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import webpush from "web-push";
+import { sendNotification, setVapidDetails } from "web-push";
 import { getSupabase } from "@/lib/supabase";
 
 // Avisa al celular de los novios cuando un invitado responde su invitación.
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     ]);
     if (!subs?.length || !vapid) return ok(0);
 
-    webpush.setVapidDetails("https://www.duacademy.site", vapid.publica, vapid.privada);
+    setVapidDetails("https://www.duacademy.site", vapid.publica, vapid.privada);
 
     const n = inv.asistentes || inv.pases || 1;
     const cuerpo =
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     await Promise.all(
       subs.map(async (s) => {
         try {
-          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, carga, { TTL: 86400, urgency: "high" });
+          await sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, carga, { TTL: 86400, urgency: "high" });
           enviados++;
         } catch (e) {
           const code = (e as { statusCode?: number }).statusCode;
