@@ -206,6 +206,15 @@ function render(root, cfg, guest, opts = {}) {
     document.addEventListener("click", e => { if (!e.target.closest(".f-cart-wrap")) menu.hidden = true; });
   }
 
+  // En el celular, las animaciones infinitas (flores que se mecen, borla, latido) solo corren
+  // mientras están a la vista: así no se acumulan decenas de capas animadas y la página no tiembla.
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle("vis", e.isIntersecting)), { rootMargin: "60px" });
+    root.querySelectorAll(".f-flor,.f-borla,.f-papel-fecha .hoy svg").forEach(el => io.observe(el));
+  } else {
+    root.querySelectorAll(".f-flor,.f-borla,.f-papel-fecha .hoy svg").forEach(el => el.classList.add("vis"));
+  }
+
   return portadaLazo(root, cfg, guest);
 }
 
@@ -227,18 +236,42 @@ function portadaLazo(root, cfg, guest) {
   c.setAttribute("aria-label", "Abrir la invitación");
   // el lienzo con el lazo es una pieza aparte (recorte de la foto) para poder caer solo
   const lienzo = new URL("../img/lazo-lienzo.webp", import.meta.url).href;
+  // El lienzo se parte en tiras verticales finas: cada una cae con un pequeño retraso (primero el centro,
+  // después las puntas), así el listón se curva y ondula como una tela de verdad en vez de bajar tieso.
+  const N = 56;
+  let tiras = "";
+  for (let j = 0; j < N; j++) {
+    const d = ((j + 0.5) / N) * 2 - 1;               // -1 (izquierda) … 1 (derecha)
+    tiras += `<i style="--a:${Math.abs(d).toFixed(3)};--k:${(-d * 3).toFixed(3)}"></i>`;
+  }
   c.innerHTML = `<div class="f-escena">
     <div class="f-puerta izq">${arte(cfg, guest)}</div>
     <div class="f-puerta der">${arte(cfg, guest)}</div>
   </div>
-  <div class="f-lienzo" aria-hidden="true"><div class="f-lienzo-in"><img alt="" src="${lienzo}" draggable="false"></div></div>`;
+  <div class="f-lienzo" aria-hidden="true"><div class="f-lienzo-in" style="--img:url('${lienzo}')">${tiras}</div></div>`;
   document.body.appendChild(c);
+  // cada tira muestra su porción de la imagen (medidas en píxeles y con 1 px de solape para que no se vean costuras)
+  const ajustaTiras = () => {
+    const caja = c.querySelector(".f-lienzo-in");
+    if (!caja) return;
+    const w = caja.offsetWidth, h = caja.offsetHeight;
+    if (!w) return;
+    caja.querySelectorAll("i").forEach((el, j) => {
+      el.style.left = (j * w / N).toFixed(2) + "px";
+      el.style.width = (w / N + 1.2).toFixed(2) + "px";
+      el.style.backgroundSize = `${w}px ${h}px`;
+      el.style.backgroundPosition = `${(-j * w / N).toFixed(2)}px 0`;
+    });
+  };
+  ajustaTiras();
+  const onResize = () => ajustaTiras();
+  window.addEventListener("resize", onResize);
   const prev = document.body.style.overflow;
   document.body.style.overflow = "hidden";
-  const quitar = () => { document.body.style.overflow = prev; c.remove(); };
+  const quitar = () => { window.removeEventListener("resize", onResize); document.body.style.overflow = prev; c.remove(); };
   let abierto = false;
   // [cae el lienzo, se abren las puertas, se libera el scroll, se retira la portada]
-  const t = reducido() ? [0, 150, 500, 700] : [650, 1750, 3400, 4300];
+  const t = reducido() ? [0, 150, 500, 700] : [650, 1750, 3400, 4800];
   const abrir = () => {
     if (abierto) return;
     abierto = true;
@@ -251,7 +284,7 @@ function portadaLazo(root, cfg, guest) {
       if (a) a.play().catch(() => {});
     }, t[1]);
     setTimeout(() => { document.body.style.overflow = prev; }, t[2]);
-    setTimeout(() => c.remove(), t[3]);
+    setTimeout(quitar, t[3]);
   };
   c.addEventListener("click", abrir);
   c.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(); } });
