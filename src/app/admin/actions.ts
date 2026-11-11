@@ -75,11 +75,24 @@ export async function guardarAuditoriaManualAction(
 
 // Auditoría ChatGPT: valida admin, revalida el asesor seleccionado contra
 // Funcionarios y resuelve su correo oficial server-side (ver guardarAuditoriaChatGPT).
+// Devuelve el error como DATO (no lo lanza): en producción Next.js oculta el
+// mensaje de un error lanzado desde una Server Action y lo reemplaza por uno
+// genérico ("An error occurred in the Server Components render…"). Retornándolo,
+// el usuario ve el motivo real (p. ej. "Ya existe una auditoría con ese ID").
+export type ResultadoGuardadoAuditoria =
+  | { ok: true; nota: string; tipoNota: string }
+  | { ok: false; error: string };
+
 export async function guardarAuditoriaChatGPTAction(
   input: AuditoriaManualInput
-): Promise<{ nota: string; tipoNota: string }> {
-  await requireAdminAction();
-  return guardarAuditoriaChatGPT(input);
+): Promise<ResultadoGuardadoAuditoria> {
+  try {
+    await requireAdminAction();
+    const r = await guardarAuditoriaChatGPT(input);
+    return { ok: true, nota: r.nota, tipoNota: r.tipoNota };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "No se pudo guardar la auditoría." };
+  }
 }
 
 // ── Envío de auditorías por asesora (sección de Auditoría ChatGPT) ──

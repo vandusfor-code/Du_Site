@@ -202,6 +202,11 @@ export default function AuditoriaChatGPTForm({
         puntajeTuteo: datos.puntajeTuteo || "Sin tuteo",
       };
       const res = await guardarAuditoriaChatGPTAction(input);
+      if (!res.ok) {
+        // Error real surfaceado como dato (no lo oculta producción).
+        onGuardado({ tipo: "error", msg: res.error });
+        return;
+      }
       setGuardadoMsg(`Auditoría ChatGPT guardada para ${asesorSel} — Nota ${res.nota} (${res.tipoNota}).`);
       setEstado("guardado");
       onGuardado({ tipo: "ok", msg: `Auditoría ChatGPT guardada para ${asesorSel} — Nota ${res.nota} (${res.tipoNota}).` });
