@@ -93,6 +93,7 @@ export type Severidad = "error" | "advertencia";
 // - criterio_no_aplica:  un criterio quedó en "No aplica" (requiere revisión).
 export type CodigoDiagnostico =
   | "json_malformado"
+  | "json_reparado"
   | "no_es_objeto"
   | "formato_invalido"
   | "version_desconocida"
@@ -171,6 +172,89 @@ function resultadoError(codigo: CodigoDiagnostico, campo: string, mensaje: strin
   };
 }
 
+// ============================================================
+// Reparación tolerante del bloque de ChatGPT.
+//
+// ChatGPT suele devolver un JSON "casi válido". Los defectos reales y
+// recurrentes que rompen JSON.parse son:
+//   1. Cercos Markdown (```json … ```) o texto antes/después del objeto.
+//   2. Comas colgantes antes de "}" o "]".
+//   3. Saltos de línea / tabulaciones CRUDOS dentro de una cadena
+//      (JSON prohíbe control chars sin escapar).
+//   4. Comillas dobles SIN ESCAPAR dentro del texto — la causa del error
+//      "Expected ',' or '}' after property value": p. ej. una evidencia como
+//      «el agente dijo "buenos días"» cierra la cadena antes de tiempo.
+//
+// Esta función hace UN recorrido carácter a carácter y repara esos cuatro
+// casos de forma determinística. NO ejecuta nada ni adivina valores: solo
+// endereza la sintaxis para que JSON.parse pueda leer el mismo contenido.
+// Es un ÚLTIMO RECURSO: solo se invoca cuando el parseo directo falla.
+// ============================================================
+export function repararJsonChatGPT(entrada: string): string {
+  let s = (entrada ?? "").replace(/^﻿/, "").trim();
+
+  // 1. Quitar cercos Markdown ```json … ``` si envuelven el bloque.
+  const cerco = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (cerco) s = cerco[1].trim();
+
+  // 2. Recortar a lo que hay entre la primera "{" y la última "}".
+  const ini = s.indexOf("{");
+  const fin = s.lastIndexOf("}");
+  if (ini !== -1 && fin > ini) s = s.slice(ini, fin + 1);
+
+  const out: string[] = [];
+  let enString = false;
+  const esEspacio = (c: string) => c === " " || c === "\t" || c === "\r" || c === "\n";
+
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+
+    if (enString) {
+      // Copiar el escape tal cual (\" , \\ , \n …) sin reinterpretarlo.
+      if (ch === "\\") {
+        out.push(ch);
+        if (i + 1 < s.length) { out.push(s[i + 1]); i++; }
+        continue;
+      }
+      if (ch === '"') {
+        // ¿Es el cierre real o una comilla incrustada en el texto?
+        // Cierre real: tras saltar espacios, lo siguiente es un carácter
+        // estructural (: , } ]) o el fin del bloque. Si no, es texto → escapar.
+        let j = i + 1;
+        while (j < s.length && esEspacio(s[j])) j++;
+        const sig = s[j];
+        if (sig === ":" || sig === "," || sig === "}" || sig === "]" || sig === undefined) {
+          out.push('"');
+          enString = false;
+        } else {
+          out.push('\\"');
+        }
+        continue;
+      }
+      // 3. Control chars crudos dentro de la cadena → escapar/normalizar.
+      if (ch === "\n") { out.push("\\n"); continue; }
+      if (ch === "\t") { out.push("\\t"); continue; }
+      if (ch === "\r") { continue; }
+      out.push(ch);
+      continue;
+    }
+
+    // Fuera de cadena:
+    if (ch === '"') { enString = true; out.push('"'); continue; }
+    if (ch === ",") {
+      // 2. Coma colgante antes de "}" o "]" → omitir.
+      let j = i + 1;
+      while (j < s.length && esEspacio(s[j])) j++;
+      if (s[j] === "}" || s[j] === "]") continue;
+      out.push(",");
+      continue;
+    }
+    out.push(ch);
+  }
+
+  return out.join("");
+}
+
 /**
  * Interpreta un bloque de texto AUDITORIA_CO_V1 y lo valida contra el esquema
  * real del sistema. NO escribe en ninguna fuente. Nunca ejecuta el contenido.
@@ -182,11 +266,22 @@ export function parseAuditoriaChatGPT(raw: string): ResultadoParseo {
   }
 
   let json: unknown;
+  let reparado = false;
   try {
     json = JSON.parse(bruto);
-  } catch (e) {
-    const detalle = e instanceof Error ? e.message : "formato no válido";
-    return resultadoError("json_malformado", "(bloque)", `No se pudo interpretar el JSON: ${detalle}`);
+  } catch {
+    // Segundo intento: reparar los defectos típicos de ChatGPT y reintentar.
+    try {
+      json = JSON.parse(repararJsonChatGPT(bruto));
+      reparado = true;
+    } catch (e2) {
+      const detalle = e2 instanceof Error ? e2.message : "formato no válido";
+      return resultadoError(
+        "json_malformado",
+        "(bloque)",
+        `No se pudo interpretar el JSON, ni siquiera tras repararlo: ${detalle}. Revisa que ChatGPT haya devuelto solo el objeto JSON.`
+      );
+    }
   }
 
   if (!esObjetoPlano(json)) {
@@ -216,6 +311,15 @@ export function parseAuditoriaChatGPT(raw: string): ResultadoParseo {
   const diagnosticos: Diagnostico[] = [];
   const datos: DatosImportados = { ...DATOS_VACIOS };
   const evidencias: Record<string, string> = {};
+
+  if (reparado) {
+    diagnosticos.push({
+      severidad: "advertencia",
+      codigo: "json_reparado",
+      campo: "(bloque)",
+      mensaje: "El JSON venía con pequeños defectos de formato (comillas o saltos de línea sin escapar) y se corrigió automáticamente. Revisa la vista previa antes de guardar.",
+    });
+  }
 
   const interaccion = esObjetoPlano(json.interaccion) ? json.interaccion : {};
   // Lee de `interaccion` y, si no está, del nivel superior (tolerante al origen).
@@ -403,7 +507,7 @@ export function construirPromptUniversal(): string {
     .join("\n");
 
   const ejemploCriterios = CRITERIOS
-    .map(({ id }) => `    "${id}": { "resultado": "Cumple", "evidencia": "cita breve de la transcripción" }`)
+    .map(({ id }) => `    "${id}": { "resultado": "Cumple", "evidencia": "cita breve con comillas simples, p. ej. el agente dijo 'buenos días'" }`)
     .join(",\n");
 
   return `Eres un auditor experto en calidad de atención al usuario de COFREM (operación de People BPO). Tu tarea es analizar la transcripción de una interacción (llamada o chat) que te enviará el usuario y devolver ÚNICAMENTE un objeto JSON válido con el formato ${FORMATO_AUDITORIA_CO} (versión ${VERSION_AUDITORIA_CO}), listo para pegar en Du Site.
@@ -425,6 +529,8 @@ ${listaCriterios}
 
 Valores permitidos para "resultado": ${VALORES_CRITERIO.map((v) => `"${v}"`).join(", ")}.
 Regla de evidencia: marca "Cumple" SOLO si hay evidencia textual explícita de que el AGENTE lo hizo. Ante la duda o ausencia de evidencia, marca "No cumple". NO uses "No aplica" por falta de evidencia: "No aplica" es solo para casos en que el criterio realmente no corresponde (p. ej. encuesta cuando la interacción se cortó).
+Regla de criterios compuestos (saludo y cierre): exigen VARIAS partes a la vez. Marca "Cumple" solo si están TODAS las partes; si falta aunque sea una, es "No cumple". No lo marques "Cumple" por cumplir la mayoría.
+Regla de evidencia obligatoria: cada "evidencia" debe ser una cita real tomada de la transcripción. Si marcas "No cumple", la evidencia explica brevemente qué faltó. Nunca dejes la evidencia vacía ni inventada.
 
 Puntaje de tuteo (campo "puntaje_tuteo"), valores permitidos: ${VALORES_TUTEO.map((v) => `"${v}"`).join(", ")}. Tuteo real = uso de "tú/te/ti/tu/tuyo" dirigido al usuario; "usted/su/le" NO es tuteo.
 
@@ -438,8 +544,16 @@ Si incluyes alguno de estos campos, Du Site lo ignorará para la identidad/persi
 ════════ 4. NOTA Y CLASIFICACIÓN ════════
 Puedes incluir "nota_propuesta" y "clasificacion_propuesta" como valores INFORMATIVOS. La nota oficial la calcula Du Site con su propia regla; no presentes tu propuesta como resultado oficial ni inventes una fórmula.
 
-════════ 5. SALIDA (ESTRICTA) ════════
-Devuelve UN ÚNICO objeto JSON válido, sin texto antes ni después, sin explicaciones ni bloques Markdown. No agregues claves desconocidas ni cambies los nombres de las claves. Estructura:
+════════ 5. SALIDA (ESTRICTA) — JSON VÁLIDO ════════
+Devuelve UN ÚNICO objeto JSON válido, sin texto antes ni después, sin explicaciones ni bloques Markdown (no uses \`\`\`). No agregues claves desconocidas ni cambies los nombres de las claves.
+
+REGLAS DE FORMATO PARA QUE EL JSON NO SE ROMPA (muy importante):
+- Dentro de cualquier texto (evidencia, observacion, hallazgos, puntos_mejora) NO uses comillas dobles ( " ). Para citar algo del agente usa comillas simples ( ' ): por ejemplo "evidencia": "el agente dijo 'buenos días, habla con Ana'".
+- No pongas saltos de línea dentro de un texto: escribe cada valor en una sola línea.
+- No dejes comas colgantes antes de } o ].
+- Usa exactamente las comillas dobles rectas ( " ) como delimitadores del JSON, no comillas curvas.
+
+Estructura:
 
 {
   "formato": "${FORMATO_AUDITORIA_CO}",

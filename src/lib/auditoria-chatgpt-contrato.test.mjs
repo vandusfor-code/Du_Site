@@ -7,6 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   parseAuditoriaChatGPT,
+  repararJsonChatGPT,
   calcularNota,
   erroresDe,
   advertenciasDe,
@@ -260,4 +261,84 @@ test("25. El prompt NO contiene secretos ni datos sensibles", () => {
   for (const secreto of ["contraseña", "password", "token", "api_key", "api key", "private_key"]) {
     assert.equal(p.includes(secreto), false, `el prompt no debe mencionar "${secreto}"`);
   }
+});
+
+// ── Reparación tolerante del JSON de ChatGPT ──
+test("26. Comilla doble SIN escapar dentro de la evidencia (el error reportado) → se repara y es ok", () => {
+  // Evidencia con comillas dobles incrustadas: rompe JSON.parse directo.
+  const roto = `{
+    "formato": "AUDITORIA_CO_V1",
+    "version": 1,
+    "criterios": {
+      "saludo": { "resultado": "Cumple", "evidencia": "el agente dijo "buenos días, habla con Ana" al usuario" },
+      "empatia": { "resultado": "Cumple" },
+      "sonrisa": { "resultado": "Cumple" },
+      "claridad": { "resultado": "Cumple" },
+      "encuesta": { "resultado": "Cumple" },
+      "informacion": { "resultado": "Cumple" },
+      "proceso": { "resultado": "Cumple" },
+      "cierre": { "resultado": "Cumple" }
+    },
+    "puntaje_tuteo": "Sin tuteo"
+  }`;
+  // Falla directo…
+  assert.throws(() => JSON.parse(roto));
+  // …pero el parser lo repara y lo acepta.
+  const r = parseAuditoriaChatGPT(roto);
+  assert.equal(r.ok, true, JSON.stringify(erroresDe(r)));
+  assert.equal(r.datos.saludo, "Cumple");
+  assert.match(r.evidencias.saludo, /buenos días/);
+  assert.ok(advertenciasDe(r).some((d) => d.codigo === "json_reparado"));
+});
+
+test("27. Cercos Markdown + coma colgante → se reparan", () => {
+  const roto = "```json\n{\n  \"formato\": \"AUDITORIA_CO_V1\",\n  \"version\": 1,\n  \"criterios\": {\n    \"saludo\": { \"resultado\": \"Cumple\" },\n    \"empatia\": { \"resultado\": \"Cumple\" },\n    \"sonrisa\": { \"resultado\": \"Cumple\" },\n    \"claridad\": { \"resultado\": \"Cumple\" },\n    \"encuesta\": { \"resultado\": \"Cumple\" },\n    \"informacion\": { \"resultado\": \"Cumple\" },\n    \"proceso\": { \"resultado\": \"Cumple\" },\n    \"cierre\": { \"resultado\": \"Cumple\" },\n  },\n  \"puntaje_tuteo\": \"Sin tuteo\",\n}\n```";
+  const r = parseAuditoriaChatGPT(roto);
+  assert.equal(r.ok, true, JSON.stringify(erroresDe(r)));
+  assert.equal(r.datos.cierre, "Cumple");
+});
+
+test("28. Salto de línea CRUDO dentro de una cadena → se escapa y se repara", () => {
+  const roto = `{
+    "formato": "AUDITORIA_CO_V1",
+    "version": 1,
+    "criterios": {
+      "saludo": { "resultado": "Cumple" },
+      "empatia": { "resultado": "Cumple" },
+      "sonrisa": { "resultado": "Cumple" },
+      "claridad": { "resultado": "Cumple" },
+      "encuesta": { "resultado": "Cumple" },
+      "informacion": { "resultado": "Cumple" },
+      "proceso": { "resultado": "Cumple" },
+      "cierre": { "resultado": "Cumple" }
+    },
+    "puntaje_tuteo": "Sin tuteo",
+    "observacion": "El usuario consultó
+por su afiliación."
+  }`;
+  const r = parseAuditoriaChatGPT(roto);
+  assert.equal(r.ok, true, JSON.stringify(erroresDe(r)));
+  assert.match(r.datos.observacion, /afiliación/);
+});
+
+test("29. JSON válido NO se marca como reparado (no hay falso positivo)", () => {
+  const r = parseAuditoriaChatGPT(bloqueValido());
+  assert.equal(advertenciasDe(r).some((d) => d.codigo === "json_reparado"), false);
+});
+
+test("30. repararJsonChatGPT es idempotente sobre un JSON ya válido", () => {
+  const valido = bloqueValido();
+  assert.deepEqual(JSON.parse(repararJsonChatGPT(valido)), JSON.parse(valido));
+});
+
+test("31. Irreparable (sin cierre) → sigue fallando como json_malformado", () => {
+  const r = parseAuditoriaChatGPT('{ "formato": "AUDITORIA_CO_V1", "criterios": ');
+  assert.equal(r.ok, false);
+  assert.equal(erroresDe(r)[0].codigo, "json_malformado");
+});
+
+test("32. El prompt exige comillas simples dentro del texto (evita el error de JSON)", () => {
+  const p = construirPromptUniversal();
+  assert.match(p, /comillas simples/i);
+  assert.match(p, /NO uses comillas dobles/i);
 });
