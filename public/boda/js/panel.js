@@ -36,6 +36,16 @@ const I = {
   chevron: svg('<path d="M6 9l6 6 6-6"/>', 18, 1.800),
   mas: svg('<path d="M12 5v14M5 12h14"/>', 16, 2),
   lupa: svg('<circle cx="11" cy="11" r="6.500"/><path d="M16 16l4.500 4.500"/>', 20, 1.700),
+  grid: svg('<rect x="4" y="4" width="6.500" height="6.500" rx="1.500"/><rect x="13.500" y="4" width="6.500" height="6.500" rx="1.500"/><rect x="4" y="13.500" width="6.500" height="6.500" rx="1.500"/><rect x="13.500" y="13.500" width="6.500" height="6.500" rx="1.500"/>', 22, 1.700),
+  gente: svg('<circle cx="9" cy="8.500" r="3.200"/><path d="M3 19.500c0-3.300 2.700-5.500 6-5.500s6 2.200 6 5.500"/><path d="M15.500 5.500a3.100 3.100 0 0 1 0 6M17.500 14.300c2.200.6 3.700 2.300 3.700 5.200"/>', 22, 1.700),
+  burbuja: svg('<path d="M4 6.500A2.500 2.500 0 0 1 6.500 4h11A2.500 2.500 0 0 1 20 6.500v7a2.500 2.500 0 0 1-2.500 2.500H11l-4.500 4v-4h0A2.500 2.500 0 0 1 4 13.500z"/>', 22, 1.600),
+  relojc: svg('<circle cx="12" cy="12" r="8.500"/><path d="M12 7.500V12l3 2"/>', 22, 1.600),
+  usercheck: svg('<circle cx="9.500" cy="8.500" r="3.300"/><path d="M3.500 19.500c0-3.200 2.600-5.300 6-5.300 1.500 0 2.800.4 3.800 1.100M15.500 17l2 2 3.500-3.800"/>', 22, 1.600),
+  userx: svg('<circle cx="9.500" cy="8.500" r="3.300"/><path d="M3.500 19.500c0-3.200 2.600-5.300 6-5.300 1.500 0 2.800.4 3.800 1.100M16 15.500l4.500 4.500M20.500 15.500L16 20"/>', 22, 1.600),
+  caja: svg('<path d="M12 3l8 4.200v9.600L12 21l-8-4.200V7.200z"/><path d="M4.500 7.500L12 11.700l7.500-4.200M12 11.700V20.500"/>', 24, 1.600),
+  flecha: svg('<path d="M9 6l6 6-6 6"/>', 20, 1.900),
+  sube: svg('<path d="M7 17L17 7M9 7h8v8"/>', 12, 2),
+  papelera: svg('<path d="M5 7h14M10 7V4.500h4V7M7 7l.8 12.500h8.400L17 7"/>', 18, 1.600),
   nota: svg('<path d="M9 18V5.500l11-2V16"/><circle cx="6.500" cy="18" r="2.500"/><circle cx="17.500" cy="16" r="2.500"/>', 26, 1.500)
 };
 const KEBAB_V = `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.700"/><circle cx="12" cy="12" r="1.700"/><circle cx="12" cy="19" r="1.700"/></svg>`;
@@ -48,10 +58,10 @@ function ramaOlivo() {
   const pts = [[84, 20], [96, 44], [108, 70], [118, 98], [126, 128], [132, 158]];
   pts.forEach(([x, y], i) => {
     const t = i % 2 ? 1 : -1;
-    hojas.push(`<ellipse cx="${x + t * 17}" cy="${y - 4}" rx="17" ry="6" transform="rotate(${t * -32} ${x + t * 17} ${y - 4})" fill="#777B55" opacity="${0.55 + i * 0.05}"/>`);
-    hojas.push(`<ellipse cx="${x - t * 15}" cy="${y + 8}" rx="15" ry="5.500" transform="rotate(${t * 36} ${x - t * 15} ${y + 8})" fill="#777B55" opacity="${0.45 + i * 0.05}"/>`);
+    hojas.push(`<ellipse cx="${x + t * 17}" cy="${y - 4}" rx="17" ry="6" transform="rotate(${t * -32} ${x + t * 17} ${y - 4})" fill="#C79AA4" opacity="${0.55 + i * 0.05}"/>`);
+    hojas.push(`<ellipse cx="${x - t * 15}" cy="${y + 8}" rx="15" ry="5.500" transform="rotate(${t * 36} ${x - t * 15} ${y + 8})" fill="#C79AA4" opacity="${0.45 + i * 0.05}"/>`);
   });
-  return `<svg class="rama" viewBox="0 0 170 200" aria-hidden="true"><path d="M70 0C96 36 118 92 136 200" fill="none" stroke="#6B6F49" stroke-width="2" opacity=".8"/>${hojas.join("")}</svg>`;
+  return `<svg class="rama" viewBox="0 0 170 200" aria-hidden="true"><path d="M70 0C96 36 118 92 136 200" fill="none" stroke="#9C5566" stroke-width="2" opacity=".8"/>${hojas.join("")}</svg>`;
 }
 
 export async function iniciarPanel(root, key) {
@@ -69,9 +79,15 @@ export async function iniciarPanel(root, key) {
   const draftKey = "boda-borrador-" + eventoId;
   let borrador = null;
   try { const b = JSON.parse(localStorage.getItem(draftKey) || "null"); if (b && b.dirty) borrador = b; } catch {}
-  let tab = "datos", dirty = false, saving = false;
+  let dirty = false, saving = false;
   let guardadoAlgunaVez = !!(data.config && data.config.novio);
-  let resultadoNuevo = null, filtro = "todos", refreshTimer = null, nuevoPases = 1;
+  let tab = guardadoAlgunaVez ? "resumen" : "datos";
+  let cdTimer = null;
+  // Foto de la última visita: sirve para mostrar "+N" en las tarjetas del resumen
+  const visKey = "boda-visto-" + eventoId;
+  let previo = null;
+  try { previo = JSON.parse(localStorage.getItem(visKey) || "null"); } catch {}
+  let resultadoNuevo = null, refreshTimer = null, nuevoPases = 1;
   let listaCanciones = false, menuCancion = false;
   let busqueda = "", filtroInv = "todos";   // buscador de invitaciones
   const mapaAbierto = new Set();   // momentos del itinerario con el campo de Maps visible
@@ -89,9 +105,9 @@ export async function iniciarPanel(root, key) {
     <main id="main"></main>
     <div class="savebar" id="savebar"><div class="savebar-in"><span>Tienes cambios sin guardar</span><button class="sb-btn" data-save>Guardar</button></div></div>
     <nav class="bnav" aria-label="Secciones"><div class="bnav-in">
-      <button data-tab="datos">${I.lapiz}<span>Editar</span></button>
-      <button data-tab="inv">${I.invit}<span>Invitaciones</span><em class="n" id="n-inv"></em></button>
-      <button data-tab="res">${I.barras}<span>Respuestas</span><em class="n" id="n-res"></em></button>
+      <button data-tab="resumen">${I.grid}<span>Resumen</span></button>
+      <button data-tab="datos">${I.caja}<span>Invitación</span></button>
+      <button data-tab="inv">${I.gente}<span>Invitados</span><em class="n" id="n-inv"></em></button>
     </div></nav>
   </div><div id="toast"></div>`;
   const main = $("#main", root);
@@ -338,7 +354,7 @@ export async function iniciarPanel(root, key) {
         <label class="chk"><input type="checkbox" data-k="sobres.activo" data-re="1" ${cfg.sobres.activo ? "checked" : ""}><span><b>Incluir “lluvia de sobres”</b><small>Un mensaje para quienes quieran hacer un detalle en efectivo.</small></span></label>
         ${cfg.sobres.activo ? F("Texto", "sobres.texto", { type: "textarea", rows: 3 }) : ""}`)}
 
-      ${sec("confirmacion", I.confirma, "Confirmación de asistencia", "Los invitados confirman en su propia invitación; tú ves las respuestas en la pestaña Respuestas.", F("Confirmar asistencia antes del", "confirmarAntes", { type: "date" }))}
+      ${sec("confirmacion", I.confirma, "Confirmación de asistencia", "Los invitados confirman en su propia invitación; tú ves las respuestas en las pestañas Resumen e Invitados.", F("Confirmar asistencia antes del", "confirmarAntes", { type: "date" }))}
 
       ${sec("final", I.fotos, "Fotos finales", `Hasta ${MAX_FINAL} fotos para el cierre, bajo “¡Te esperamos!”.`, finalHTML())}
 
@@ -360,7 +376,7 @@ export async function iniciarPanel(root, key) {
   function pintarInvitaciones() {
     const listo = cfg.novio && cfg.novia && guardadoAlgunaVez;
     main.innerHTML = `<div class="vista">
-      ${cabecera("INVITACIONES", "Una para cada invitado", "Solo escribes el nombre: toda la información de la boda ya está en tu formulario.")}
+      ${cabecera("INVITADOS", "Una para cada invitado", "Solo escribes el nombre: toda la información de la boda ya está en tu formulario.")}
       ${listo ? "" : `<div class="aviso">Primero completa y guarda los datos de tu invitación.<span><button class="btn chico" data-gotab="datos">Ir a mi invitación</button></span></div>`}
       <section class="sec"><div class="sec-h"><span class="sec-ic">${I.invit}</span><div><h2>Nueva invitación</h2><p>Se crea un enlace único. Cuando esa persona confirme, sabrás exactamente quién fue.</p></div></div>
         <div class="nuevo">
@@ -374,6 +390,7 @@ export async function iniciarPanel(root, key) {
           <button class="btn sec" id="gen-lote">Generar todas</button></details>
       </section>
       <h2 class="lista-t">Tus invitaciones <em>${invitados.length}</em></h2>
+      <div class="acts-l"><button class="btn chico sec" data-refresh>Actualizar</button><button class="btn chico" data-csv ${invitados.length ? "" : "disabled"}>Descargar lista</button></div>
       ${invitados.length ? `<div class="buscar-w">${buscador("q-inv")}<div class="chips filtros" id="chips-inv">${chipsInv()}</div></div>` : ""}
       <div class="lista" id="lista-inv">${listaInvHTML()}</div>
       ${pie()}
@@ -413,27 +430,61 @@ export async function iniciarPanel(root, key) {
       <a class="btn chico" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(mensajeWA(i.nombre) + " " + enlace(i.codigo))}">WhatsApp</a>
       <button class="lnk" data-edit="${i.codigo}">Editar</button><button class="lnk mal" data-del="${i.codigo}">Eliminar</button></div></div>`;
 
-  // ---------- pestaña: respuestas (RSVP) ----------
-  function pintarRespuestas() {
-    const conf = invitados.filter(i => i.estado === "confirmado");
-    const pend = invitados.filter(i => i.estado === "pendiente");
-    const dec = invitados.filter(i => i.estado === "declinado");
-    const personas = conf.reduce((s, i) => s + (i.asistentes || i.pases), 0);
+  // ---------- pestaña: resumen ----------
+  const pct = (a, b) => (b ? Math.round((a * 100) / b) : 0);
+  function numeros() {
+    const conf = invitados.filter(i => i.estado === "confirmado"), dec = invitados.filter(i => i.estado === "declinado"), pend = invitados.filter(i => i.estado === "pendiente");
+    return { tot: invitados.length, resp: conf.length + dec.length, pend: pend.length, conf: conf.length, dec: dec.length,
+      pers: conf.reduce((t, i) => t + (i.asistentes || i.pases), 0), listaPend: pend };
+  }
+  const delta = (n, k) => (previo && n[k] - previo[k] > 0 ? `<span class="delta">+${n[k] - previo[k]}</span>` : "");
+  const objetivo = () => {
+    const f = parseFecha(cfg.fecha); if (!f) return null;
+    const [h, m] = String(cfg.ceremonia.hora || "00:00").split(":").map(Number);
+    return new Date(f.Y, f.M - 1, f.D, h || 0, m || 0).getTime();
+  };
+  function tickCuenta() {
+    const el = $("#cd"); if (!el) { clearInterval(cdTimer); return; }
+    const t = objetivo(); if (t == null) return;
+    const r = Math.max(0, Math.floor((t - Date.now()) / 1000));
+    const v = [Math.floor(r / 86400), Math.floor((r % 86400) / 3600), Math.floor((r % 3600) / 60), r % 60];
+    $$("[data-cd]", el).forEach((e, i) => (e.textContent = i === 0 ? v[0] : String(v[i]).padStart(2, "0")));
+  }
+  function pintarResumen() {
+    const n = numeros(), falta = faltantes();
+    const ult = invitados.filter(i => i.respondido).sort((a, b) => new Date(b.respondido) - new Date(a.respondido))[0];
+    const nueva = ult && previo && new Date(ult.respondido).getTime() > previo.ts;
+    const pers = x => `${x} ${x === 1 ? "invitado" : "invitados"}`;
+    const avisoResp = ult ? `<button class="notif" data-gotab="inv"><span class="av ${ult.estado}">${esc((ult.nombre.trim()[0] || "?").toUpperCase())}</span><span class="nt"><b>${nueva ? "Nueva respuesta" : "Última respuesta"}</b><small>${esc(ult.nombre)} ${ult.estado === "confirmado" ? `ha confirmado · ${pers(ult.asistentes || ult.pases)}` : "no podrá asistir"}</small></span></button>` : "";
+    const media = n.conf ? (n.pers / n.conf).toFixed(1).replace(".", ",") : "0";
+    const tarjetaN = (cls, ic, num, txt, sub, k) => `<div class="kpi ${cls}">${delta(n, k)}<span class="kpi-ic">${ic}</span><b>${num}</b><span class="kpi-t">${txt}</span><small>${I.sube} ${sub}</small></div>`;
+    const estado = !guardadoAlgunaVez ? ["En preparación", "gotab"] : falta.length ? [`Faltan ${falta.length} ${falta.length === 1 ? "dato" : "datos"}`, "gotab"] : ["Lista para enviar", "preview"];
+    const t = objetivo();
+    const cuenta = t == null ? "" : t - Date.now() <= 0
+      ? `<div class="cuenta"><h3>♡ El gran día ya llegó ♡</h3></div>`
+      : `<div class="cuenta" id="cd"><h3>♡ Cuenta atrás para el gran día ♡</h3><div class="cd-row"><div><b data-cd>0</b><span>Días</span></div><i>:</i><div><b data-cd>00</b><span>Horas</span></div><i>:</i><div><b data-cd>00</b><span>Min</span></div><i>:</i><div><b data-cd>00</b><span>Seg</span></div></div></div>`;
+    const pend = n.listaPend.slice(0, 4);
+    const rec = i => `<div class="rec-f"><div><b>${esc(i.nombre)}</b><small>${i.visto ? "Ya abrió su invitación" : "Aún no la abre"}</small></div><a class="btn chico" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent("Hola " + i.nombre + " 💌 Te recordamos confirmar tu asistencia a la boda de " + nombreCorto() + ". Tu invitación: " + enlace(i.codigo))}">Recordar</a></div>`;
     main.innerHTML = `<div class="vista">
-      ${cabecera("RESPUESTAS", "Quién confirmó", `${conf.length} de ${invitados.length} invitaciones confirmadas.`)}
-      <div class="stats"><div class="stat ok"><b>${personas}</b><span>personas confirmadas</span></div><div class="stat"><b>${pend.length}</b><span>sin responder</span></div><div class="stat"><b>${dec.length}</b><span>no asisten</span></div></div>
-      <section class="sec"><div class="barra-res">${buscador("q-res")}<div class="filtros chips">${[["todos", `Todos (${invitados.length})`], ["conf", `Confirmados (${conf.length})`], ["pend", `Pendientes (${pend.length})`], ["dec", `No asisten (${dec.length})`]].map(([k, t]) => `<button data-filtro="${k}" class="${filtro === k ? "on" : ""}">${t}</button>`).join("")}</div>
-        <div class="acts"><button class="btn chico sec" data-refresh>Actualizar</button><button class="btn chico" data-csv ${invitados.length ? "" : "disabled"}>Descargar lista</button></div></div>
-        <div class="lista" id="lista-res">${filasResHTML()}</div>
-      </section>
+      ${cabecera("RESUMEN", cfg.novia || cfg.novio ? `${esc(cfg.novia || "…")} <i>&amp;</i> ${esc(cfg.novio || "…")}` : `<span class="ph">Tu boda</span>`, "Así van las respuestas de tus invitados.", cortos() ? "una-linea" : "")}
+      <div class="dash">
+        ${avisoResp}
+        <div class="kpis">
+          ${tarjetaN("k-hero", I.sobre, n.tot, "Invitaciones creadas", n.resp + " respuestas recibidas", "tot")}
+          ${tarjetaN("k-resp", I.burbuja, n.resp, "Respuestas", pct(n.resp, n.tot) + "% de respuesta", "resp")}
+          ${tarjetaN("k-pend", I.relojc, n.pend, "Pendientes", pct(n.pend, n.tot) + "% de invitados", "pend")}
+          ${tarjetaN("k-conf", I.usercheck, n.conf, "Confirmados", pct(n.conf, n.resp) + "% de respuestas", "conf")}
+          ${tarjetaN("k-dec", I.userx, n.dec, "Rechazados", pct(n.dec, n.resp) + "% de respuestas", "dec")}
+          ${tarjetaN("k-pers", I.gente, n.pers, "Total asistentes", media + " de media", "pers")}
+        </div>
+        <button class="estado" ${estado[1] === "preview" ? "data-preview" : 'data-gotab="datos"'}><span class="kpi-ic">${I.caja}</span><span class="et"><small>Estado de la invitación</small><b>${estado[0]}</b></span>${I.flecha}</button>
+        ${cuenta}
+        ${pend.length ? `<section class="rec"><h3>Faltan por responder <em>${n.pend}</em></h3>${pend.map(rec).join("")}${n.pend > pend.length ? `<button class="lnk" data-gotab="inv">Ver todos →</button>` : ""}</section>` : ""}
+        ${n.tot ? "" : `<div class="vacio">Aún no has creado invitaciones. <button class="lnk" data-gotab="inv">Crear la primera →</button></div>`}
+      </div>
       ${pie()}
     </div>`;
-  }
-
-  function filasResHTML() {
-    const l = invitados.filter(i => pasaFiltro(i, filtro) && coincide(i))
-      .sort((a, b) => (b.respondido ? new Date(b.respondido) : 0) - (a.respondido ? new Date(a.respondido) : 0));
-    return l.length ? l.map(i => `<div class="ti"><div class="top"><div><div class="nom">${esc(i.nombre)}</div><div class="meta">${detalleEstado(i)}</div></div><span class="badge ${i.estado}">${estadoTxt[i.estado]}</span></div><div class="acts"><button class="lnk mal" data-del="${i.codigo}">Eliminar</button></div></div>`).join("") : (invitados.length ? vacioBusqueda().replace("ninguna invitación", "ningún invitado") : `<div class="vacio">Cuando crees invitaciones, aquí verás quién confirma.</div>`);
+    clearInterval(cdTimer); tickCuenta(); cdTimer = setInterval(tickCuenta, 1000);
   }
 
   function descargarCSV() {
@@ -449,12 +500,11 @@ export async function iniciarPanel(root, key) {
   function pintar() {
     $$(".bnav button", root).forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle("on", on); b.setAttribute("aria-current", on ? "page" : "false"); });
     $("#n-inv").textContent = invitados.length || ""; $("#n-inv").style.display = invitados.length ? "" : "none";
-    const nc = invitados.filter(i => i.estado === "confirmado").length;
-    $("#n-res").textContent = nc || ""; $("#n-res").style.display = nc ? "" : "none";
-    ({ datos: pintarDatos, inv: pintarInvitaciones, res: pintarRespuestas })[tab]();
+    clearInterval(cdTimer);
+    ({ resumen: pintarResumen, datos: pintarDatos, inv: pintarInvitaciones })[tab]();
     actualizarEstado();
     clearInterval(refreshTimer);
-    if (tab === "res") refreshTimer = setInterval(() => recargar(true), 30000);
+    if (tab === "resumen") refreshTimer = setInterval(() => recargar(true), 30000);
   }
   async function recargar(silencio) {
     try { const d = await rpc("boda_admin_get", { p_key: key }); invitados = d.invitados || []; if (tab !== "datos") pintar(); if (!silencio) toast("Lista actualizada"); }
@@ -564,11 +614,10 @@ export async function iniciarPanel(root, key) {
     if (d.rm) { setPath(cfg, d.rm, ""); marcarCambio(); return repintarDatos(); }
     if (d.rmF !== undefined) { cfg.fotos.final.splice(+d.rmF, 1); marcarCambio(); return repintarDatos(); }
     if (d.copy) return copiar(enlace(d.copy));
-    if (d.filtro) { filtro = d.filtro; return pintarRespuestas(); }
     if (d.finv) { filtroInv = d.finv; $("#chips-inv").innerHTML = chipsInv(); $("#lista-inv").innerHTML = listaInvHTML(); return; }
     if (d.limpiar !== undefined) {
       busqueda = ""; const inp = $(".buscar input"); inp.value = ""; t.hidden = true; inp.focus();
-      if (inp.id === "q-inv") $("#lista-inv").innerHTML = listaInvHTML(); else $("#lista-res").innerHTML = filasResHTML();
+      $("#lista-inv").innerHTML = listaInvHTML();
       return;
     }
     if (d.refresh !== undefined) return recargar(false);
@@ -614,10 +663,10 @@ export async function iniciarPanel(root, key) {
   }
 
   root.addEventListener("input", e => {
-    if (e.target.id === "q-inv" || e.target.id === "q-res") {
+    if (e.target.id === "q-inv") {
       busqueda = e.target.value;
       const x = $(".b-x", e.target.parentElement); if (x) x.hidden = !busqueda;
-      if (e.target.id === "q-inv") $("#lista-inv").innerHTML = listaInvHTML(); else $("#lista-res").innerHTML = filasResHTML();
+      $("#lista-inv").innerHTML = listaInvHTML();
       return;
     }
     const k = e.target.dataset.k;
@@ -639,5 +688,6 @@ export async function iniciarPanel(root, key) {
   });
   document.addEventListener("click", e => { if (!e.target.closest(".sel, .menu, .kebab, #b-menu")) cerrarMenus(); });
 
+  { const n0 = numeros(); try { localStorage.setItem(visKey, JSON.stringify({ tot: n0.tot, resp: n0.resp, pend: n0.pend, conf: n0.conf, dec: n0.dec, pers: n0.pers, ts: Date.now() })); } catch {} }
   pintar();
 }
