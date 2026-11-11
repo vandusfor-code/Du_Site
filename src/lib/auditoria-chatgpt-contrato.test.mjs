@@ -342,3 +342,23 @@ test("32. El prompt exige comillas simples dentro del texto (evita el error de J
   assert.match(p, /comillas simples/i);
   assert.match(p, /NO uses comillas dobles/i);
 });
+
+test("33. El prompt deja claro el 'No aplica' para llamadas cortas/cortadas (encuesta y cierre)", () => {
+  const p = construirPromptUniversal();
+  // La encuesta es obligatoria cuando sí llega al cierre…
+  assert.match(p, /encuesta es OBLIGATORIA/i);
+  // …pero no se penaliza cuando la interacción no llegó al cierre.
+  assert.match(p, /interacciones que NO se desarrollan|se cortan/i);
+  assert.match(p, /el usuario colg/i);
+  assert.match(p, /No aplica/);
+});
+
+test("34. 'No aplica' en encuesta Y cierre por llamada cortada → ok, se excluyen de la nota", () => {
+  const data = JSON.parse(bloqueValido());
+  data.criterios.encuesta = { resultado: "No aplica", evidencia: "la llamada se cortó antes del cierre" };
+  data.criterios.cierre = { resultado: "No aplica", evidencia: "el usuario colgó, no hubo despedida" };
+  const r = parseAuditoriaChatGPT(JSON.stringify(data));
+  assert.equal(r.ok, true, JSON.stringify(erroresDe(r)));
+  // saludo, empatia, sonrisa, claridad "Cumple" (4 que puntúan) → 100/OK.
+  assert.deepEqual(r.notaCalculada, { nota: 100, tipoNota: "OK" });
+});

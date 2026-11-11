@@ -496,10 +496,10 @@ export function construirPromptUniversal(): string {
     empatia: "Cumple si el AGENTE muestra sensibilidad ante la situación del usuario.",
     sonrisa: "En llamada: Cumple si el AGENTE mantiene un tono positivo y amable durante toda la interacción. En chat: Cumple si mantiene amabilidad en la redacción.",
     claridad: "Cumple si el AGENTE es directo y el usuario entiende sin tener que repreguntar.",
-    encuesta: "Cumple si el AGENTE invita a la encuesta. Marca \"No aplica\" SOLO si la interacción se cortó y no hubo oportunidad de invitarla.",
+    encuesta: "La invitación a la encuesta es OBLIGATORIA cuando la interacción llega a su cierre. PRIMERO valida en la transcripción si la interacción se desarrolló y llegó a esa instancia (la asesora atendió la gestión y alcanzó a despedirse, o al menos llegó el momento de cerrar). Si SÍ llegó al cierre: marca 'Cumple' solo si el AGENTE invitó EXPLÍCITAMENTE a la encuesta; si no la mencionó, 'No cumple'. Si la interacción NO llegó al cierre (llamada corta, se cortó, o el usuario colgó/se fue antes de que la asesora pudiera cerrar): marca 'No aplica' — nunca 'No cumple', porque no hubo oportunidad. OJO: NO uses 'No aplica' si la asesora sí se despidió pero simplemente olvidó la encuesta; eso es 'No cumple'.",
     informacion: "Cumple si el AGENTE da una respuesta concreta a lo solicitado. (No afecta la nota oficial.)",
     proceso: "Cumple si el AGENTE sigue un proceso lógico y ordenado. (No afecta la nota oficial.)",
-    cierre: "Cumple si el AGENTE hace las 3 cosas: pregunta si necesita algo más + se despide con su nombre + invita a la encuesta.",
+    cierre: "Evalúa el cierre SOLO si la interacción llegó a esa instancia. Cumple si el AGENTE hace las 3 cosas al cerrar: (1) pregunta si necesita algo más / alguna otra duda, (2) se despide con su nombre, (3) invita a la encuesta. Si llegó al cierre pero falta alguna de las 3, 'No cumple'. Si la interacción NO llegó al cierre (llamada corta, se cortó, o el usuario colgó antes de que la asesora pudiera despedirse): marca 'No aplica' — no se penaliza un cierre que no tuvo oportunidad de darse.",
   };
 
   const listaCriterios = CRITERIOS
@@ -531,6 +531,13 @@ Valores permitidos para "resultado": ${VALORES_CRITERIO.map((v) => `"${v}"`).joi
 Regla de evidencia: marca "Cumple" SOLO si hay evidencia textual explícita de que el AGENTE lo hizo. Ante la duda o ausencia de evidencia, marca "No cumple". NO uses "No aplica" por falta de evidencia: "No aplica" es solo para casos en que el criterio realmente no corresponde (p. ej. encuesta cuando la interacción se cortó).
 Regla de criterios compuestos (saludo y cierre): exigen VARIAS partes a la vez. Marca "Cumple" solo si están TODAS las partes; si falta aunque sea una, es "No cumple". No lo marques "Cumple" por cumplir la mayoría.
 Regla de evidencia obligatoria: cada "evidencia" debe ser una cita real tomada de la transcripción. Si marcas "No cumple", la evidencia explica brevemente qué faltó. Nunca dejes la evidencia vacía ni inventada.
+
+REGLA CRÍTICA — interacciones que NO se desarrollan o se cortan:
+Algunas llamadas/chats son muy cortos o se cortan y el usuario cuelga o se va ANTES de que la asesora pueda cerrar la interacción. En esos casos NUNCA marques "No cumple" en "encuesta" ni en "cierre": marca "No aplica", porque la asesora no tuvo oportunidad de invitar a la encuesta ni de despedirse. No se puede calificar mal algo que no llegó a corresponder.
+Procedimiento obligatorio antes de evaluar "encuesta" y "cierre":
+1) Lee la transcripción y determina si la interacción LLEGÓ a la etapa de cierre: ¿la asesora alcanzó a atender/resolver la gestión y a despedirse, o al menos llegó el momento natural de cerrar?
+2) Si SÍ llegó al cierre → la encuesta es OBLIGATORIA: "Cumple" solo si la invitó; si no, "No cumple". Y evalúa las 3 partes del cierre.
+3) Si NO llegó al cierre (se cortó, llamada corta, el usuario colgó/se fue) → "encuesta" = "No aplica" y "cierre" = "No aplica". En la evidencia explica por qué (p. ej. 'la llamada se cortó antes del cierre, el usuario colgó').
 
 Puntaje de tuteo (campo "puntaje_tuteo"), valores permitidos: ${VALORES_TUTEO.map((v) => `"${v}"`).join(", ")}. Tuteo real = uso de "tú/te/ti/tu/tuyo" dirigido al usuario; "usted/su/le" NO es tuteo.
 
