@@ -12,7 +12,7 @@ import Terminal from "./Terminal";
 import { useCuenta, useRsvp } from "./hooks";
 import { Musica, Silencio, Terminal as IcTerminal } from "./icons";
 import { despertar, setSonido, sonidoActivo, sfx } from "./audio";
-import { iniciar as iniciarMusica, preparar as prepararMusica } from "./musica";
+import { bloquear as bloquearMusica, iniciar as iniciarMusica, pausar as pausarMusica, permitir as permitirMusica, preparar as prepararMusica } from "./musica";
 
 const Mundo = dynamic(() => import("./Mundo"), { ssr: false });
 
@@ -54,21 +54,61 @@ export default function Invitacion(props: InvProps) {
     setSnd(sonidoActivo());
   }, []);
 
-  // la canción (si hay) se deja lista; empieza a sonar cuando el invitado desliza después de la compilación
+  // ---------- CANCIÓN (blindada): nunca suena en la pantalla de inicio ----------
+  // Cada carga arranca bloqueada, en silencio y sin que el navegador restaure un scroll viejo.
+  useEffect(() => {
+    bloquearMusica();
+    try {
+      if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    } catch {}
+    if (!props.directo) window.scrollTo(0, 0);
+    return () => bloquearMusica();
+  }, [props.directo]);
   useEffect(() => {
     if (cfg.cancion) prepararMusica(cfg.cancion);
   }, [cfg.cancion]);
+
+  // Compuerta: la canción solo empieza si (a) ya terminó la compilación, (b) hubo un gesto real de desplazamiento
+  // DESPUÉS de eso y (c) la posición confirma que el invitado ya salió de la pantalla de inicio.
+  // Si vuelve arriba, se pausa y la compuerta se cierra hasta que deslice otra vez.
   useEffect(() => {
     if (fase !== "pagina" || !cfg.cancion) return;
-    const h = () => {
-      if (window.scrollY > 40) {
-        window.removeEventListener("scroll", h);
+    let gesto = false;
+    let sonando = false;
+    const marca = () => {
+      gesto = true;
+    };
+    const tecla = (e: KeyboardEvent) => {
+      if (["ArrowDown", "ArrowUp", "PageDown", "PageUp", "End", "Home", " "].includes(e.key)) gesto = true;
+    };
+    const evaluar = () => {
+      const ancla = document.getElementById("anfitrion");
+      if (!ancla) return;
+      const top = ancla.getBoundingClientRect().top;
+      const salio = top < window.innerHeight * 0.65 && window.scrollY > 120;
+      const enInicio = top > window.innerHeight * 0.9 || window.scrollY < 60;
+      if (!sonando && gesto && salio) {
+        sonando = true;
+        permitirMusica();
         iniciarMusica();
+      } else if (sonando && enInicio) {
+        sonando = false;
+        pausarMusica();
       }
     };
-    window.addEventListener("scroll", h, { passive: true });
-    h();
-    return () => window.removeEventListener("scroll", h);
+    const opc = { passive: true, capture: true } as const;
+    window.addEventListener("wheel", marca, opc);
+    window.addEventListener("touchmove", marca, opc);
+    window.addEventListener("pointerdown", marca, opc);
+    window.addEventListener("keydown", tecla, opc);
+    window.addEventListener("scroll", evaluar, { passive: true });
+    return () => {
+      window.removeEventListener("wheel", marca, opc);
+      window.removeEventListener("touchmove", marca, opc);
+      window.removeEventListener("pointerdown", marca, opc);
+      window.removeEventListener("keydown", tecla, opc);
+      window.removeEventListener("scroll", evaluar);
+    };
   }, [fase, cfg.cancion]);
 
   // bloquear scroll mientras dura la portada y la compilación
