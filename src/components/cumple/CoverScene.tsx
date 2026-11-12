@@ -15,7 +15,8 @@ export interface CoverProps {
   letra: string;
   tituloCarta: string[];
   subCarta: string;
-  abrir: boolean; // lo activa el botón de la portada
+  mantener: boolean; // el invitado mantiene presionado el botón de la portada
+  onLista?: () => void; // el lienzo 3D ya está listo
   onProgreso: (p: number) => void;
   onSolicitaAbrir: () => void;
   onAbierto: () => void;
@@ -82,6 +83,9 @@ function Escena({ p }: { p: CoverProps }) {
     fase: "idle" as "idle" | "rompe" | "fin",
     prog: 0,
     sostiene: false,
+    boton: false,
+    sost0: 0,
+    base: 0,
     auto: false,
     t: 0,
     ult: 0,
@@ -92,10 +96,10 @@ function Escena({ p }: { p: CoverProps }) {
     fin: false,
   });
 
-  // el botón de la portada dispara la apertura automática
+  // el botón de la portada: mientras se mantiene presionado, el sello se va resquebrajando
   useEffect(() => {
-    if (p.abrir && st.current.fase === "idle") st.current.auto = true;
-  }, [p.abrir]);
+    st.current.boton = p.mantener;
+  }, [p.mantener]);
 
   // puntero / giroscopio → inclinación suave de toda la escena
   useEffect(() => {
@@ -118,6 +122,7 @@ function Escena({ p }: { p: CoverProps }) {
 
   useFrame((state, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05);
+    const dtP = Math.min(dtRaw, 0.25); // el llenado del sello va por tiempo real (1.5 s) aunque el equipo sea lento
     const s = st.current;
     const time = state.clock.elapsedTime;
     pantalla.tick(dt);
@@ -133,8 +138,18 @@ function Escena({ p }: { p: CoverProps }) {
 
     // ---- mantener pulsado el sello ----
     if (s.fase === "idle") {
-      if (s.sostiene || s.auto) s.prog = clamp01(s.prog + dt / (s.auto ? 0.55 : 1.05));
-      else s.prog = clamp01(s.prog - dt * 1.6);
+      // el llenado sigue el reloj real (1.5 s), sin depender de los cuadros por segundo del equipo
+      if (s.sostiene || s.boton || s.auto) {
+        const ahora = performance.now();
+        if (!s.sost0) {
+          s.sost0 = ahora;
+          s.base = s.prog;
+        }
+        s.prog = clamp01(s.base + (ahora - s.sost0) / 1000 / (s.auto ? 0.55 : 1.5));
+      } else {
+        s.sost0 = 0;
+        s.prog = clamp01(s.prog - dtP * 1.6);
+      }
       if (s.prog > 0.02 && time - s.ult > 0.11) {
         s.ult = time;
         sfx.crujido(s.prog);
@@ -495,6 +510,7 @@ export default function CoverScene(props: CoverProps) {
       style={{ position: "absolute", inset: 0, touchAction: "none" }}
       onCreated={(st) => {
         if (process.env.NODE_ENV !== "production") (window as unknown as { __cm?: unknown }).__cm = st;
+        props.onLista?.();
       }}
     >
       <Escena p={props} />

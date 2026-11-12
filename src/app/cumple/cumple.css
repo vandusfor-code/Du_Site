@@ -2360,3 +2360,86 @@ html.lenis body {
   justify-self: start;
   padding-left: 0;
 }
+
+/* ---------- portada: hay que MANTENER presionado (no basta con tocar) ---------- */
+.cm-abrir {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+}
+.cm-abrir.mantiene {
+  transform: scale(0.97);
+  border-color: var(--or);
+  box-shadow: 0 6px 18px rgba(240, 127, 19, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+.cm-abrir.cargando {
+  opacity: 0.7;
+  cursor: progress;
+}
+.cm-abrir.aviso {
+  animation: cm-sacude 0.5s ease both;
+  border-color: #d9534f;
+}
+.cm-abrir.aviso .t1 {
+  color: #c0392b;
+}
+@keyframes cm-sacude {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-7px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+.cm-abrir .go {
+  position: relative;
+}
+.cm-abrir:not(.mantiene):not(.cargando) .go::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid rgba(240, 127, 19, 0.6);
+  animation: cm-onda 1.8s ease-out infinite;
+}
+@keyframes cm-onda {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+.cm-hint {
+  max-width: 32ch;
+  text-align: left;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  line-height: 1.45;
+  color: var(--ink);
+  animation: none;
+}
+.cm-hint b {
+  color: var(--or-d);
+  font-weight: 600;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-abrir .go::after,
+  .cm-abrir.aviso {
+    animation: none;
+  }
+}
