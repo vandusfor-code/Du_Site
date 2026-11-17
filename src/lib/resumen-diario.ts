@@ -5,6 +5,8 @@ import { obtenerConfigIA } from "@/lib/config-ia";
 import { obtenerFuncionariosParaSelector } from "@/lib/auditorias-admin";
 import { enviarCorreoIndividual, FROM_CALIDAD } from "@/lib/mailer";
 import { correoDeEnvio } from "@/lib/notificacion-por-enviar";
+import { enviarLoteAuditorias } from "@/lib/envio-auditorias";
+import { registrarAcuse, registrarCompromisoCiclo } from "@/lib/acuse-compromiso-ciclo";
 
 // ============================================================
 // RESUMEN DIARIO DE AUDITORÍAS (una notificación por asesora/día).
@@ -183,6 +185,10 @@ export async function notificarResumenesDelDia(fecha: string): Promise<Resultado
 
   for (const r of resumenes) {
     if (!r.correo) { sinCorreo++; detalle.push({ nombre: r.nombre, estado: "Sin correo" }); continue; }
+    // Idempotencia: si ya se notificó hoy, NO se reenvía (evita doble correo),
+    // pero igual cuenta como notificada y el ciclo se marcará abajo.
+    const { data: yaEnv } = await supabase.from("resumen_diario").select("enviado_en").eq("fecha", fecha).eq("asesor_codigo", r.asesorCodigo).maybeSingle();
+    if (yaEnv?.enviado_en) { notificadas++; detalle.push({ nombre: r.nombre, estado: "Ya notificada (no se reenvió)" }); continue; }
     const { destino } = correoDeEnvio(r.correo);
     try {
       const envio = await enviarCorreoIndividual(destino, `Tu retroalimentación de calidad — ${fecha}`, correoHtml(r.nombre, r, url, fecha), FROM_CALIDAD);
@@ -197,6 +203,17 @@ export async function notificarResumenesDelDia(fecha: string): Promise<Resultado
       fallidas++; detalle.push({ nombre: r.nombre, estado: "Falló el envío" });
     }
   }
+
+  // CONEXIÓN con el módulo Calidad: crea/marca los ciclos del día como NOTIFICADA
+  // (sin reenviar el correo de lote). Así el tablero de Calidad muestra los
+  // pendientes de acuse y, si no firman a tiempo, el cron los escala a Coordinación.
+  // Best-effort: si falla, la notificación por correo igual quedó hecha.
+  try {
+    await enviarLoteAuditorias(fecha, undefined, { soloMarcar: true });
+  } catch (e) {
+    console.error("[resumen-diario] marcar ciclos NOTIFICADA falló:", e instanceof Error ? e.message : e);
+  }
+
   return { asesorasNotificadas: notificadas, sinCorreo, fallidas, detalle };
 }
 
@@ -270,11 +287,36 @@ export async function firmarResumenDiario(nombre: string, fecha: string, comprom
   if (!comp) return { ok: false, error: "Escribe tu compromiso de mejora antes de firmar." };
   const supabase = getSupabase();
   // Resuelve la fila exacta por nombre tolerante + fecha.
-  const { data: todos } = await supabase.from("resumen_diario").select("id, nombre, fecha, firmado_en").eq("fecha", fecha);
+  const { data: todos } = await supabase.from("resumen_diario").select("id, nombre, fecha, asesor_codigo, firmado_en").eq("fecha", fecha);
   const fila = (todos ?? []).find((r) => norm(String(r.nombre)) === norm(nombre));
   if (!fila) return { ok: false, error: "No se encontró tu resumen del día." };
   if (fila.firmado_en) return { ok: true }; // ya firmado (idempotente)
   const { error } = await supabase.from("resumen_diario").update({ firmado_en: new Date().toISOString(), compromiso: comp }).eq("id", fila.id);
   if (error) return { ok: false, error: error.message };
+
+  // CONEXIÓN con el módulo Calidad: una sola firma ACUSA todas sus auditorías del
+  // día; en las que requieren compromiso (PENC) registra el MISMO compromiso.
+  // Best-effort por auditoría: no bloquea la firma del resumen.
+  const codigo = String(fila.asesor_codigo ?? "").trim();
+  if (codigo) {
+    try {
+      const porAsesor = await auditoriasPorAsesora(fecha);
+      const audits = porAsesor.get(codigo) ?? [];
+      for (const a of audits) {
+        if (!a.idGestion) continue;
+        try {
+          const res = await registrarAcuse(a.idGestion, codigo);
+          if (res.estado === "COMPROMISO_PENDIENTE") {
+            await registrarCompromisoCiclo(a.idGestion, codigo, comp);
+          }
+        } catch (e) {
+          console.error("[resumen-diario] acuse/compromiso ciclo falló:", a.idGestion, e instanceof Error ? e.message : e);
+        }
+      }
+    } catch (e) {
+      console.error("[resumen-diario] acuse en bloque falló:", e instanceof Error ? e.message : e);
+    }
+  }
+
   return { ok: true };
 }

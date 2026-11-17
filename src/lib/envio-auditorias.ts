@@ -197,7 +197,14 @@ function enmascararCorreo(correo: string): string {
 // Envía un correo por asesora para sus auditorías PENDIENTES (CREADA) de la
 // fecha. `asesora` restringe a una; vacío = todas las de la fecha. Recalcula
 // TODO server-side: nunca confía en ids enviados por el navegador.
-export async function enviarLoteAuditorias(fecha: string, asesora?: string): Promise<ResultadoEnvioLote> {
+export async function enviarLoteAuditorias(
+  fecha: string,
+  asesora?: string,
+  opciones?: { soloMarcar?: boolean }
+): Promise<ResultadoEnvioLote> {
+  // soloMarcar: marca los ciclos CREADA->NOTIFICADA SIN enviar el correo de lote
+  // (lo usa el flujo "Resumen del día", que envía su propio correo consolidado).
+  const soloMarcar = opciones?.soloMarcar === true;
   // Asegura que exista la fila de ciclo de cada auditoría (incl. las recién
   // guardadas, que todavía no tienen ciclo). adoptarAuditorias() es idempotente
   // (upsert ignoreDuplicates): crea en CREADA las elegibles y NO_ELEGIBLE las
@@ -272,12 +279,17 @@ export async function enviarLoteAuditorias(fecha: string, asesora?: string): Pro
     const html = correoLoteAuditorias(nombre, url, idsCoinciden.length, fechaLabel);
 
     let envio;
-    try {
-      envio = await enviarCorreoIndividual(destino, `Tienes ${idsCoinciden.length} auditoría(s) de calidad por revisar`, html, FROM_CALIDAD);
-    } catch (e) {
-      fallidas++;
-      resultados.push({ ...base, accion: "FALLO_ENVIO", detalle: e instanceof Error ? e.message : String(e) });
-      continue;
+    if (soloMarcar) {
+      // No se envía el correo de lote: el resumen del día ya se envió aparte.
+      envio = { aceptado: true, messageId: "resumen-diario", respuestaServidor: null };
+    } else {
+      try {
+        envio = await enviarCorreoIndividual(destino, `Tienes ${idsCoinciden.length} auditoría(s) de calidad por revisar`, html, FROM_CALIDAD);
+      } catch (e) {
+        fallidas++;
+        resultados.push({ ...base, accion: "FALLO_ENVIO", detalle: e instanceof Error ? e.message : String(e) });
+        continue;
+      }
     }
     if (!envio.aceptado) {
       fallidas++;
