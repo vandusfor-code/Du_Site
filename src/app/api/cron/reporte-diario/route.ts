@@ -22,10 +22,12 @@ function tokenValido(request: NextRequest): boolean {
 async function ejecutar(request: NextRequest): Promise<NextResponse> {
   if (!tokenValido(request)) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const dry = ["1", "true", "si", "sí"].includes((request.nextUrl.searchParams.get("dry") ?? "").toLowerCase());
+  // Reenvío de un día puntual: ?fecha=DD/MM/YYYY (la hoja debe mostrar ese día en B1).
+  const fecha = request.nextUrl.searchParams.get("fecha") ?? undefined;
   if (corriendo) return NextResponse.json({ ok: true, saltado: true, motivo: "Ya en ejecución." });
   corriendo = true;
   try {
-    const r = await enviarReporteDiario(dry);
+    const r = await enviarReporteDiario(dry, fecha);
     console.log("[cron/reporte-diario]", JSON.stringify(r));
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {

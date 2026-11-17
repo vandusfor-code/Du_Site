@@ -104,10 +104,18 @@ export interface ResultadoReporte {
 }
 
 // Genera y envía el reporte. `dry` evalúa todo (incluido el PDF) sin enviar.
-export async function enviarReporteDiario(dry = false): Promise<ResultadoReporte> {
-  const { fecha, diaSemana } = hoyColombia();
+// `fechaOverride` (DD/MM/YYYY) fuerza la fecha del ASUNTO/CUERPO/NOMBRE del PDF
+// —para reenviar un día puntual cuyo envío automático falló—. El PDF sigue
+// exportando lo que muestre la hoja "Gestiones diarias" en ese momento (celda
+// B1), así que antes de llamar con una fecha pasada, esa hoja debe mostrar ese
+// día (poner la fecha en B1). Con fecha explícita NO aplica la regla de domingos.
+export async function enviarReporteDiario(dry = false, fechaOverride?: string): Promise<ResultadoReporte> {
+  const hoy = hoyColombia();
+  const fechaManual = (fechaOverride ?? "").trim();
+  const usaOverride = /^\d{2}\/\d{2}\/\d{4}$/.test(fechaManual);
+  const fecha = usaOverride ? fechaManual : hoy.fecha;
   const dest = destinatarios();
-  if (diaSemana === 0) {
+  if (!usaOverride && hoy.diaSemana === 0) {
     return { enviado: false, motivo: "Domingo: no se envía.", fecha, destinatarios: dest };
   }
   const gid = await gidDeHoja();
