@@ -19,6 +19,7 @@ import AdminSidebar from "./AdminSidebar";
 import AuditoriaManualForm from "./AuditoriaManualForm";
 import AuditoriaChatGPTForm from "./AuditoriaChatGPTForm";
 import EnvioAuditorias from "./EnvioAuditorias";
+import ConfigIAPanel from "./ConfigIAPanel";
 import styles from "./auditorias.module.css";
 
 /* Formateo es-CO: 1021 → "1.021", 91.4 → "91,4" */
@@ -350,7 +351,9 @@ export default function AdminDashboard({
               )}
             </section>
           ) : (
-            <section className={styles.panel}>
+            <>
+            <ConfigIAPanel onBanner={(msg) => setBanner(msg)} />
+            <section className={styles.panel} style={{ marginTop: 16 }}>
               <h2><TrendingUp size={18} />Estado de auditorías</h2>
               <div className={styles.miniStats}>
                 <div><Clock3 className={styles.warnIcon} /><b>{data?.estado.pendientes ?? 0}</b><span>Pendientes</span></div>
@@ -373,6 +376,7 @@ export default function AdminDashboard({
                 </button>
               </div>
             </section>
+            </>
           )}
 
           {/* Cumplimiento por criterio */}

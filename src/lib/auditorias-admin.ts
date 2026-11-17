@@ -3,6 +3,7 @@ import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate, hoyEn
 import { parseCsv } from "@/lib/csv-parse";
 import { resolverAsesor } from "@/lib/auditoria-chatgpt-contrato";
 import { registrarAuditoriaBono } from "@/lib/bono-store";
+import { obtenerConfigIA } from "@/lib/config-ia";
 
 // ============================================================
 // AUDITORÍA COFREM — puerto del Apps Script original a Next.js.
@@ -143,6 +144,61 @@ async function llamarClaude(prompt: string, modelo: string, maxTokens: number, i
   return null;
 }
 
+// Llamada a OpenAI (Chat Completions). La key y el modelo salen de la config
+// editable (app_config). `jsonMode` fuerza salida JSON válida (response_format),
+// lo que reduce fallos de parseo en los criterios/textos.
+async function llamarOpenAI(
+  prompt: string, modelo: string, maxTokens: number, jsonMode: boolean, apiKey: string, intentos = 2
+): Promise<string | null> {
+  const url = "https://api.openai.com/v1/chat/completions";
+  for (let intento = 1; intento <= intentos; intento++) {
+    try {
+      const body: Record<string, unknown> = {
+        model: modelo,
+        max_tokens: maxTokens,
+        temperature: 0.2,
+        messages: [{ role: "user", content: prompt }],
+      };
+      if (jsonMode) body.response_format = { type: "json_object" };
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify(body),
+      });
+      if (response.status === 429) {
+        await new Promise((r) => setTimeout(r, Math.pow(2, intento) * 1000));
+        continue;
+      }
+      const json = await response.json();
+      if (!response.ok) {
+        console.error(`Error HTTP ${response.status} en OpenAI ${modelo}:`, json?.error?.message);
+        return null;
+      }
+      const txt = json?.choices?.[0]?.message?.content;
+      if (typeof txt === "string" && txt.trim()) return txt;
+      console.error("Respuesta inesperada de OpenAI:", JSON.stringify(json).slice(0, 300));
+      return null;
+    } catch (e) {
+      console.error(`Fallo OpenAI intento ${intento} (${modelo}):`, e);
+      if (intento < intentos) await new Promise((r) => setTimeout(r, Math.pow(2, intento) * 1000));
+    }
+  }
+  return null;
+}
+
+// Router del auditor: usa OpenAI si está configurado como motor y hay API key;
+// si no, cae a Claude (comportamiento anterior). `claudeModelo` es el modelo a
+// usar cuando el motor es Claude. Las dos respuestas del auditor son JSON.
+async function llamarAuditor(
+  prompt: string, maxTokens: number, jsonMode: boolean, claudeModelo: string
+): Promise<string | null> {
+  const cfg = await obtenerConfigIA();
+  if (cfg.motor === "openai" && cfg.openaiKey) {
+    return llamarOpenAI(prompt, cfg.modelo, maxTokens, jsonMode, cfg.openaiKey);
+  }
+  return llamarClaude(prompt, claudeModelo, maxTokens);
+}
+
 function extraerJson<T>(texto: string): T | null {
   try {
     const clean = texto.replace(/```json|```/g, "").trim();
@@ -257,9 +313,9 @@ Responde ÚNICAMENTE con JSON válido, sin texto adicional:
 TRANSCRIPCIÓN:
 ${transcripcion}`;
 
-  const respuestaCriterios = await llamarClaude(promptCriterios, MODELO_CRITERIOS, 1024);
+  const respuestaCriterios = await llamarAuditor(promptCriterios, 1024, true, MODELO_CRITERIOS);
   if (!respuestaCriterios) {
-    await registrarError(idGestion, "Claude (criterios) no respondió");
+    await registrarError(idGestion, "IA (criterios) no respondió");
     return null;
   }
 
@@ -368,9 +424,9 @@ Responde ÚNICAMENTE con JSON válido, sin texto adicional antes o después:
 TRANSCRIPCIÓN:
 ${transcripcion}`;
 
-  const respuestaTextos = await llamarClaude(promptTextos, MODELO_TEXTOS, 2048);
+  const respuestaTextos = await llamarAuditor(promptTextos, 2048, true, MODELO_TEXTOS);
   if (!respuestaTextos) {
-    await registrarError(idGestion, "Claude (textos) no respondió");
+    await registrarError(idGestion, "IA (textos) no respondió");
     return null;
   }
 

@@ -18,6 +18,7 @@ import {
   type AuditoriaManualInput,
 } from "@/lib/auditorias-admin";
 import { obtenerEnvioAuditorias, enviarLoteAuditorias, type ResultadoEnvioLote } from "@/lib/envio-auditorias";
+import { obtenerConfigIA, guardarConfigIA, probarOpenAIKey, enmascararKey } from "@/lib/config-ia";
 import type { FiltrosEnvio, ResumenEnvio } from "@/lib/envio-auditorias-tipos";
 
 // Corregido: verificaba session.user.modulos.includes("admin") — el
@@ -93,6 +94,39 @@ export async function guardarAuditoriaChatGPTAction(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "No se pudo guardar la auditoría." };
   }
+}
+
+// ── Configuración del auditor con IA (OpenAI) ──
+// La API key NUNCA se devuelve al cliente: solo si existe y una máscara.
+export async function obtenerConfigIAAction(): Promise<{
+  tieneKey: boolean; keyMascara: string; modelo: string; motor: "openai" | "claude";
+}> {
+  await requireAdminAction();
+  const cfg = await obtenerConfigIA(true);
+  return { tieneKey: !!cfg.openaiKey, keyMascara: enmascararKey(cfg.openaiKey), modelo: cfg.modelo, motor: cfg.motor };
+}
+
+export async function guardarConfigIAAction(input: {
+  openaiKey?: string; modelo?: string; motor?: "openai" | "claude";
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireAdminAction();
+    const patch: Partial<{ openaiKey: string; modelo: string; motor: "openai" | "claude" }> = {};
+    // Solo actualiza la key si mandaron una no vacía (para no borrarla sin querer).
+    if (typeof input.openaiKey === "string" && input.openaiKey.trim()) patch.openaiKey = input.openaiKey.trim();
+    if (typeof input.modelo === "string" && input.modelo.trim()) patch.modelo = input.modelo.trim();
+    if (input.motor === "openai" || input.motor === "claude") patch.motor = input.motor;
+    await guardarConfigIA(patch);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "No se pudo guardar la configuración." };
+  }
+}
+
+export async function probarOpenAIAction(): Promise<{ ok: boolean; mensaje: string }> {
+  await requireAdminAction();
+  const cfg = await obtenerConfigIA(true);
+  return probarOpenAIKey(cfg.openaiKey, cfg.modelo);
 }
 
 // ── Envío de auditorías por asesora (sección de Auditoría ChatGPT) ──
