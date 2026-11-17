@@ -15,7 +15,10 @@ import { obtenerConfigIA } from "@/lib/config-ia";
 const BLOQUE_ESCRITURA = 10;
 const MAX_INTENTOS = 2;
 const TOPE_MAXIMO_POR_CORRIDA = 50;
-const LIMITE_MS = 5 * 60 * 1000;
+// Cada corrida devuelve progreso parcial a los ~2 min (escribe lo auditado y el
+// resto queda pendiente para la siguiente pulsación de "Ejecutar"). Evita que un
+// request muy largo se corte en el proxy sin mostrar avance.
+const LIMITE_MS = 2 * 60 * 1000;
 
 const MODELO_CRITERIOS = "claude-sonnet-5";
 const MODELO_TEXTOS = "claude-opus-5";
@@ -160,11 +163,20 @@ async function llamarOpenAI(
         messages: [{ role: "user", content: prompt }],
       };
       if (jsonMode) body.response_format = { type: "json_object" };
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify(body),
-      });
+      // Timeout por llamada: una respuesta colgada no debe congelar toda la corrida.
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 45_000);
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify(body),
+          signal: ctrl.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
       if (response.status === 429) {
         await new Promise((r) => setTimeout(r, Math.pow(2, intento) * 1000));
         continue;
