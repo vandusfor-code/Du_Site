@@ -200,6 +200,37 @@ export async function notificarResumenesDelDia(fecha: string): Promise<Resultado
   return { asesorasNotificadas: notificadas, sinCorreo, fallidas, detalle };
 }
 
+// PRUEBA: genera el resumen de UNA asesora (match por nombre o código) y lo
+// envía a un correo indicado, para ver cómo llega. No marca enviado_en.
+export async function enviarResumenPrueba(
+  fecha: string, filtroAsesora: string, correoDestino: string
+): Promise<{ ok: boolean; mensaje: string; asesora?: string }> {
+  const porAsesor = await auditoriasPorAsesora(fecha);
+  if (porAsesor.size === 0) return { ok: false, mensaje: `No hay auditorías registradas el ${fecha}.` };
+
+  const directorio = await obtenerFuncionariosParaSelector();
+  const mapaDir = new Map(directorio.map((f) => [f.asesor.trim().toUpperCase(), f]));
+  const f = norm(filtroAsesora);
+
+  for (const [asesorCodigo, audits] of porAsesor) {
+    const dir = mapaDir.get(asesorCodigo.trim().toUpperCase());
+    const nombre = dir?.nombre?.trim() || asesorCodigo;
+    if (!(norm(nombre).includes(f) || norm(asesorCodigo).includes(f))) continue;
+
+    const promedio = Math.round(audits.reduce((s, a) => s + a.nota, 0) / audits.length);
+    const { positivo, mejorar } = await sintetizar(nombre, audits);
+    const r: ResumenAsesora = { asesorCodigo, nombre, correo: correoDestino, numAuditorias: audits.length, promedioNota: promedio, positivo, mejorar };
+    const html = correoHtml(nombre, r, `${appUrl()}/mi-retroalimentacion`, fecha);
+    const envio = await enviarCorreoIndividual(correoDestino, `[PRUEBA] Tu retroalimentación de calidad — ${fecha}`, html, FROM_CALIDAD);
+    return {
+      ok: envio.aceptado,
+      asesora: nombre,
+      mensaje: envio.aceptado ? `Enviado a ${correoDestino} (resumen de ${nombre}, ${audits.length} auditoría(s)).` : `No se aceptó el envío: ${envio.respuestaServidor ?? ""}`,
+    };
+  }
+  return { ok: false, mensaje: `No se encontró ninguna asesora que coincida con "${filtroAsesora}" con auditorías del ${fecha}.` };
+}
+
 // ── Lado de la asesora: ver y firmar ──
 export interface ResumenParaFirma {
   fecha: string; nombre: string; numAuditorias: number; promedioNota: number;
