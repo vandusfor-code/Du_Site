@@ -6,6 +6,7 @@ import type { FuncionarioOpcion } from "@/lib/auditorias-admin";
 import type { ResumenEnvio, GrupoAsesora } from "@/lib/envio-auditorias-tipos";
 import type { ResultadoEnvioLote } from "@/lib/envio-auditorias";
 import { obtenerEnvioAuditoriasAction, enviarLoteAuditoriasAction, notificarResumenDiaAction } from "./actions";
+import type { ResultadoNotificacionResumen } from "@/lib/resumen-diario";
 import styles from "./auditorias.module.css";
 
 function hoyBogotaISO(): string {
@@ -44,22 +45,18 @@ export default function EnvioAuditorias({
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoEnvioLote | null>(null);
   const [notificandoResumen, setNotificandoResumen] = useState(false);
+  const [resResumen, setResResumen] = useState<ResultadoNotificacionResumen | null>(null);
+  const [errResumen, setErrResumen] = useState<string>("");
 
   async function notificarResumenDia() {
     setNotificandoResumen(true);
+    setResResumen(null);
+    setErrResumen("");
     try {
       const r = await notificarResumenDiaAction(fecha);
-      const partes = [`${r.asesorasNotificadas} asesora(s) notificada(s)`];
-      if (r.sinCorreo) partes.push(`${r.sinCorreo} sin correo`);
-      if (r.fallidas) partes.push(`${r.fallidas} con fallo`);
-      onBanner({
-        tipo: r.fallidas > 0 && r.asesorasNotificadas === 0 ? "error" : "ok",
-        msg: r.asesorasNotificadas === 0 && r.sinCorreo === 0 && r.fallidas === 0
-          ? `No hay auditorías del ${fecha} para resumir.`
-          : `Resumen del día enviado: ${partes.join(", ")}.`,
-      });
+      setResResumen(r); // → muestra el pop-up emergente
     } catch (e) {
-      onBanner({ tipo: "error", msg: e instanceof Error ? e.message : "Error al notificar el resumen del día" });
+      setErrResumen(e instanceof Error ? e.message : "Error al notificar el resumen del día");
     } finally {
       setNotificandoResumen(false);
     }
@@ -138,8 +135,58 @@ export default function EnvioAuditorias({
 
   const hayPendientesElegibles = (resumen?.grupos ?? []).some((g) => g.idsPendientesElegibles.length > 0);
 
+  const totalResumen = resResumen ? resResumen.asesorasNotificadas + resResumen.sinCorreo + resResumen.fallidas : 0;
+
   return (
     <section className={`${styles.panel} ${styles.manualForm}`}>
+      {/* POP-UP emergente del resultado de "Notificar resumen del día" */}
+      {(resResumen || errResumen) && (
+        <div
+          role="dialog" aria-modal="true"
+          onClick={() => { setResResumen(null); setErrResumen(""); }}
+          style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", color: "#0e0a2a", borderRadius: 16, padding: "26px 26px 22px", maxWidth: 460, width: "100%", boxShadow: "0 24px 70px rgba(0,0,0,.35)", textAlign: "center" }}>
+            {errResumen ? (
+              <>
+                <AlertTriangle size={46} color="#e11d48" />
+                <h3 style={{ margin: "10px 0 6px", fontSize: 20 }}>No se pudo notificar</h3>
+                <p style={{ color: "#6b6a85", margin: "0 0 18px" }}>{errResumen}</p>
+              </>
+            ) : totalResumen === 0 ? (
+              <>
+                <CheckCircle2 size={46} color="#8a93a8" />
+                <h3 style={{ margin: "10px 0 6px", fontSize: 20 }}>Sin auditorías para resumir</h3>
+                <p style={{ color: "#6b6a85", margin: "0 0 18px" }}>No hay auditorías del <b>{fecha}</b> para notificar.</p>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={48} color="#16a34a" />
+                <h3 style={{ margin: "10px 0 6px", fontSize: 21 }}>¡Auditorías notificadas! ✅</h3>
+                <p style={{ color: "#6b6a85", margin: "0 0 14px" }}>
+                  <b style={{ color: "#16a34a" }}>{resResumen!.asesorasNotificadas}</b> asesora(s) recibieron su resumen del <b>{fecha}</b>
+                  {resResumen!.sinCorreo > 0 ? ` · ${resResumen!.sinCorreo} sin correo` : ""}
+                  {resResumen!.fallidas > 0 ? ` · ${resResumen!.fallidas} con fallo` : ""}.
+                </p>
+                {resResumen!.detalle.length > 0 && (
+                  <div style={{ textAlign: "left", maxHeight: 200, overflowY: "auto", border: "1px solid #e7e4f5", borderRadius: 10, padding: "8px 12px", margin: "0 0 16px", fontSize: 13.5 }}>
+                    {resResumen!.detalle.map((d, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: i < resResumen!.detalle.length - 1 ? "1px solid #f1f0fb" : "none" }}>
+                        <span>{d.nombre}</span>
+                        <b style={{ color: d.estado === "Notificada" ? "#16a34a" : "#e11d48" }}>{d.estado}</b>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            <button className={styles.primary} onClick={() => { setResResumen(null); setErrResumen(""); }} style={{ width: "100%", justifyContent: "center" }}>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
       <h2><Send size={18} /> Envío de auditorías</h2>
       <p className={styles.gptHint}>
         Filtra por fecha de registro, revisa las auditorías agrupadas por asesora y envíalas. Cada asesora recibe
