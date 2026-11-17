@@ -22,7 +22,7 @@ const NAV: ItemNav[] = [
   { icon: Send, label: "Cortes de envío" },
   { icon: FileBarChart, label: "Reportes" },
   { icon: Bell, label: "Alertas" },
-  { icon: Settings, label: "Configuración" },
+  { icon: Settings, label: "Configuración", href: "/admin/configuracion" },
 ];
 
 export default function AdminSidebar({ nombre, activo }: { nombre: string; activo: string }) {
