@@ -10,7 +10,11 @@ import {
   obtenerFuncionariosParaSelector,
   guardarAuditoriaManual,
   guardarAuditoriaChatGPT,
+  progresoAuditorias,
+  eliminarAuditoriasDuplicadas,
   type ResultadoProcesamiento,
+  type ProgresoAuditorias,
+  type ResultadoDedup,
   type ResultadoCargaCsv,
   type DashboardAuditorias,
   type DashboardFiltros,
@@ -35,9 +39,31 @@ async function requireAdminAction(): Promise<void> {
   }
 }
 
+// Candado anti-doble-ejecución: si ya hay una corrida en curso, no lanza otra en
+// paralelo (evita que se auditen dos veces las mismas transcripciones).
+let auditoriaEnCurso = false;
+
 export async function ejecutarAuditoriasAction(): Promise<ResultadoProcesamiento> {
   await requireAdminAction();
-  return procesarTranscripciones();
+  if (auditoriaEnCurso) {
+    return { procesadas: 0, errores: 0, detuvoPorTope: false, detuvoPorTiempo: false, resumenesCortes: 0, yaEnCurso: true };
+  }
+  auditoriaEnCurso = true;
+  try {
+    return await procesarTranscripciones();
+  } finally {
+    auditoriaEnCurso = false;
+  }
+}
+
+export async function progresoAuditoriasAction(): Promise<ProgresoAuditorias> {
+  await requireAdminAction();
+  return progresoAuditorias();
+}
+
+export async function eliminarDuplicadasAction(): Promise<ResultadoDedup> {
+  await requireAdminAction();
+  return eliminarAuditoriasDuplicadas();
 }
 
 export async function generarResumenCortesAction(): Promise<number> {

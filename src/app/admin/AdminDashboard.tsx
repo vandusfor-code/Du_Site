@@ -14,7 +14,10 @@ import {
   generarResumenCortesAction,
   cargarTranscripcionesAction,
   obtenerDashboardAuditoriasAction,
+  progresoAuditoriasAction,
+  eliminarDuplicadasAction,
 } from "./actions";
+import type { ProgresoAuditorias } from "@/lib/auditorias-admin";
 import AdminSidebar from "./AdminSidebar";
 import AuditoriaManualForm from "./AuditoriaManualForm";
 import AuditoriaChatGPTForm from "./AuditoriaChatGPTForm";
@@ -81,6 +84,8 @@ export default function AdminDashboard({
   const [filtros, setFiltros] = useState<DashboardFiltros>({ mes: mesEnCursoNombre() });
   const [cargando, setCargando] = useState(false);
   const [procesando, setProcesando] = useState(false);
+  const [progreso, setProgreso] = useState<ProgresoAuditorias | null>(null);
+  const [eliminandoDup, setEliminandoDup] = useState(false);
   const [generando, setGenerando] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
 
@@ -153,15 +158,42 @@ export default function AdminDashboard({
   async function ejecutarPendientes() {
     setProcesando(true);
     setBanner(null);
+    try { setProgreso(await progresoAuditoriasAction()); } catch { /* no bloquea */ }
+    // Barra de progreso en vivo: consulta ligera cada 5 s mientras corre.
+    const intv = setInterval(async () => {
+      try { setProgreso(await progresoAuditoriasAction()); } catch { /* ignora */ }
+    }, 5000);
     try {
       const res = await ejecutarAuditoriasAction();
-      const corte = res.detuvoPorTope ? " (se alcanzó el tope de 50)" : res.detuvoPorTiempo ? " (se alcanzó el límite de tiempo)" : "";
-      setBanner({ tipo: "ok", msg: `Procesadas ${res.procesadas}, errores ${res.errores}, resúmenes ${res.resumenesCortes}${corte}.` });
+      if (res.yaEnCurso) {
+        setBanner({ tipo: "error", msg: "Ya hay una ejecución en curso. Espera a que termine antes de volver a darle." });
+      } else {
+        const corte = res.detuvoPorTope ? " (se alcanzó el tope de 50)" : res.detuvoPorTiempo ? " (quedaron pendientes — dale de nuevo para continuar)" : "";
+        setBanner({ tipo: "ok", msg: `Procesadas ${res.procesadas}, errores ${res.errores}, resúmenes ${res.resumenesCortes}${corte}.` });
+      }
       await refrescar();
     } catch (e) {
       setBanner({ tipo: "error", msg: e instanceof Error ? e.message : "Error al ejecutar auditorías" });
     } finally {
+      clearInterval(intv);
       setProcesando(false);
+      setProgreso(null);
+    }
+  }
+
+  async function eliminarDuplicadas() {
+    setEliminandoDup(true);
+    setBanner(null);
+    try {
+      const res = await eliminarDuplicadasAction();
+      setBanner(res.duplicadosEliminados > 0
+        ? { tipo: "ok", msg: `Se eliminaron ${res.duplicadosEliminados} auditoría(s) duplicada(s) de ${res.idsAfectados} gestión(es).` }
+        : { tipo: "ok", msg: "No se encontraron auditorías duplicadas." });
+      await refrescar();
+    } catch (e) {
+      setBanner({ tipo: "error", msg: e instanceof Error ? e.message : "Error al eliminar duplicadas" });
+    } finally {
+      setEliminandoDup(false);
     }
   }
 
@@ -357,11 +389,27 @@ export default function AdminDashboard({
                 <div><CheckCircle2 className={styles.goodIcon} /><b>{data?.estado.procesadasHoy ?? 0}</b><span>Procesadas hoy</span></div>
                 <div><XCircle className={styles.badIcon} /><b>{data?.estado.conError ?? 0}</b><span>Con error</span></div>
               </div>
-              <div className={styles.progressMeta}>
-                <span><b>{data?.estado.procesadasHoy ?? 0}</b> / {data?.estado.totalLote ?? 0} procesadas</span>
-                <b>{data?.estado.progresoPct ?? 0}%</b>
-              </div>
-              <div className={styles.progress}><span style={{ width: `${data?.estado.progresoPct ?? 0}%` }} /></div>
+              {(() => {
+                const liveTotal = procesando && progreso ? progreso.total : (data?.estado.totalLote ?? 0);
+                const liveHechas = procesando && progreso ? progreso.procesadas + progreso.errores : (data?.estado.procesadasHoy ?? 0);
+                const livePct = procesando && progreso
+                  ? (progreso.total ? Math.round(((progreso.procesadas + progreso.errores) / progreso.total) * 100) : 0)
+                  : (data?.estado.progresoPct ?? 0);
+                return (
+                  <>
+                    <div className={styles.progressMeta}>
+                      <span><b>{liveHechas}</b> / {liveTotal} procesadas{procesando ? "…" : ""}</span>
+                      <b>{livePct}%</b>
+                    </div>
+                    <div className={styles.progress}><span style={{ width: `${livePct}%` }} /></div>
+                    {procesando && progreso && (
+                      <div style={{ fontSize: 12, color: "#667189", marginTop: 6 }}>
+                        Auditando con IA… {progreso.procesadas} ok · {progreso.errores} con error · {progreso.pendientes} por procesar
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               <div className={styles.panelActions}>
                 <button className={styles.primary} onClick={ejecutarPendientes} disabled={procesando}>
                   {procesando ? <Loader2 size={14} className={styles.spin} /> : <Play size={14} />}
@@ -370,6 +418,10 @@ export default function AdminDashboard({
                 <button className={styles.secondary} onClick={generarCortes} disabled={generando}>
                   {generando ? <Loader2 size={14} className={styles.spin} /> : null}
                   Generar cortes
+                </button>
+                <button className={styles.secondary} onClick={eliminarDuplicadas} disabled={eliminandoDup || procesando} title="Elimina auditorías con el mismo ID de gestión repetido">
+                  {eliminandoDup ? <Loader2 size={14} className={styles.spin} /> : null}
+                  Eliminar duplicadas
                 </button>
               </div>
             </section>

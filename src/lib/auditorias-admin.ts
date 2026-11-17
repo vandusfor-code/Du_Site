@@ -1,5 +1,5 @@
 import "server-only";
-import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate, hoyEnBogota } from "@/lib/sheets";
+import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate, hoyEnBogota, getSpreadsheetMeta, batchUpdate } from "@/lib/sheets";
 import { parseCsv } from "@/lib/csv-parse";
 import { resolverAsesor } from "@/lib/auditoria-chatgpt-contrato";
 import { registrarAuditoriaBono } from "@/lib/bono-store";
@@ -278,15 +278,22 @@ DEFINICIÓN DE TUTEO (solo del AGENTE):
 IMPORTANTE: Nunca uses "cliente", siempre "usuario".`;
 }
 
+// Solo a esta asesora se le evalúa el "cierre abrupto" (mensaje de inconveniente
+// de plataforma para aplazar/cerrar sin dar manejo). A las demás NO se les evalúa.
+const CODIGO_CIERRE_ABRUPTO = "H.RINCON224"; // heillen.rincon
+
 async function auditarLlamada(
   transcripcionCompleta: string,
   idGestion: string,
   esChat: boolean,
+  asesorCodigo: string,
   registrarError: (idGestion: string, motivo: string, respuestaCruda?: string) => Promise<void>
 ): Promise<ResultadoAuditoria | null> {
   const transcripcion = prepararTranscripcion(transcripcionCompleta);
   const tipoInteraccion = esChat ? "chat" : "llamada";
   const contexto = contextoPrompt(esChat);
+  // ¿A esta asesora se le evalúa el cierre abrupto?
+  const evaluaCierreAbrupto = (asesorCodigo ?? "").trim().toUpperCase() === CODIGO_CIERRE_ABRUPTO;
 
   const promptCriterios = `${contexto}
 
@@ -309,10 +316,10 @@ INFORMACIÓN — Cumple si AGENTE da respuesta concreta. (NO afecta nota)
 PROCESO — Cumple si AGENTE sigue proceso lógico. (NO afecta nota)
 CIERRE — Cumple si AGENTE hace los 3: pregunta si necesita algo más + despedida con su nombre + invita a encuesta. "No aplica" SOLO si la interacción se cortó antes del cierre.
 
-MALA PRÁCTICA GRAVE — CIERRE ABRUPTO (campo "cierre_abrupto"):
+${evaluaCierreAbrupto ? `MALA PRÁCTICA GRAVE — CIERRE ABRUPTO (campo "cierre_abrupto"):
 Marca true SOLO si el AGENTE cierra, rechaza o aplaza la gestión diciéndole al usuario que se comunique MÁS TARDE / que hay un inconveniente o caída de la plataforma o el sistema y por eso NO puede atenderlo, EN LUGAR de darle manejo, solución o una alternativa. Ejemplo (o variantes muy parecidas): "En este momento presentamos un inconveniente con la plataforma de consulta, intente comunicarse más tarde mientras el problema se soluciona. Ofrecemos disculpas por la novedad y agradecemos su comprensión. Que tenga un excelente día". Esto NO es aceptable: el agente debe DAR MANEJO, nunca finalizar la conversación abruptamente. Si el agente reconoce una falla pero igual gestiona, escala o da una alternativa, entonces cierre_abrupto=false.
 
-PUNTAJE TUTEO: "Sin tuteo" / "Tuteo leve" / "Tuteo real" (solo del AGENTE)
+` : ""}PUNTAJE TUTEO: "Sin tuteo" / "Tuteo leve" / "Tuteo real" (solo del AGENTE)
 TONO GENERAL: "Alto" / "Medio" / "Bajo"
 
 Responde ÚNICAMENTE con JSON válido, sin texto adicional:
@@ -324,8 +331,7 @@ Responde ÚNICAMENTE con JSON válido, sin texto adicional:
   "encuesta": "Cumple" o "No cumple" o "No aplica",
   "informacion": "Cumple" o "No cumple",
   "proceso": "Cumple" o "No cumple",
-  "cierre": "Cumple" o "No cumple" o "No aplica",
-  "cierre_abrupto": true o false,
+  "cierre": "Cumple" o "No cumple" o "No aplica",${evaluaCierreAbrupto ? `\n  "cierre_abrupto": true o false,` : ""}
   "puntaje_tuteo": "Sin tuteo" o "Tuteo leve" o "Tuteo real",
   "tono_general": "Alto" o "Medio" o "Bajo",
   "tipo_consulta": "Máximo 3 palabras del motivo principal"
@@ -379,7 +385,7 @@ Resultados de evaluación de esta ${tipoInteraccion}:
 - Encuesta: ${cNorm.encuesta}
 - Cierre: ${cNorm.cierre}
 - Tuteo detectado: ${criterios.puntaje_tuteo}
-- ¿Todo cumplió bien?: ${todosCumplen ? "SÍ — interacción muy buena" : "NO — hay aspectos a mejorar"}${criterios.cierre_abrupto === true ? "\n- FALTA GRAVE: el agente cerró la gestión diciéndole al usuario que se comunicara más tarde por una falla de la plataforma, SIN dar manejo. Esta práctica NO es aceptable (es PENC con nota 0). En HALLAZGOS y en MEJORA debes señalarlo de forma clara y firme (aunque respetuosa): no se puede finalizar la conversación abruptamente; siempre hay que dar manejo, alternativa o escalar." : ""}
+- ¿Todo cumplió bien?: ${todosCumplen ? "SÍ — interacción muy buena" : "NO — hay aspectos a mejorar"}${evaluaCierreAbrupto && criterios.cierre_abrupto === true ? "\n- FALTA GRAVE: el agente cerró la gestión diciéndole al usuario que se comunicara más tarde por una falla de la plataforma, SIN dar manejo. Esta práctica NO es aceptable (es PENC con nota 0). En HALLAZGOS y en MEJORA debes señalarlo de forma clara y firme (aunque respetuosa): no se puede finalizar la conversación abruptamente; siempre hay que dar manejo, alternativa o escalar." : ""}
 
 Genera tres campos siguiendo EXACTAMENTE este estilo:
 
@@ -479,9 +485,10 @@ ${transcripcion}`;
     tipoNota = "PENC";
   }
 
-  // Falta GRAVE: cierre abrupto / "comuníquese más tarde por falla de plataforma"
-  // sin dar manejo. Anula la nota: PENC 0, sin importar los demás criterios.
-  if (criterios.cierre_abrupto === true) {
+  // Falta GRAVE (SOLO para la asesora evaluada por esto): cierre abrupto /
+  // "comuníquese más tarde por falla de plataforma" sin dar manejo. Anula la
+  // nota: PENC 0, sin importar los demás criterios.
+  if (evaluaCierreAbrupto && criterios.cierre_abrupto === true) {
     nota = 0;
     tipoNota = "PENC";
   }
@@ -497,6 +504,79 @@ ${transcripcion}`;
 }
 
 /* ===================== */
+/* PROGRESO EN VIVO (lectura ligera: solo Transcripciones1!A:E) */
+/* ===================== */
+
+export interface ProgresoAuditorias {
+  total: number;
+  procesadas: number;
+  errores: number;
+  pendientes: number;
+}
+
+export async function progresoAuditorias(): Promise<ProgresoAuditorias> {
+  const id = sheetId();
+  const data = await readRange(id, "Transcripciones1!A:E", { unformatted: true });
+  let total = 0, procesadas = 0, errores = 0, pendientes = 0;
+  for (let i = 1; i < data.length; i++) {
+    if (!esFechaDeHoyBogota(data[i]?.[0])) continue;
+    const estado = texto(data[i], 4).trim();
+    total++;
+    if (estado === "Procesado") procesadas++;
+    else if (estado === "Error") errores++;
+    else pendientes++;
+  }
+  return { total, procesadas, errores, pendientes };
+}
+
+/* ===================== */
+/* ELIMINAR AUDITORÍAS DUPLICADAS (mismo ID de gestión en Consolidado) */
+/* ===================== */
+
+export interface ResultadoDedup {
+  duplicadosEliminados: number;
+  idsAfectados: number;
+}
+
+// Conserva la PRIMERA aparición de cada ID de gestión (columna G) y elimina las
+// filas repetidas. No toca Supabase (bono_auditoria hace upsert por id_gestion,
+// no duplica). Elimina de abajo hacia arriba para no correr los índices.
+export async function eliminarAuditoriasDuplicadas(): Promise<ResultadoDedup> {
+  const id = sheetId();
+  const datos = await readRange(id, "Consolidado!A:AA", { unformatted: true });
+
+  const vistos = new Set<string>();
+  const filasAEliminar: number[] = []; // índice 0-based de fila de hoja
+  const idsDup = new Set<string>();
+  for (let i = 1; i < datos.length; i++) {
+    const idGestion = texto(datos[i], 6).trim();
+    if (!idGestion) continue;
+    if (vistos.has(idGestion)) {
+      filasAEliminar.push(i);
+      idsDup.add(idGestion);
+    } else {
+      vistos.add(idGestion);
+    }
+  }
+  if (filasAEliminar.length === 0) return { duplicadosEliminados: 0, idsAfectados: 0 };
+
+  const meta = await getSpreadsheetMeta<{ sheets?: { properties?: { sheetId?: number; title?: string } }[] }>(
+    id, "sheets.properties(sheetId,title)"
+  );
+  const hoja = meta.sheets?.find((s) => (s.properties?.title ?? "").trim().toLowerCase() === "consolidado");
+  const gid = hoja?.properties?.sheetId;
+  if (gid === undefined) throw new Error('No se encontró la pestaña "Consolidado".');
+
+  const descend = [...filasAEliminar].sort((a, b) => b - a);
+  const requests = descend.map((idx) => ({
+    deleteDimension: { range: { sheetId: gid, dimension: "ROWS", startIndex: idx, endIndex: idx + 1 } },
+  }));
+  await batchUpdate(id, requests);
+
+  return { duplicadosEliminados: filasAEliminar.length, idsAfectados: idsDup.size };
+}
+
+/* ===================== */
 /* PROCESAR TRANSCRIPCIONES */
 /* ===================== */
 
@@ -506,6 +586,7 @@ export interface ResultadoProcesamiento {
   detuvoPorTope: boolean;
   detuvoPorTiempo: boolean;
   resumenesCortes: number;
+  yaEnCurso?: boolean;
 }
 
 export async function procesarTranscripciones(): Promise<ResultadoProcesamiento> {
@@ -627,7 +708,7 @@ export async function procesarTranscripciones(): Promise<ResultadoProcesamiento>
       continue;
     }
 
-    const evaluacion = await auditarLlamada(transcripcion, idGestion, esChat, registrarError);
+    const evaluacion = await auditarLlamada(transcripcion, idGestion, esChat, asesor, registrarError);
 
     if (!evaluacion) {
       const nuevoEstado = intentoActual >= MAX_INTENTOS ? "Error" : "Intento " + intentoActual;
