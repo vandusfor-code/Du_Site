@@ -23,6 +23,7 @@ import {
 } from "@/lib/auditorias-admin";
 import { obtenerEnvioAuditorias, enviarLoteAuditorias, type ResultadoEnvioLote } from "@/lib/envio-auditorias";
 import { obtenerConfigIA, guardarConfigIA, probarOpenAIKey, enmascararKey } from "@/lib/config-ia";
+import { notificarResumenesDelDia, type ResultadoNotificacionResumen } from "@/lib/resumen-diario";
 import type { FiltrosEnvio, ResumenEnvio } from "@/lib/envio-auditorias-tipos";
 
 // Corregido: verificaba session.user.modulos.includes("admin") — el
@@ -64,6 +65,13 @@ export async function progresoAuditoriasAction(): Promise<ProgresoAuditorias> {
 export async function eliminarDuplicadasAction(): Promise<ResultadoDedup> {
   await requireAdminAction();
   return eliminarAuditoriasDuplicadas();
+}
+
+// Notificación consolidada: un correo por asesora con el resumen (IA) de sus
+// auditorías del día; firma una sola vez en /mi-retroalimentacion.
+export async function notificarResumenDiaAction(fecha: string): Promise<ResultadoNotificacionResumen> {
+  await requireAdminAction();
+  return notificarResumenesDelDia(fecha);
 }
 
 export async function generarResumenCortesAction(): Promise<number> {

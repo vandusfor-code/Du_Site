@@ -5,7 +5,7 @@ import { Loader2, Send, CalendarDays, Users, AlertTriangle, CheckCircle2, Refres
 import type { FuncionarioOpcion } from "@/lib/auditorias-admin";
 import type { ResumenEnvio, GrupoAsesora } from "@/lib/envio-auditorias-tipos";
 import type { ResultadoEnvioLote } from "@/lib/envio-auditorias";
-import { obtenerEnvioAuditoriasAction, enviarLoteAuditoriasAction } from "./actions";
+import { obtenerEnvioAuditoriasAction, enviarLoteAuditoriasAction, notificarResumenDiaAction } from "./actions";
 import styles from "./auditorias.module.css";
 
 function hoyBogotaISO(): string {
@@ -43,6 +43,27 @@ export default function EnvioAuditorias({
   const [confirmacion, setConfirmacion] = useState<Confirmacion | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoEnvioLote | null>(null);
+  const [notificandoResumen, setNotificandoResumen] = useState(false);
+
+  async function notificarResumenDia() {
+    setNotificandoResumen(true);
+    try {
+      const r = await notificarResumenDiaAction(fecha);
+      const partes = [`${r.asesorasNotificadas} asesora(s) notificada(s)`];
+      if (r.sinCorreo) partes.push(`${r.sinCorreo} sin correo`);
+      if (r.fallidas) partes.push(`${r.fallidas} con fallo`);
+      onBanner({
+        tipo: r.fallidas > 0 && r.asesorasNotificadas === 0 ? "error" : "ok",
+        msg: r.asesorasNotificadas === 0 && r.sinCorreo === 0 && r.fallidas === 0
+          ? `No hay auditorías del ${fecha} para resumir.`
+          : `Resumen del día enviado: ${partes.join(", ")}.`,
+      });
+    } catch (e) {
+      onBanner({ tipo: "error", msg: e instanceof Error ? e.message : "Error al notificar el resumen del día" });
+    } finally {
+      setNotificandoResumen(false);
+    }
+  }
 
   const asesorasUnicas = (() => {
     const v = new Set<string>();
@@ -124,6 +145,19 @@ export default function EnvioAuditorias({
         Filtra por fecha de registro, revisa las auditorías agrupadas por asesora y envíalas. Cada asesora recibe
         <b> un solo correo</b> con enlace al portal para consultar sus evaluaciones, confirmar recepción y registrar compromisos.
       </p>
+
+      {/* NUEVO: Resumen consolidado del día (IA) + una sola firma */}
+      <div style={{ background: "#f3f0ff", border: "1px solid #ddd3ff", borderRadius: 12, padding: "14px 16px", margin: "4px 0 18px" }}>
+        <b style={{ color: "#5b4ee6", display: "flex", alignItems: "center", gap: 6 }}>✨ Resumen del día (recomendado)</b>
+        <p style={{ margin: "6px 0 12px", fontSize: 13, color: "#4b4b63", lineHeight: 1.5 }}>
+          Envía <b>un solo correo por asesora</b> con un resumen (IA) de TODAS sus auditorías del <b>{fecha}</b> —lo positivo y lo que debe
+          mejorar— y un enlace donde <b>firma una sola vez</b> y deja un compromiso general. No llena la bandeja ni la hace firmar varias veces.
+        </p>
+        <button className={styles.primary} onClick={notificarResumenDia} disabled={notificandoResumen}>
+          {notificandoResumen ? <Loader2 size={14} className={styles.spin} /> : <Send size={14} />}
+          Notificar resumen del día
+        </button>
+      </div>
 
       {/* Filtros */}
       <div className={styles.gptRow}>
