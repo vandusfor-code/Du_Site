@@ -57,7 +57,11 @@ async function auditoriasPorAsesora(fecha: string): Promise<Map<string, Auditori
     if (!d || ymd(d) !== fecha) continue;
     const asesor = txt(f, COL.asesor);
     if (!asesor) continue;
-    const nota = parseFloat(txt(f, COL.nota).replace("%", "").replace(",", ".")) || 0;
+    // Sheets guarda "100%" como fracción (1.0); leída sin formato vuelve 1, 0.33…
+    // Si viene como fracción (0..1), se lleva a escala 0..100.
+    let nraw = parseFloat(txt(f, COL.nota).replace("%", "").replace(",", ".")) || 0;
+    if (nraw > 0 && nraw <= 1) nraw = nraw * 100;
+    const nota = Math.round(nraw);
     const lista = porAsesor.get(asesor) ?? [];
     lista.push({ idGestion: txt(f, COL.idGestion), nota, tipoNota: txt(f, COL.tipoNota), hallazgos: txt(f, COL.hallazgos), mejora: txt(f, COL.mejora) });
     porAsesor.set(asesor, lista);
