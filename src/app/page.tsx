@@ -10,6 +10,7 @@ import { resolverAsesoraId } from "@/lib/documentacion-identidad";
 import { obtenerPendientesDocumentacion } from "@/lib/documentacion-editor";
 import { obtenerBannerHome, type BannerHome } from "@/lib/home-config";
 import { obtenerMiBono } from "@/lib/mi-bono";
+import { obtenerPendienteFirmaResumen } from "@/lib/resumen-diario";
 
 const TRACKABLE = ["metricas", "quiz", "radicaciones", "linea-amiga"] as const;
 const RANGO_PRIORIDAD = { Alta: 0, Media: 1, Baja: 2 } as const;
@@ -128,7 +129,7 @@ export default async function Home() {
   // hace UNA sola lectura de Consolidado (antes eran dos llamadas separadas,
   // cada una releyendo la hoja completa) y alimenta tanto Pendientes como
   // el resumen — menos presión sobre la cuota compartida de Sheets.
-  const [auditoriasYConteoR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, gestionesMesR, cronogramaR, bannerR, serieRadR, seriePqrsfR, miBonoR] =
+  const [auditoriasYConteoR, duacademyR, radicacionesR, lineaAmigaR, documentacionR, gestionesMesR, cronogramaR, bannerR, serieRadR, seriePqrsfR, miBonoR, pendienteFirmaR] =
     await Promise.allSettled([
       tieneMetricas ? obtenerAuditoriasYConteoAnterior(usuario) : Promise.resolve({ auditorias: [], conteoMesAnterior: 0 }),
       has("quiz") ? obtenerPanelCursos(usuario) : Promise.resolve(null),
@@ -143,6 +144,8 @@ export default async function Home() {
       // "Mi bono": si hay un mes CERRADO con el bono de esta persona, se muestra
       // la tarjeta de celebración en el inicio. Barato (una consulta a Supabase).
       obtenerMiBono(usuario, nombre),
+      // Firma única del resumen del día (pendiente si fue notificado y no firmado).
+      tieneMetricas ? obtenerPendienteFirmaResumen(nombre) : Promise.resolve(null),
     ]);
 
   const miBono = miBonoR.status === "fulfilled" ? miBonoR.value : null;
@@ -154,20 +157,24 @@ export default async function Home() {
   // ── Construcción de Pendientes desde los datos ya cargados ──
   const listaTareas: TareaPendiente[] = [];
 
-  auditorias
-    .filter((a) => !a.comprometido)
-    .forEach((a) => {
-      listaTareas.push({
-        id: `metricas-${a.idGestion}`,
-        titulo: `Firmar compromiso: ${a.tipoGestion}`,
-        moduloId: "metricas",
-        moduloNombre: "Métricas",
-        moduloHref: "/modulos/metricas",
-        fecha: a.fecha,
-        prioridad: "Media",
-        createdAtTs: parseFechaRelevante(a.fecha),
-      });
+  // Firma ÚNICA del resumen del día: un solo pendiente que lleva directo a la
+  // página de firma (/mi-retroalimentacion). Reemplaza el antiguo pendiente por
+  // auditoría (que la hacía firmar una por una).
+  const pendienteFirma = pendienteFirmaR.status === "fulfilled" ? pendienteFirmaR.value : null;
+  if (pendienteFirma) {
+    listaTareas.push({
+      id: "firmar-retroalimentacion",
+      titulo: pendienteFirma.numAuditorias === 1
+        ? "Firmar mi retroalimentación de calidad"
+        : `Firmar mi retroalimentación de calidad (${pendienteFirma.numAuditorias} auditorías)`,
+      moduloId: "metricas",
+      moduloNombre: "Calidad",
+      moduloHref: "/mi-retroalimentacion",
+      fecha: pendienteFirma.fecha,
+      prioridad: "Media",
+      createdAtTs: parseFechaRelevante(pendienteFirma.fecha),
     });
+  }
 
   if (duacademyR.status === "fulfilled" && duacademyR.value) {
     // DuAcademy NATIVO: los cursos activos que la asesora aún no ha presentado.

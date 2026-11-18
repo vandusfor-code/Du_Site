@@ -252,6 +252,23 @@ export async function enviarResumenPrueba(
   return { ok: false, mensaje: `No se encontró ninguna asesora que coincida con "${filtroAsesora}" con auditorías del ${fecha}.` };
 }
 
+// Pendiente de firma para el Home de la asesora: el resumen más reciente que ya
+// fue NOTIFICADO (enviado_en) pero AÚN NO firmado. null si no hay nada que firmar.
+export interface PendienteFirma { fecha: string; numAuditorias: number; }
+export async function obtenerPendienteFirmaResumen(nombre: string): Promise<PendienteFirma | null> {
+  const supabase = getSupabase();
+  const { data } = await supabase
+    .from("resumen_diario")
+    .select("fecha, num_auditorias, nombre, enviado_en, firmado_en")
+    .not("enviado_en", "is", null)
+    .is("firmado_en", null)
+    .order("fecha", { ascending: false })
+    .limit(60);
+  const match = (data ?? []).find((r) => norm(String(r.nombre)) === norm(nombre));
+  if (!match) return null;
+  return { fecha: String(match.fecha), numAuditorias: Number(match.num_auditorias ?? 0) };
+}
+
 // ── Lado de la asesora: ver y firmar ──
 export interface ResumenParaFirma {
   fecha: string; nombre: string; numAuditorias: number; promedioNota: number;
