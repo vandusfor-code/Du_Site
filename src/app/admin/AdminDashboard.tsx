@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ClipboardCheck, FileBarChart, Bell, Upload, MoreVertical, CalendarDays,
   Search, SlidersHorizontal, Eye, Play, TrendingUp, AlertTriangle, Target,
   BadgeCheck, ClipboardList, CheckCircle2, Clock3,
-  XCircle, Loader2, X,
+  XCircle, Loader2, X, Trash2, Pencil, MessageSquare, Save,
 } from "lucide-react";
 import type { DashboardAuditorias, DashboardFiltros, AuditoriaHistorial, FuncionarioOpcion } from "@/lib/auditorias-admin";
 import { mesEnCursoNombre } from "@/lib/meses";
@@ -16,8 +16,12 @@ import {
   obtenerDashboardAuditoriasAction,
   progresoAuditoriasAction,
   eliminarDuplicadasAction,
+  eliminarAuditoriaAction,
+  obtenerTranscripcionAction,
+  editarAuditoriaAction,
 } from "./actions";
 import type { ProgresoAuditorias } from "@/lib/auditorias-admin";
+import { calcularNota, VALORES_CRITERIO, VALORES_TUTEO } from "@/lib/auditoria-chatgpt-contrato";
 import AdminSidebar from "./AdminSidebar";
 import AuditoriaManualForm from "./AuditoriaManualForm";
 import AuditoriaChatGPTForm from "./AuditoriaChatGPTForm";
@@ -565,19 +569,93 @@ export default function AdminDashboard({
         </section>
       </main>
 
-      {detalle && <DetalleModal a={detalle} onClose={() => setDetalle(null)} />}
+      {detalle && <DetalleModal a={detalle} onClose={() => setDetalle(null)} onCambio={() => { setDetalle(null); refrescar(); }} />}
     </div>
   );
 }
 
-function DetalleModal({ a, onClose }: { a: AuditoriaHistorial; onClose: () => void }) {
+const CRITS = [
+  ["saludo", "Saludo"], ["empatia", "Empatía"], ["sonrisa", "Sonrisa"], ["claridad", "Claridad"],
+  ["encuesta", "Encuesta"], ["informacion", "Información"], ["proceso", "Proceso"], ["cierre", "Cierre"],
+] as const;
+
+// Burbujas de chat a partir de la transcripción "AGENTE: … | CLIENTE: … | …".
+function Transcripcion({ texto }: { texto: string }) {
+  const turnos = texto.split("|").map((t) => t.trim()).filter(Boolean);
+  if (turnos.length === 0) return <p style={{ color: "#8a93a8", fontSize: 13 }}>No hay transcripción guardada para esta gestión.</p>;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 340, overflowY: "auto", padding: "4px 2px" }}>
+      {turnos.map((t, i) => {
+        const esAgente = /^AGENTE\s*:/i.test(t);
+        const esCliente = /^CLIENTE\s*:/i.test(t);
+        const cuerpo = t.replace(/^(AGENTE|CLIENTE)\s*:/i, "").trim();
+        const quien = esAgente ? "Agente" : esCliente ? "Usuario" : "";
+        return (
+          <div key={i} style={{ display: "flex", justifyContent: esAgente ? "flex-end" : "flex-start" }}>
+            <div style={{
+              maxWidth: "78%", padding: "9px 13px", borderRadius: 14, fontSize: 13.5, lineHeight: 1.45,
+              background: esAgente ? "#21175d" : "#eef0f6", color: esAgente ? "#fff" : "#1f2430",
+              borderBottomRightRadius: esAgente ? 4 : 14, borderBottomLeftRadius: esAgente ? 14 : 4,
+            }}>
+              {quien && <div style={{ fontSize: 10.5, fontWeight: 800, opacity: 0.7, marginBottom: 2, textTransform: "uppercase", letterSpacing: ".4px" }}>{quien}</div>}
+              {cuerpo || t}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DetalleModal({ a, onClose, onCambio }: { a: AuditoriaHistorial; onClose: () => void; onCambio: () => void }) {
+  const [editando, setEditando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+  const [confirmarEliminar, setConfirmarEliminar] = useState(false);
+  const [error, setError] = useState("");
+  // Transcripción
+  const [verTrans, setVerTrans] = useState(false);
+  const [transcripcion, setTranscripcion] = useState<string | null>(null);
+  const [cargandoTrans, setCargandoTrans] = useState(false);
+  // Campos editables
+  const [f, setF] = useState({
+    saludo: a.saludo, empatia: a.empatia, sonrisa: a.sonrisa, claridad: a.claridad,
+    encuesta: a.encuesta, informacion: a.informacion, proceso: a.proceso, cierre: a.cierre,
+    puntajeTuteo: a.puntajeTuteo || "Sin tuteo", observacion: a.observacion, hallazgos: a.hallazgos, mejora: a.mejora,
+  });
+
   const penc = a.tipoNota.toUpperCase() === "PENC";
-  const criterios: [string, string][] = [
-    ["Saludo", a.saludo], ["Empatía", a.empatia], ["Sonrisa", a.sonrisa], ["Claridad", a.claridad],
-    ["Encuesta", a.encuesta], ["Información", a.informacion], ["Proceso", a.proceso], ["Cierre", a.cierre],
-  ];
+  const notaViva = useMemo(() => calcularNota(f), [f]);
   const critClass = (v: string) =>
     v.toLowerCase().includes("no cumple") ? styles.critNo : v.toLowerCase().includes("no aplica") ? styles.critNa : styles.critOk;
+
+  async function toggleTrans() {
+    if (!verTrans && transcripcion === null) {
+      setCargandoTrans(true);
+      try { const r = await obtenerTranscripcionAction(a.idGestion); setTranscripcion(r.texto || ""); }
+      catch { setTranscripcion(""); }
+      finally { setCargandoTrans(false); }
+    }
+    setVerTrans((v) => !v);
+  }
+
+  async function guardar() {
+    setGuardando(true); setError("");
+    const res = await editarAuditoriaAction({ idGestion: a.idGestion, ...f });
+    setGuardando(false);
+    if (res.ok) onCambio();
+    else setError(res.error);
+  }
+
+  async function eliminar() {
+    setEliminando(true); setError("");
+    const res = await eliminarAuditoriaAction(a.idGestion);
+    setEliminando(false);
+    if ("ok" in res && res.ok) onCambio();
+    else setError("error" in res ? res.error : "No se pudo eliminar.");
+  }
+
+  const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }));
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -590,36 +668,92 @@ function DetalleModal({ a, onClose }: { a: AuditoriaHistorial; onClose: () => vo
           </div>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
             <div className={styles.modalNota}>
-              <strong>{a.nota}</strong>
-              <div><span className={penc ? styles.penc : styles.ok}>{penc ? "PENC" : "Cumple"}</span></div>
+              <strong>{editando ? notaViva.nota + "%" : a.nota}</strong>
+              <div><span className={(editando ? notaViva.tipoNota === "PENC" : penc) ? styles.penc : styles.ok}>{(editando ? notaViva.tipoNota === "PENC" : penc) ? "PENC" : "Cumple"}</span></div>
             </div>
             <button className={styles.closeBtn} onClick={onClose} aria-label="Cerrar"><X size={16} /></button>
           </div>
         </div>
+
+        {/* Barra de acciones */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "0 0 12px" }}>
+          <button className={styles.secondary} onClick={toggleTrans} disabled={cargandoTrans}>
+            {cargandoTrans ? <Loader2 size={14} className={styles.spin} /> : <MessageSquare size={14} />} {verTrans ? "Ocultar transcripción" : "Ver transcripción"}
+          </button>
+          {!editando && <button className={styles.secondary} onClick={() => setEditando(true)}><Pencil size={14} /> Editar notas</button>}
+          {!confirmarEliminar
+            ? <button className={styles.secondary} style={{ color: "#d93142", borderColor: "#f3b4b4" }} onClick={() => setConfirmarEliminar(true)}><Trash2 size={14} /> Eliminar</button>
+            : <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                <button className={styles.secondary} style={{ background: "#d93142", color: "#fff", borderColor: "#d93142" }} onClick={eliminar} disabled={eliminando}>
+                  {eliminando ? <Loader2 size={14} className={styles.spin} /> : <Trash2 size={14} />} Confirmar
+                </button>
+                <button className={styles.secondary} onClick={() => setConfirmarEliminar(false)} disabled={eliminando}>Cancelar</button>
+              </span>}
+        </div>
+
+        {error && <div className={`${styles.banner} ${styles.bannerError}`} style={{ marginBottom: 12 }}>{error}</div>}
+
+        {verTrans && (
+          <div style={{ border: "1px solid #e7e4f5", borderRadius: 12, padding: 12, marginBottom: 14, background: "#fafaff" }}>
+            {transcripcion === null ? <p style={{ color: "#8a93a8", fontSize: 13 }}>Cargando…</p> : <Transcripcion texto={transcripcion} />}
+          </div>
+        )}
+
         <div className={styles.modalBody}>
           <div className={styles.metaGrid}>
             <div className={styles.metaItem}><span>Fecha</span><b>{a.fecha || "—"}</b></div>
             <div className={styles.metaItem}><span>Canal</span><b>{a.canal || "—"}</b></div>
             <div className={styles.metaItem}><span>Tipo consulta</span><b>{a.tipoConsulta || "—"}</b></div>
             <div className={styles.metaItem}><span>Correo</span><b>{a.correo || "—"}</b></div>
-            <div className={styles.metaItem}><span>Tuteo</span><b>{a.puntajeTuteo || "—"}</b></div>
+            <div className={styles.metaItem}><span>Tuteo</span><b>{editando ? f.puntajeTuteo : (a.puntajeTuteo || "—")}</b></div>
             <div className={styles.metaItem}><span>Tono</span><b>{a.tonoGeneral || "—"}</b></div>
             <div className={styles.metaItem}><span>Evaluador</span><b>{a.evaluador || "—"}</b></div>
             <div className={styles.metaItem}><span>Tipo gestión</span><b>{a.tipoGestion || "—"}</b></div>
           </div>
-          <div>
-            <div className={styles.critGrid}>
-              {criterios.map(([nombre, valor]) => (
-                <div className={styles.critBox} key={nombre}>
-                  <span>{nombre}</span>
-                  <b className={critClass(valor)}>{valor || "—"}</b>
+
+          {editando ? (
+            <>
+              <div className={styles.critGrid}>
+                {CRITS.map(([k, label]) => (
+                  <div className={styles.critBox} key={k}>
+                    <span>{label}</span>
+                    <select value={(f as Record<string, string>)[k]} onChange={(e) => set(k as keyof typeof f, e.target.value)} style={{ marginTop: 4, width: "100%", padding: "6px 8px", borderRadius: 8, border: "1px solid #e7e4f5", fontSize: 13 }}>
+                      {VALORES_CRITERIO.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                ))}
+                <div className={styles.critBox}>
+                  <span>Tuteo</span>
+                  <select value={f.puntajeTuteo} onChange={(e) => set("puntajeTuteo", e.target.value)} style={{ marginTop: 4, width: "100%", padding: "6px 8px", borderRadius: 8, border: "1px solid #e7e4f5", fontSize: 13 }}>
+                    {VALORES_TUTEO.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
                 </div>
-              ))}
-            </div>
-          </div>
-          <div className={styles.bloque}><span>Observación</span><p>{a.observacion || "—"}</p></div>
-          <div className={styles.bloque}><span>Hallazgos</span><p>{a.hallazgos || "—"}</p></div>
-          <div className={styles.bloque}><span>Puntos de mejora</span><p>{a.mejora || "—"}</p></div>
+              </div>
+              <div className={styles.bloque}><span>Observación</span><textarea value={f.observacion} onChange={(e) => set("observacion", e.target.value)} rows={2} style={{ width: "100%", boxSizing: "border-box" }} /></div>
+              <div className={styles.bloque}><span>Hallazgos</span><textarea value={f.hallazgos} onChange={(e) => set("hallazgos", e.target.value)} rows={2} style={{ width: "100%", boxSizing: "border-box" }} /></div>
+              <div className={styles.bloque}><span>Puntos de mejora</span><textarea value={f.mejora} onChange={(e) => set("mejora", e.target.value)} rows={2} style={{ width: "100%", boxSizing: "border-box" }} /></div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+                <button className={styles.secondary} onClick={() => setEditando(false)} disabled={guardando}>Cancelar</button>
+                <button className={styles.primary} onClick={guardar} disabled={guardando}>
+                  {guardando ? <Loader2 size={14} className={styles.spin} /> : <Save size={14} />} Guardar cambios
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={styles.critGrid}>
+                {CRITS.map(([k, label]) => (
+                  <div className={styles.critBox} key={k}>
+                    <span>{label}</span>
+                    <b className={critClass((f as Record<string, string>)[k])}>{(f as Record<string, string>)[k] || "—"}</b>
+                  </div>
+                ))}
+              </div>
+              <div className={styles.bloque}><span>Observación</span><p>{a.observacion || "—"}</p></div>
+              <div className={styles.bloque}><span>Hallazgos</span><p>{a.hallazgos || "—"}</p></div>
+              <div className={styles.bloque}><span>Puntos de mejora</span><p>{a.mejora || "—"}</p></div>
+            </>
+          )}
         </div>
       </div>
     </div>

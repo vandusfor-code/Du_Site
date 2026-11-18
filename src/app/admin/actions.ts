@@ -12,6 +12,10 @@ import {
   guardarAuditoriaChatGPT,
   progresoAuditorias,
   eliminarAuditoriasDuplicadas,
+  eliminarAuditoria,
+  obtenerTranscripcion,
+  editarAuditoria,
+  type EdicionAuditoria,
   type ResultadoProcesamiento,
   type ProgresoAuditorias,
   type ResultadoDedup,
@@ -65,6 +69,33 @@ export async function progresoAuditoriasAction(): Promise<ProgresoAuditorias> {
 export async function eliminarDuplicadasAction(): Promise<ResultadoDedup> {
   await requireAdminAction();
   return eliminarAuditoriasDuplicadas();
+}
+
+// ── Historial: eliminar, ver transcripción, editar manual ──
+export async function eliminarAuditoriaAction(idGestion: string): Promise<{ ok: boolean } | { ok: false; error: string }> {
+  try {
+    await requireAdminAction();
+    return await eliminarAuditoria(idGestion);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "No se pudo eliminar." };
+  }
+}
+
+export async function obtenerTranscripcionAction(idGestion: string): Promise<{ texto: string }> {
+  await requireAdminAction();
+  return { texto: await obtenerTranscripcion(idGestion) };
+}
+
+export async function editarAuditoriaAction(
+  input: EdicionAuditoria
+): Promise<{ ok: true; nota: string; tipoNota: string } | { ok: false; error: string }> {
+  try {
+    await requireAdminAction();
+    const r = await editarAuditoria(input);
+    return { ok: true, nota: r.nota, tipoNota: r.tipoNota };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "No se pudo guardar." };
+  }
 }
 
 // Notificación consolidada: un correo por asesora con el resumen (IA) de sus

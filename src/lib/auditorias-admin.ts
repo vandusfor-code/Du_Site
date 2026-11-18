@@ -1,9 +1,10 @@
 import "server-only";
-import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate, hoyEnBogota, getSpreadsheetMeta, batchUpdate } from "@/lib/sheets";
+import { readRange, appendRows, updateRange, asegurarHoja, parseSheetDate, hoyEnBogota, getSpreadsheetMeta, batchUpdate, eliminarFilaPorValor } from "@/lib/sheets";
 import { parseCsv } from "@/lib/csv-parse";
 import { resolverAsesor } from "@/lib/auditoria-chatgpt-contrato";
 import { registrarAuditoriaBono } from "@/lib/bono-store";
 import { obtenerConfigIA } from "@/lib/config-ia";
+import { getSupabase } from "@/lib/supabase";
 
 // ============================================================
 // AUDITORÍA COFREM — puerto del Apps Script original a Next.js.
@@ -501,6 +502,80 @@ ${transcripcion}`;
     puntajeTuteo, fechaProcesamiento: new Date(), tonoGeneral,
     nota: nota + "%", tipoNota,
   };
+}
+
+/* ===================== */
+/* HISTORIAL: eliminar, ver transcripción, editar manual */
+/* ===================== */
+
+// Elimina una auditoría del Consolidado (por ID de gestión) y de Supabase.
+export async function eliminarAuditoria(idGestion: string): Promise<{ ok: boolean }> {
+  const id = sheetId();
+  const clave = (idGestion ?? "").trim();
+  if (!clave) throw new Error("ID de gestión vacío.");
+  await eliminarFilaPorValor(id, "Consolidado", 6, clave); // columna G = ID gestión
+  try {
+    const supabase = getSupabase();
+    await supabase.from("bono_auditoria").delete().eq("id_gestion", clave);
+  } catch (e) {
+    console.error("[eliminarAuditoria] limpiar bono_auditoria:", e instanceof Error ? e.message : e);
+  }
+  return { ok: true };
+}
+
+// Devuelve la transcripción cruda (Transcripciones1) de una gestión, o "".
+export async function obtenerTranscripcion(idGestion: string): Promise<string> {
+  const id = sheetId();
+  const clave = (idGestion ?? "").trim();
+  if (!clave) return "";
+  const data = await readRange(id, "Transcripciones1!A:D", { unformatted: true });
+  for (let i = 1; i < data.length; i++) {
+    if (texto(data[i], 1).trim() === clave) return texto(data[i], 2);
+  }
+  return "";
+}
+
+export interface EdicionAuditoria {
+  idGestion: string;
+  saludo: string; empatia: string; sonrisa: string; claridad: string;
+  encuesta: string; informacion: string; proceso: string; cierre: string;
+  puntajeTuteo: string; observacion: string; hallazgos: string; mejora: string;
+}
+
+// Edita manualmente una auditoría del Consolidado: guarda los criterios/textos y
+// RECALCULA la nota con la regla oficial (calcularNotaManual). Sincroniza Supabase.
+export async function editarAuditoria(input: EdicionAuditoria): Promise<{ nota: string; tipoNota: string }> {
+  const id = sheetId();
+  const clave = (input.idGestion ?? "").trim();
+  if (!clave) throw new Error("ID de gestión vacío.");
+  const data = await readRange(id, "Consolidado!A:AA", { unformatted: true });
+  let fila = -1;
+  for (let i = 1; i < data.length; i++) { if (texto(data[i], 6).trim() === clave) { fila = i; break; } }
+  if (fila === -1) throw new Error("No se encontró la auditoría en el Consolidado.");
+
+  const { nota, tipoNota } = calcularNotaManual(input);
+  const filaSheet = fila + 1; // 1-indexado (fila 1 = encabezado)
+
+  // Criterios I..P (saludo..cierre) + nota Q + tipoNota R.
+  await updateRange(id, `Consolidado!I${filaSheet}:R${filaSheet}`, [[
+    input.saludo, input.empatia, input.sonrisa, input.claridad,
+    input.encuesta, input.informacion, input.proceso, input.cierre,
+    nota + "%", tipoNota,
+  ]]);
+  // Textos S..U (observación, hallazgos, mejora).
+  await updateRange(id, `Consolidado!S${filaSheet}:U${filaSheet}`, [[input.observacion, input.hallazgos, input.mejora]]);
+  // Puntaje tuteo (columna Y).
+  await updateRange(id, `Consolidado!Y${filaSheet}`, [[input.puntajeTuteo]]);
+
+  // Supabase (PEC/PENC del bono).
+  try {
+    const d = parseSheetDate(data[fila][0]);
+    const mes = d ? `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}` : "";
+    await registrarAuditoriaBono(clave, mes, texto(data[fila], 2), nota, tipoNota);
+  } catch (e) {
+    console.error("[editarAuditoria] sync bono:", e instanceof Error ? e.message : e);
+  }
+  return { nota: nota + "%", tipoNota };
 }
 
 /* ===================== */
