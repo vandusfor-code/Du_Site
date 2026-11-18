@@ -6,6 +6,7 @@ import {
   guardarCompromiso,
   type AuditoriaConEstado,
 } from "@/lib/metricas";
+import { obtenerTranscripcion } from "@/lib/auditorias-admin";
 import {
   registrarAcuse,
   registrarCompromisoCiclo,
@@ -24,6 +25,15 @@ async function usuarioActual(): Promise<string> {
 export async function cargarAuditoriasAction(): Promise<AuditoriaConEstado[]> {
   const usuario = await usuarioActual();
   return obtenerAuditoriasConEstado(usuario);
+}
+
+// Transcripción de UNA gestión, SOLO si pertenece a la asesora autenticada.
+// La verificación es server-side (nunca confía en el navegador).
+export async function verMiTranscripcionAction(idGestion: string): Promise<{ texto: string }> {
+  const usuario = await usuarioActual();
+  const mias = await obtenerAuditoriasConEstado(usuario);
+  if (!mias.some((a) => a.idGestion === idGestion)) return { texto: "" };
+  return { texto: await obtenerTranscripcion(idGestion) };
 }
 
 // Estado del ciclo (Supabase) de cada auditoría de la asesora autenticada, para

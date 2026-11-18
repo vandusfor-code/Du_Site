@@ -26,6 +26,7 @@ import {
   cargarEstadosCicloAction,
   registrarAcuseAction,
   firmarCompromisoAction,
+  verMiTranscripcionAction,
 } from "./actions";
 import type { AuditoriaConEstado, MetricasAsesor } from "@/lib/metricas";
 import type { EstadoCicloAsesora } from "@/lib/acuse-compromiso-ciclo";
@@ -111,6 +112,21 @@ export default function MetricasDashboard({
   // Estado del ciclo (Supabase) por idGestion — gobierna acuse/firma.
   const [ciclos, setCiclos] = useState<Record<string, EstadoCicloAsesora>>({});
   const [, startTransition] = useTransition();
+  // Transcripción por gestión: estado de carga y texto.
+  const [trans, setTrans] = useState<Record<string, string>>({});
+  const [transAbierta, setTransAbierta] = useState<Record<string, boolean>>({});
+  const [transCargando, setTransCargando] = useState<string | null>(null);
+
+  async function toggleTranscripcion(idGestion: string) {
+    if (transAbierta[idGestion]) { setTransAbierta((p) => ({ ...p, [idGestion]: false })); return; }
+    if (trans[idGestion] === undefined) {
+      setTransCargando(idGestion);
+      try { const r = await verMiTranscripcionAction(idGestion); setTrans((p) => ({ ...p, [idGestion]: r.texto || "" })); }
+      catch { setTrans((p) => ({ ...p, [idGestion]: "" })); }
+      finally { setTransCargando(null); }
+    }
+    setTransAbierta((p) => ({ ...p, [idGestion]: true }));
+  }
   const { soundOn, toggleSound, playClick, playNotify } = useModuleSound();
   const { toast, showToast } = useToast();
 
@@ -792,6 +808,40 @@ export default function MetricasDashboard({
                     {item.tipoGestion} — ID: {item.idGestion}
                   </div>
                   <div className="auc-mejora">{item.puntosMejora || "Sin puntos de mejora registrados."}</div>
+
+                  <button
+                    onClick={() => toggleTranscripcion(item.idGestion)}
+                    disabled={transCargando === item.idGestion}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--bg-body)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", fontSize: 12.5, fontWeight: 600, color: "var(--primary)", cursor: "pointer", marginBottom: 10 }}
+                  >
+                    <i className={transCargando === item.idGestion ? "ph ph-circle-notch" : "ph ph-chat-circle-text"} style={transCargando === item.idGestion ? { animation: "spin 0.7s linear infinite" } : undefined} />
+                    {transAbierta[item.idGestion] ? "Ocultar transcripción" : "Ver transcripción"}
+                  </button>
+                  {transAbierta[item.idGestion] && (
+                    <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 12, background: "var(--bg-body)" }}>
+                      {(() => {
+                        const turnos = (trans[item.idGestion] ?? "").split("|").map((t) => t.trim()).filter(Boolean);
+                        if (turnos.length === 0) return <p style={{ fontSize: 12.5, color: "var(--text-muted)" }}>No hay transcripción guardada para esta gestión.</p>;
+                        return (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto" }}>
+                            {turnos.map((t, k) => {
+                              const esAgente = /^AGENTE\s*:/i.test(t);
+                              const cuerpo = t.replace(/^(AGENTE|CLIENTE)\s*:/i, "").trim();
+                              const quien = esAgente ? "Tú (agente)" : /^CLIENTE\s*:/i.test(t) ? "Usuario" : "";
+                              return (
+                                <div key={k} style={{ display: "flex", justifyContent: esAgente ? "flex-end" : "flex-start" }}>
+                                  <div style={{ maxWidth: "80%", padding: "9px 13px", borderRadius: 14, fontSize: 13, lineHeight: 1.45, background: esAgente ? "var(--primary)" : "#eef0f6", color: esAgente ? "#fff" : "#1f2430", borderBottomRightRadius: esAgente ? 4 : 14, borderBottomLeftRadius: esAgente ? 14 : 4 }}>
+                                    {quien && <div style={{ fontSize: 10, fontWeight: 800, opacity: 0.7, marginBottom: 2, textTransform: "uppercase", letterSpacing: ".4px" }}>{quien}</div>}
+                                    {cuerpo || t}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {cuerpoAuditoria(item)}
                 </div>
