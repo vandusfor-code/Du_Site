@@ -1,29 +1,16 @@
 import { requireModuloOAdmin } from "@/lib/auth-helpers";
-import { obtenerPanelCalidad, obtenerKPIsPanelCalidad, obtenerDetalleAuditoriaCalidad } from "@/lib/gestion-calidad";
-import CalidadDashboard from "./CalidadDashboard";
+import { obtenerSeguimientoResumen } from "@/lib/seguimiento-resumen";
+import SeguimientoResumen from "./SeguimientoResumen";
 
-export default async function CalidadPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ id?: string }>;
-}) {
+export const dynamic = "force-dynamic";
+
+export default async function CalidadPage() {
   const session = await requireModuloOAdmin("calidad");
-  const { id } = await searchParams;
-
-  const [kpis, panel, detalleInicial] = await Promise.all([
-    obtenerKPIsPanelCalidad(),
-    obtenerPanelCalidad({}, 0),
-    id
-      ? obtenerDetalleAuditoriaCalidad(id).catch(() => null)
-      : Promise.resolve(null),
-  ]);
-
+  const { kpis, filas } = await obtenerSeguimientoResumen({});
   return (
-    <CalidadDashboard
+    <SeguimientoResumen
       kpisIniciales={kpis}
-      panelInicial={panel}
-      idResaltadoInicial={id ?? null}
-      detalleInicial={detalleInicial}
+      filasIniciales={filas}
       nombreUsuario={session.user.nombre || session.user.usuario || "Usuario"}
       rolUsuario={session.user.rol}
     />
