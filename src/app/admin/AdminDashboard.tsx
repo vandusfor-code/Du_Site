@@ -405,7 +405,6 @@ export default function AdminDashboard({
               )}
             </section>
           ) : (
-            <>
             <section className={styles.panel}>
               <h2><TrendingUp size={18} />Estado de auditorías</h2>
               <div className={styles.miniStats}>
@@ -448,26 +447,26 @@ export default function AdminDashboard({
                   Eliminar duplicadas
                 </button>
               </div>
-            </section>
 
-            {/* Notificar resumen del día (1 correo + 1 firma por asesora) */}
-            <section className={styles.panel} style={{ marginTop: 16 }}>
-              <h2><Bell size={18} /> Notificar resumen del día</h2>
-              <p className={styles.gptHint}>
-                Envía <b>un solo correo por asesora</b> con el resumen (IA) de sus auditorías del día —lo positivo y lo que debe
-                mejorar— y un enlace donde <b>firma una sola vez</b>. Aparece también en el tablero de Calidad.
-              </p>
-              <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-                <div className={styles.formField} style={{ maxWidth: 200 }}>
-                  <label><CalendarDays size={12} /> Fecha</label>
-                  <input type="date" value={fechaResumen} onChange={(e) => setFechaResumen(e.target.value)} />
+              {/* Notificar resumen del día (1 correo + 1 firma por asesora) */}
+              <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid #eef0f6" }}>
+                <h3 style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14.5, margin: "0 0 6px" }}>
+                  <Bell size={16} /> Notificar resumen del día
+                </h3>
+                <p className={styles.gptHint} style={{ margin: "0 0 12px" }}>
+                  Un solo correo por asesora con el resumen (IA) de sus auditorías del día. Firma una sola vez; aparece en el tablero de Calidad.
+                </p>
+                <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                  <div className={styles.formField} style={{ maxWidth: 170 }}>
+                    <label><CalendarDays size={12} /> Fecha</label>
+                    <input type="date" value={fechaResumen} onChange={(e) => setFechaResumen(e.target.value)} />
+                  </div>
+                  <button className={styles.primary} onClick={notificarResumen} disabled={notificandoR}>
+                    {notificandoR ? <Loader2 size={14} className={styles.spin} /> : <Bell size={14} />} Notificar
+                  </button>
                 </div>
-                <button className={styles.primary} onClick={notificarResumen} disabled={notificandoR}>
-                  {notificandoR ? <Loader2 size={14} className={styles.spin} /> : <Bell size={14} />} Notificar resumen del día
-                </button>
               </div>
             </section>
-            </>
           )}
 
           {/* Cumplimiento por criterio */}
