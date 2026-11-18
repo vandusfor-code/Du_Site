@@ -19,8 +19,10 @@ import {
   eliminarAuditoriaAction,
   obtenerTranscripcionAction,
   editarAuditoriaAction,
+  notificarResumenDiaAction,
 } from "./actions";
 import type { ProgresoAuditorias } from "@/lib/auditorias-admin";
+import type { ResultadoNotificacionResumen } from "@/lib/resumen-diario";
 import { calcularNota, VALORES_CRITERIO, VALORES_TUTEO } from "@/lib/auditoria-chatgpt-contrato";
 import AdminSidebar from "./AdminSidebar";
 import AuditoriaManualForm from "./AuditoriaManualForm";
@@ -90,6 +92,23 @@ export default function AdminDashboard({
   const [procesando, setProcesando] = useState(false);
   const [progreso, setProgreso] = useState<ProgresoAuditorias | null>(null);
   const [eliminandoDup, setEliminandoDup] = useState(false);
+  // Notificar resumen del día (desde el panel de auditorías IA).
+  const hoyISO = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  const [fechaResumen, setFechaResumen] = useState(hoyISO);
+  const [notificandoR, setNotificandoR] = useState(false);
+  const [resNotif, setResNotif] = useState<ResultadoNotificacionResumen | null>(null);
+  const [errNotif, setErrNotif] = useState("");
+
+  async function notificarResumen() {
+    setNotificandoR(true); setResNotif(null); setErrNotif("");
+    try {
+      setResNotif(await notificarResumenDiaAction(fechaResumen));
+    } catch (e) {
+      setErrNotif(e instanceof Error ? e.message : "No se pudo notificar.");
+    } finally {
+      setNotificandoR(false);
+    }
+  }
   const [generando, setGenerando] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
 
@@ -386,6 +405,7 @@ export default function AdminDashboard({
               )}
             </section>
           ) : (
+            <>
             <section className={styles.panel}>
               <h2><TrendingUp size={18} />Estado de auditorías</h2>
               <div className={styles.miniStats}>
@@ -429,6 +449,25 @@ export default function AdminDashboard({
                 </button>
               </div>
             </section>
+
+            {/* Notificar resumen del día (1 correo + 1 firma por asesora) */}
+            <section className={styles.panel} style={{ marginTop: 16 }}>
+              <h2><Bell size={18} /> Notificar resumen del día</h2>
+              <p className={styles.gptHint}>
+                Envía <b>un solo correo por asesora</b> con el resumen (IA) de sus auditorías del día —lo positivo y lo que debe
+                mejorar— y un enlace donde <b>firma una sola vez</b>. Aparece también en el tablero de Calidad.
+              </p>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                <div className={styles.formField} style={{ maxWidth: 200 }}>
+                  <label><CalendarDays size={12} /> Fecha</label>
+                  <input type="date" value={fechaResumen} onChange={(e) => setFechaResumen(e.target.value)} />
+                </div>
+                <button className={styles.primary} onClick={notificarResumen} disabled={notificandoR}>
+                  {notificandoR ? <Loader2 size={14} className={styles.spin} /> : <Bell size={14} />} Notificar resumen del día
+                </button>
+              </div>
+            </section>
+            </>
           )}
 
           {/* Cumplimiento por criterio */}
@@ -570,6 +609,43 @@ export default function AdminDashboard({
       </main>
 
       {detalle && <DetalleModal a={detalle} onClose={() => setDetalle(null)} onCambio={() => { setDetalle(null); refrescar(); }} />}
+
+      {/* Pop-up del resultado de "Notificar resumen del día" */}
+      {(resNotif || errNotif) && (() => {
+        const total = resNotif ? resNotif.asesorasNotificadas + resNotif.sinCorreo + resNotif.fallidas : 0;
+        return (
+          <div role="dialog" aria-modal="true" onClick={() => { setResNotif(null); setErrNotif(""); }}
+            style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", color: "#0e0a2a", borderRadius: 16, padding: "26px 26px 22px", maxWidth: 460, width: "100%", boxShadow: "0 24px 70px rgba(0,0,0,.35)", textAlign: "center" }}>
+              {errNotif ? (
+                <><AlertTriangle size={44} color="#e11d48" /><h3 style={{ margin: "10px 0 6px", fontSize: 20 }}>No se pudo notificar</h3><p style={{ color: "#6b6a85", margin: "0 0 18px" }}>{errNotif}</p></>
+              ) : total === 0 ? (
+                <><CheckCircle2 size={44} color="#8a93a8" /><h3 style={{ margin: "10px 0 6px", fontSize: 20 }}>Sin auditorías para resumir</h3><p style={{ color: "#6b6a85", margin: "0 0 18px" }}>No hay auditorías del <b>{fechaResumen}</b>.</p></>
+              ) : (
+                <>
+                  <CheckCircle2 size={48} color="#16a34a" />
+                  <h3 style={{ margin: "10px 0 6px", fontSize: 21 }}>¡Auditorías notificadas! ✅</h3>
+                  <p style={{ color: "#6b6a85", margin: "0 0 14px" }}>
+                    <b style={{ color: "#16a34a" }}>{resNotif!.asesorasNotificadas}</b> asesora(s) del <b>{fechaResumen}</b>
+                    {resNotif!.sinCorreo > 0 ? ` · ${resNotif!.sinCorreo} sin correo` : ""}
+                    {resNotif!.fallidas > 0 ? ` · ${resNotif!.fallidas} con fallo` : ""}.
+                  </p>
+                  {resNotif!.detalle.length > 0 && (
+                    <div style={{ textAlign: "left", maxHeight: 200, overflowY: "auto", border: "1px solid #e7e4f5", borderRadius: 10, padding: "8px 12px", margin: "0 0 16px", fontSize: 13.5 }}>
+                      {resNotif!.detalle.map((d, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
+                          <span>{d.nombre}</span><b style={{ color: d.estado === "Notificada" ? "#16a34a" : "#e11d48" }}>{d.estado}</b>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+              <button className={styles.primary} onClick={() => { setResNotif(null); setErrNotif(""); }} style={{ width: "100%", justifyContent: "center" }}>Entendido</button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
