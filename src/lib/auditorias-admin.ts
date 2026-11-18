@@ -428,7 +428,7 @@ NO inventes algo que mejorar. Si todo salió bien, dilo claramente.`
 3. Cerrar con apoyo motivador
 
 PROHIBIDO empezar con: "Hiciste un buen trabajo", "Hiciste un gran trabajo", "La forma en que explicaste".
-Si hubo tuteo real: cita la frase y sugiere ajustarla — SIN mencionar "usted".
+Si hubo tuteo real: cítalo como algo a CORREGIR y recuérdale que el trato SIEMPRE debe ser de usted. El tuteo NO es aceptable; NUNCA le recomiendes tutear.
 Habla en SEGUNDA persona ("Manejaste...", "Mostraste...").`
 }
 
@@ -437,7 +437,7 @@ REGLAS ABSOLUTAS para los TRES campos:
 - Nunca uses "cliente", siempre "usuario"
 - Nunca menciones distorsiones fonéticas del nombre Cofrem como error
 - Nunca menciones "su merced" como algo a corregir
-- En MEJORA: NUNCA recomendar "usar usted", "tratar de usted", "decir usted"
+- REGLA CRÍTICA DEL TRATO: el trato SIEMPRE debe ser de usted. El TUTEO (tú/te/ti/tu/tuyo) NO es aceptable en ningún caso. NUNCA, jamás, recomiendes tutear ni sugieras un "trato más cercano con tú" ni "generar cercanía con el tuteo". Si hubo tuteo, la mejora es MANTENER el trato de usted.
 - Tono: directo, humano, cercano — como si fueras Duvan hablando con su equipo
 - ${esChat ? "Es un CHAT — no menciones voz, tono de voz, sonrisa audible" : "Es una LLAMADA — puedes mencionar tono de voz"}
 - Máximo 4 oraciones por campo
