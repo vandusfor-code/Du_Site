@@ -109,7 +109,7 @@ export default function SeguimientoResumen({
         {/* Tabla consolidada */}
         <div style={{ background: "var(--cal-surface)", border: "1px solid var(--cal-border)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5, color: "var(--cal-text)" }}>
               <thead>
                 <tr style={{ background: "#fafbfe", color: "var(--cal-muted)", textAlign: "left" }}>
                   {["ASESORA", "FECHA", "# AUDITORÍAS", "CALIDAD PROM.", "ESTADO", "DÍAS SIN FIRMAR", "COMPROMISO"].map((h) => (
@@ -126,8 +126,8 @@ export default function SeguimientoResumen({
                     <tr key={f.id} style={{ borderTop: "1px solid var(--cal-border)" }}>
                       <td style={{ padding: "11px 14px", fontWeight: 700, color: "var(--cal-text-strong)" }}>{f.nombre}</td>
                       <td style={{ padding: "11px 14px", color: "var(--cal-muted)" }}>{f.fecha}</td>
-                      <td style={{ padding: "11px 14px" }}>{f.numAuditorias}</td>
-                      <td style={{ padding: "11px 14px", fontWeight: 700 }}>{f.promedio}%</td>
+                      <td style={{ padding: "11px 14px", color: "var(--cal-text-strong)", fontWeight: 600 }}>{f.numAuditorias}</td>
+                      <td style={{ padding: "11px 14px", fontWeight: 700, color: "var(--cal-text-strong)" }}>{f.promedio}%</td>
                       <td style={{ padding: "11px 14px" }}>
                         <span style={{ background: b.bg, color: b.color, padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>{b.txt}</span>
                       </td>
