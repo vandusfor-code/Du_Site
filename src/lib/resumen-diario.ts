@@ -87,7 +87,8 @@ async function sintetizar(nombre: string, audits: AuditoriaDia[]): Promise<{ pos
   "positivo": "Sus fortalezas reales del día, con detalles concretos tomados de las auditorías. 2 a 4 frases.",
   "mejorar": "Lo que debe mejorar, con acciones claras y accionables. 2 a 4 frases. Si todo salió muy bien, dilo con sinceridad."
 }
-Reglas: básate ÚNICAMENTE en los insumos (no inventes). Nunca uses la palabra "cliente", usa "usuario". No menciones distorsiones del nombre Cofrem como error. No recomiendes "tratar de usted".
+REGLA CRÍTICA DEL TRATO: el agente SIEMPRE debe tratar de "usted". El TUTEO (tú/te/ti/tu/tuyo) NO es aceptable en NINGÚN caso. NUNCA, jamás, recomiendes tutear ni sugieras un "trato más cercano con tú" ni "generar cercanía con el tuteo". Si en los insumos aparece que hubo tuteo, es una FALTA a corregir: la mejora es mantener SIEMPRE el trato de usted.
+Otras reglas: básate ÚNICAMENTE en los insumos (no inventes). Nunca uses la palabra "cliente", usa "usuario". No menciones distorsiones del nombre Cofrem como error.
 
 INSUMOS:
 ${insumo}`;
