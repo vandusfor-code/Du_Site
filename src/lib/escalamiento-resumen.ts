@@ -38,40 +38,59 @@ export async function obtenerAsesorasEscaladas(soloVencidas: boolean): Promise<A
 
 export function construirCorreoEscalamiento(nombreDest: string, asesoras: AsesoraEscalada[], urlPanel: string): string {
   const totalAsesoras = asesoras.length;
-  const totalAuditorias = asesoras.reduce((s, a) => s + a.auditoriasPendientes, 0);
+  const totalCompromisos = asesoras.reduce((s, a) => s + a.diasPendientes, 0);
   const hoy = new Date().toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "2-digit", year: "numeric" });
 
-  const filas = asesoras.map((a) => `
-    <tr>
-      <td style="padding:6px 10px;border-bottom:1px solid #eef0f6;color:#1f2430;">${a.nombre}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #eef0f6;text-align:center;font-weight:700;color:${a.diasSinFirmar >= 2 ? "#c0143c" : "#b45309"};">${a.diasSinFirmar}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #eef0f6;text-align:center;color:#1f2430;">${a.auditoriasPendientes}</td>
+  const filas = asesoras.map((a, i) => `
+    <tr style="background:${i % 2 ? "#faf9ff" : "#ffffff"};">
+      <td style="padding:12px 16px;font-weight:700;color:#21175d;border-bottom:1px solid #eef0f6;">${a.nombre}</td>
+      <td style="padding:12px 16px;text-align:center;border-bottom:1px solid #eef0f6;">
+        <span style="display:inline-block;background:${a.diasSinFirmar >= 2 ? "#fff1f2" : "#fffbeb"};color:${a.diasSinFirmar >= 2 ? "#be123c" : "#b45309"};padding:3px 12px;border-radius:999px;font-weight:700;font-size:13px;">${a.diasSinFirmar} día${a.diasSinFirmar === 1 ? "" : "s"}</span>
+      </td>
+      <td style="padding:12px 16px;text-align:center;color:#2f2f2f;border-bottom:1px solid #eef0f6;">${a.diasPendientes}</td>
     </tr>`).join("");
 
-  // Compacto a propósito: cabe en una sola captura. Sin gradientes, sin iconos,
-  // sin relleno de más. Tabla densa con totales en una línea.
   return `
-  <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;color:#1f2430;padding:14px;">
-    <div style="border-left:4px solid #21175d;padding-left:10px;margin-bottom:10px;">
-      <div style="font-size:16px;font-weight:800;color:#21175d;">Firmas de calidad pendientes</div>
-      <div style="font-size:12px;color:#6b7280;">Retroalimentaciones sin firmar · ${hoy}</div>
-    </div>
-    <p style="margin:0 0 10px;font-size:13px;">Hola ${nombreDest}, estas asesoras aún no han firmado su retroalimentación:</p>
-    <div style="font-size:13px;margin:0 0 8px;">
-      <b style="color:#21175d;">${totalAsesoras}</b> asesora(s) sin firmar · <b style="color:#c2410c;">${totalAuditorias}</b> auditoría(s) pendiente(s)
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <thead>
-        <tr style="background:#f1ecff;">
-          <th style="padding:6px 10px;text-align:left;font-size:11px;color:#5c34d1;letter-spacing:.3px;">ASESORA</th>
-          <th style="padding:6px 10px;text-align:center;font-size:11px;color:#5c34d1;letter-spacing:.3px;">DÍAS</th>
-          <th style="padding:6px 10px;text-align:center;font-size:11px;color:#5c34d1;letter-spacing:.3px;">AUDIT. PEND.</th>
-        </tr>
-      </thead>
-      <tbody>${filas || `<tr><td colspan="3" style="padding:12px;text-align:center;color:#8a93a8;">No hay firmas pendientes.</td></tr>`}</tbody>
-    </table>
-    <div style="font-size:11px;color:#9ca3af;margin-top:10px;">
-      <a href="${urlPanel}" style="color:#5c34d1;text-decoration:none;">Ver seguimiento</a> · Du Site · Calidad · People BPO
+  <div style="font-family:Arial,Helvetica,sans-serif;background:#f3f4f8;padding:24px;">
+    <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 8px 26px rgba(24,30,55,0.10);">
+      <div style="background:linear-gradient(135deg,#21175d,#3f2d9c);padding:22px 26px;">
+        <h2 style="margin:0;color:#ffffff;font-size:19px;">Firmas de calidad pendientes</h2>
+        <p style="margin:6px 0 0;color:#c9c2f5;font-size:13px;">Seguimiento de retroalimentaciones sin firmar · ${hoy}</p>
+      </div>
+      <div style="height:4px;background:#C1E12A;"></div>
+      <div style="padding:24px 26px;color:#2f2f2f;line-height:1.6;">
+        <p style="margin:0 0 14px;">Hola <strong>${nombreDest}</strong>,</p>
+        <p style="margin:0 0 18px;">Te comparto el estado de las <strong>retroalimentaciones de calidad</strong> que aún no han sido firmadas por las asesoras. Es un reporte informativo para su seguimiento.</p>
+
+        <table role="presentation" width="100%" style="border-collapse:separate;border-spacing:12px 0;margin:0 0 20px;">
+          <tr>
+            <td width="50%" style="background:#f1ecff;border-radius:14px;padding:18px 14px;text-align:center;">
+              <div style="font-size:32px;font-weight:800;color:#5b2eff;line-height:1;">${totalAsesoras}</div>
+              <div style="font-size:12.5px;color:#6b6a85;margin-top:6px;">Asesoras sin firmar</div>
+            </td>
+            <td width="50%" style="background:#f1ecff;border-radius:14px;padding:18px 14px;text-align:center;">
+              <div style="font-size:32px;font-weight:800;color:#5b2eff;line-height:1;">${totalCompromisos}</div>
+              <div style="font-size:12.5px;color:#6b6a85;margin-top:6px;">Compromisos sin firmar</div>
+            </td>
+          </tr>
+        </table>
+
+        <table style="width:100%;border-collapse:collapse;border:1px solid #eef0f6;border-radius:10px;overflow:hidden;">
+          <thead>
+            <tr style="background:#f1ecff;">
+              <th style="padding:11px 16px;text-align:left;font-size:12px;color:#5c34d1;text-transform:uppercase;letter-spacing:.4px;">Asesora</th>
+              <th style="padding:11px 16px;text-align:center;font-size:12px;color:#5c34d1;text-transform:uppercase;letter-spacing:.4px;">Días sin firmar</th>
+              <th style="padding:11px 16px;text-align:center;font-size:12px;color:#5c34d1;text-transform:uppercase;letter-spacing:.4px;">Compromisos</th>
+            </tr>
+          </thead>
+          <tbody>${filas || `<tr><td colspan="3" style="padding:18px;text-align:center;color:#8a93a8;">No hay firmas pendientes. ¡Todo al día!</td></tr>`}</tbody>
+        </table>
+
+        <p style="text-align:center;margin:22px 0 6px;">
+          <a href="${urlPanel}" style="background:#21175d;color:#fff;text-decoration:none;padding:12px 26px;border-radius:10px;font-weight:bold;display:inline-block;font-size:14px;">Ver el seguimiento completo</a>
+        </p>
+        <p style="margin:22px 0 0;font-size:13px;color:#6b7280;">Cordialmente,<br><strong>Du Site</strong> · Sistema de seguimiento de Calidad · People BPO</p>
+      </div>
     </div>
   </div>`;
 }
