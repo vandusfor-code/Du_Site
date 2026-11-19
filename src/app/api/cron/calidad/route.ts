@@ -7,10 +7,7 @@ import {
   procesarRecordatoriosPendientes,
   dryRunRecordatorios,
 } from "@/lib/recordatorios-calidad";
-import {
-  procesarEscalamiento,
-  dryRunEscalamiento,
-} from "@/lib/escalamiento-calidad";
+import { enviarEscalamientoResumen, obtenerAsesorasEscaladas } from "@/lib/escalamiento-resumen";
 
 // ============================================================
 // CRON del módulo Calidad — ciclo diario COMPLETO de notificaciones.
@@ -84,8 +81,12 @@ async function ejecutar(request: NextRequest): Promise<NextResponse> {
     const recordatorios = await paso("recordatorios", () =>
       dry ? dryRunRecordatorios() : procesarRecordatoriosPendientes()
     );
-    const escalamiento = await paso("escalamiento", () =>
-      dry ? dryRunEscalamiento() : procesarEscalamiento()
+    // Escalamiento a Mónica: CONSOLIDADO por asesora (resumen_diario). En real,
+    // envía el correo y marca escalado_en. En dry, solo cuenta las vencidas nuevas.
+    const escalamiento = await paso("escalamiento", async () =>
+      dry
+        ? { consolidado: true, vencidasNuevas: (await obtenerAsesorasEscaladas(true, true)).length }
+        : enviarEscalamientoResumen({ soloVencidas: true, marcar: true })
     );
 
     const resultado = {

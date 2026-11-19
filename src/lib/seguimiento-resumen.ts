@@ -28,6 +28,7 @@ export interface FilaSeguimiento {
   firmadoEn: string | null;
   diasSinFirmar: number | null;
   vencida: boolean;
+  escaladoEn: string | null;
 }
 
 export interface KpisSeguimiento {
@@ -70,6 +71,7 @@ function mapFila(r: Record<string, unknown>): FilaSeguimiento {
     enviadoEn, firmadoEn,
     diasSinFirmar,
     vencida,
+    escaladoEn: r.escalado_en ? String(r.escalado_en) : null,
   };
 }
 

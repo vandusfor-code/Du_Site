@@ -1,6 +1,7 @@
 import "server-only";
 import { obtenerSeguimientoResumen } from "@/lib/seguimiento-resumen";
 import { enviarCorreoIndividual, FROM_CALIDAD } from "@/lib/mailer";
+import { getSupabase } from "@/lib/supabase";
 
 // ============================================================
 // Escalamiento CONSOLIDADO a Coordinación (Mónica): UN correo informativo con el
@@ -18,19 +19,24 @@ export interface AsesoraEscalada {
   diasSinFirmar: number;   // máximo de sus días sin firmar
   auditoriasPendientes: number;
   diasPendientes: number;  // cuántos días/resúmenes sin firmar
+  ids: string[];           // ids de resumen_diario incluidos (para marcar escalado)
 }
 
-// Agrupa por asesora las retroalimentaciones NOTIFICADAS sin firmar. Si
-// `soloVencidas`, solo las que superaron el plazo (2 días hábiles).
-export async function obtenerAsesorasEscaladas(soloVencidas: boolean): Promise<AsesoraEscalada[]> {
+// Agrupa por asesora las retroalimentaciones NOTIFICADAS sin firmar. `soloVencidas`
+// limita a las que superaron el plazo (2 días hábiles). `soloNoEscaladas` excluye
+// las que ya se escalaron a Mónica (para no re-escalar).
+export async function obtenerAsesorasEscaladas(soloVencidas: boolean, soloNoEscaladas = false): Promise<AsesoraEscalada[]> {
   const { filas } = await obtenerSeguimientoResumen({});
-  const pend = filas.filter((f) => f.estado === "NOTIFICADA" && (!soloVencidas || f.vencida));
+  const pend = filas.filter((f) =>
+    f.estado === "NOTIFICADA" && (!soloVencidas || f.vencida) && (!soloNoEscaladas || !f.escaladoEn)
+  );
   const porAsesora = new Map<string, AsesoraEscalada>();
   for (const f of pend) {
-    const prev = porAsesora.get(f.asesorCodigo) ?? { nombre: f.nombre, asesorCodigo: f.asesorCodigo, diasSinFirmar: 0, auditoriasPendientes: 0, diasPendientes: 0 };
+    const prev = porAsesora.get(f.asesorCodigo) ?? { nombre: f.nombre, asesorCodigo: f.asesorCodigo, diasSinFirmar: 0, auditoriasPendientes: 0, diasPendientes: 0, ids: [] };
     prev.diasSinFirmar = Math.max(prev.diasSinFirmar, f.diasSinFirmar ?? 0);
     prev.auditoriasPendientes += f.numAuditorias;
     prev.diasPendientes += 1;
+    prev.ids.push(f.id);
     porAsesora.set(f.asesorCodigo, prev);
   }
   return Array.from(porAsesora.values()).sort((a, b) => b.diasSinFirmar - a.diasSinFirmar);
@@ -100,14 +106,35 @@ function appUrl(): string {
 }
 
 // Envía el correo consolidado. `correoOverride` es para pruebas (ej. tu correo).
+// `marcar` = escalamiento REAL: solo vencidas NO escaladas aún, y al enviar marca
+// escalado_en en resumen_diario (para que el tablero muestre "Escalada a Mónica"
+// y no se re-escale).
 export async function enviarEscalamientoResumen(
-  opts: { soloVencidas: boolean; correoOverride?: string }
+  opts: { soloVencidas: boolean; correoOverride?: string; marcar?: boolean }
 ): Promise<{ ok: boolean; asesoras: number; destino: string; mensaje: string }> {
-  const asesoras = await obtenerAsesorasEscaladas(opts.soloVencidas);
+  const marcar = opts.marcar === true;
+  const asesoras = await obtenerAsesorasEscaladas(opts.soloVencidas, marcar);
   const destino = (opts.correoOverride ?? DESTINATARIO_ESCALAMIENTO).trim();
+
+  // En el escalamiento real, si no hay vencidas nuevas, NO se envía nada a Mónica.
+  if (marcar && asesoras.length === 0) {
+    return { ok: true, asesoras: 0, destino, mensaje: "Sin firmas vencidas nuevas para escalar." };
+  }
+
   const html = construirCorreoEscalamiento(NOMBRE_DESTINATARIO, asesoras, `${appUrl()}/modulos/calidad`);
   const asunto = `Firmas de calidad pendientes — ${asesoras.length} asesora(s)`;
   const envio = await enviarCorreoIndividual(destino, asunto, html, FROM_CALIDAD);
+
+  if (marcar && envio.aceptado) {
+    const ids = asesoras.flatMap((a) => a.ids);
+    if (ids.length) {
+      try {
+        await getSupabase().from("resumen_diario").update({ escalado_en: new Date().toISOString() }).in("id", ids);
+      } catch (e) {
+        console.error("[escalamiento-resumen] marcar escalado_en:", e instanceof Error ? e.message : e);
+      }
+    }
+  }
   return {
     ok: envio.aceptado, asesoras: asesoras.length, destino,
     mensaje: envio.aceptado ? `Enviado a ${destino} (${asesoras.length} asesora(s))` : `No se aceptó: ${envio.respuestaServidor ?? ""}`,

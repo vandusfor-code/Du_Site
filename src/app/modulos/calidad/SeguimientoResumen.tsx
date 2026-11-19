@@ -20,6 +20,7 @@ const ESTADO_LABEL: Record<EstadoSeguimiento, string> = {
 
 function badge(fila: FilaSeguimiento) {
   if (fila.estado === "FIRMADA") return { bg: "#ecfdf5", color: "#047857", txt: "Firmada" };
+  if (fila.escaladoEn) return { bg: "#eef2ff", color: "#4338ca", txt: "Escalada a Mónica" };
   if (fila.vencida) return { bg: "#fff1f2", color: "#be123c", txt: "Vencida sin firma" };
   if (fila.estado === "NOTIFICADA") return { bg: "#fffbeb", color: "#b45309", txt: "Pendiente de firma" };
   return { bg: "#f1f5f9", color: "#475569", txt: "Pendiente de notificar" };
