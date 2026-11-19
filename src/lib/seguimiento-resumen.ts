@@ -1,5 +1,6 @@
 import "server-only";
 import { getSupabase } from "@/lib/supabase";
+import { sumarDiasHabiles } from "@/lib/dias-habiles-colombia";
 
 // ============================================================
 // Seguimiento CONSOLIDADO por asesora/día (tabla resumen_diario). Una fila por
@@ -8,7 +9,9 @@ import { getSupabase } from "@/lib/supabase";
 // debajo (acuse masivo + escalamiento), pero aquí NO se muestran una a una.
 // ============================================================
 
-const DIAS_PARA_VENCER = 2; // días calendario desde la notificación sin firmar
+// "Vencida" = mismo criterio que el ESCALAMIENTO a Mónica: 2 días HÁBILES sin
+// acuse desde la notificación (ver escalamiento-calidad/gestion-calidad).
+const DIAS_HABILES_PARA_VENCER = 2;
 
 export type EstadoSeguimiento = "PENDIENTE_NOTIF" | "NOTIFICADA" | "FIRMADA";
 
@@ -53,6 +56,8 @@ function mapFila(r: Record<string, unknown>): FilaSeguimiento {
   const firmadoEn = r.firmado_en ? String(r.firmado_en) : null;
   const estado: EstadoSeguimiento = firmadoEn ? "FIRMADA" : enviadoEn ? "NOTIFICADA" : "PENDIENTE_NOTIF";
   const diasSinFirmar = enviadoEn && !firmadoEn ? diasEntre(enviadoEn, null) : null;
+  const vencida = estado === "NOTIFICADA" && !!enviadoEn
+    && Date.now() > sumarDiasHabiles(new Date(enviadoEn), DIAS_HABILES_PARA_VENCER).getTime();
   return {
     id: String(r.id),
     fecha: String(r.fecha),
@@ -64,7 +69,7 @@ function mapFila(r: Record<string, unknown>): FilaSeguimiento {
     compromiso: String(r.compromiso ?? ""),
     enviadoEn, firmadoEn,
     diasSinFirmar,
-    vencida: estado === "NOTIFICADA" && (diasSinFirmar ?? 0) >= DIAS_PARA_VENCER,
+    vencida,
   };
 }
 

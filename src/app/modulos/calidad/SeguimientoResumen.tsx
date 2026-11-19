@@ -76,7 +76,7 @@ export default function SeguimientoResumen({
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 18 }}>
           {card(<Mail size={16} />, kpis.notificadas, "Notificadas", "Asesoras con resumen del día", "#7044ed")}
           {card(<Clock size={16} />, kpis.pendientesFirma, "Pendientes de firma", "Aún no firman", "#b45309")}
-          {card(<TriangleAlert size={16} />, kpis.vencidas, "Vencidas sin firma", `Más de 2 días sin firmar`, "#be123c")}
+          {card(<TriangleAlert size={16} />, kpis.vencidas, "Vencidas sin firma", "+2 días hábiles · se escala a Mónica", "#be123c")}
           {card(<CircleCheck size={16} />, kpis.firmadas, "Firmadas", "Acuse + compromiso listos", "#047857")}
         </div>
 
