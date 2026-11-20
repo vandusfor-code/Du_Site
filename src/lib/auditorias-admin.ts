@@ -212,6 +212,23 @@ async function llamarAuditor(
   return llamarClaude(prompt, claudeModelo, maxTokens);
 }
 
+// Verifica que el AGENTE (no el usuario) haya enviado realmente el mensaje de
+// "inconveniente con la plataforma / comuníquese más tarde". Es un candado
+// server-side: el PENC 0 por cierre abrupto SOLO se aplica si este mensaje está
+// de verdad en la transcripción, para que un falso positivo del modelo (ej. el
+// usuario dejó de responder) NO califique 0 a la asesora.
+function agenteEnviaMensajePlataforma(transcripcionCompleta: string): boolean {
+  const agente = (transcripcionCompleta ?? "")
+    .split("|").map((s) => s.trim())
+    .filter((l) => /^AGENTE\s*:/i.test(l))
+    .join(" ")
+    .toLowerCase();
+  const inconveniente = /(inconvenient|novedad|falla|ca[ií]d[ao]|fuera de servicio|no (est[aá]|se encuentra) disponible)/.test(agente);
+  const plataforma = /(plataforma|sistema|aplicaci[oó]n|p[aá]gina|portal|consulta)/.test(agente);
+  const masTarde = /(m[aá]s tarde|m[aá]s adelante|comun[ií]que|intente (comunic|llamar)|vuelva a (comunic|llamar|intentar)|m[aá]s luego)/.test(agente);
+  return inconveniente && plataforma && masTarde;
+}
+
 function extraerJson<T>(texto: string): T | null {
   try {
     const clean = texto.replace(/```json|```/g, "").trim();
@@ -318,7 +335,13 @@ PROCESO — Cumple si AGENTE sigue proceso lógico. (NO afecta nota)
 CIERRE — Cumple si AGENTE hace los 3: pregunta si necesita algo más + despedida con su nombre + invita a encuesta. "No aplica" SOLO si la interacción se cortó antes del cierre.
 
 ${evaluaCierreAbrupto ? `MALA PRÁCTICA GRAVE — CIERRE ABRUPTO (campo "cierre_abrupto"):
-Marca true SOLO si el AGENTE cierra, rechaza o aplaza la gestión diciéndole al usuario que se comunique MÁS TARDE / que hay un inconveniente o caída de la plataforma o el sistema y por eso NO puede atenderlo, EN LUGAR de darle manejo, solución o una alternativa. Ejemplo (o variantes muy parecidas): "En este momento presentamos un inconveniente con la plataforma de consulta, intente comunicarse más tarde mientras el problema se soluciona. Ofrecemos disculpas por la novedad y agradecemos su comprensión. Que tenga un excelente día". Esto NO es aceptable: el agente debe DAR MANEJO, nunca finalizar la conversación abruptamente. Si el agente reconoce una falla pero igual gestiona, escala o da una alternativa, entonces cierre_abrupto=false.
+Marca true ÚNICAMENTE si el AGENTE ESCRIBE/DICE un mensaje diciéndole al usuario que hay un inconveniente/caída/novedad con la PLATAFORMA o el SISTEMA y que por eso se comunique MÁS TARDE, usándolo para NO atender la gestión. Ejemplo exacto (o una variante casi idéntica, del propio AGENTE): "En este momento presentamos un inconveniente con la plataforma de consulta, intente comunicarse más tarde mientras el problema se soluciona. Ofrecemos disculpas por la novedad y agradecemos su comprensión. Que tenga un excelente día".
+
+En TODOS los demás casos marca false. En particular, cierre_abrupto=FALSE (y NO es falta del agente) si:
+- El USUARIO deja de responder, se despide, cuelga o cierra la conversación por su cuenta.
+- La conversación simplemente termina o se corta sin que el AGENTE haya enviado ese mensaje de "plataforma con inconveniente / comuníquese más tarde".
+- El agente atendió, resolvió, escaló o dio una alternativa.
+NUNCA marques true solo porque la conversación se cortó, el usuario no respondió más, o la interacción quedó incompleta. Solo cuenta si el AGENTE realmente envió ESE mensaje específico de inconveniente de plataforma para aplazar la atención.
 
 ` : ""}PUNTAJE TUTEO: "Sin tuteo" / "Tuteo leve" / "Tuteo real" (solo del AGENTE)
 TONO GENERAL: "Alto" / "Medio" / "Bajo"
@@ -374,6 +397,12 @@ ${transcripcion}`;
   );
   const todosCumplen = criteriosEvaluados.length > 0 && criteriosEvaluados.every((v) => v === "Cumple");
 
+  // Cierre abrupto REAL (solo heillen): el modelo lo detectó Y el agente sí envió
+  // el mensaje de plataforma. Si no está el mensaje, se ignora (falso positivo).
+  const esCierreAbruptoReal = evaluaCierreAbrupto
+    && criterios.cierre_abrupto === true
+    && agenteEnviaMensajePlataforma(transcripcionCompleta);
+
   const promptTextos = `${contexto}
 
 Eres Duvan, Coordinador de Formación y Calidad de Cofrem en People BPO. Acabas de revisar esta ${tipoInteraccion} y vas a dejar tu retroalimentación al asesor. Hablas de forma directa, cercana, humana — como lo harías cara a cara con tu equipo. Conoces el contexto colombiano y los regionalismos.
@@ -386,7 +415,7 @@ Resultados de evaluación de esta ${tipoInteraccion}:
 - Encuesta: ${cNorm.encuesta}
 - Cierre: ${cNorm.cierre}
 - Tuteo detectado: ${criterios.puntaje_tuteo}
-- ¿Todo cumplió bien?: ${todosCumplen ? "SÍ — interacción muy buena" : "NO — hay aspectos a mejorar"}${evaluaCierreAbrupto && criterios.cierre_abrupto === true ? "\n- FALTA GRAVE: el agente cerró la gestión diciéndole al usuario que se comunicara más tarde por una falla de la plataforma, SIN dar manejo. Esta práctica NO es aceptable (es PENC con nota 0). En HALLAZGOS y en MEJORA debes señalarlo de forma clara y firme (aunque respetuosa): no se puede finalizar la conversación abruptamente; siempre hay que dar manejo, alternativa o escalar." : ""}
+- ¿Todo cumplió bien?: ${todosCumplen ? "SÍ — interacción muy buena" : "NO — hay aspectos a mejorar"}${esCierreAbruptoReal ? "\n- FALTA GRAVE: el agente cerró la gestión diciéndole al usuario que se comunicara más tarde por una falla de la plataforma, SIN dar manejo. Esta práctica NO es aceptable (es PENC con nota 0). En HALLAZGOS y en MEJORA debes señalarlo de forma clara y firme (aunque respetuosa): no se puede finalizar la conversación abruptamente; siempre hay que dar manejo, alternativa o escalar." : ""}
 
 Genera tres campos siguiendo EXACTAMENTE este estilo:
 
@@ -486,10 +515,10 @@ ${transcripcion}`;
     tipoNota = "PENC";
   }
 
-  // Falta GRAVE (SOLO para la asesora evaluada por esto): cierre abrupto /
-  // "comuníquese más tarde por falla de plataforma" sin dar manejo. Anula la
-  // nota: PENC 0, sin importar los demás criterios.
-  if (evaluaCierreAbrupto && criterios.cierre_abrupto === true) {
+  // Falta GRAVE (SOLO heillen, y SOLO si el agente envió de verdad el mensaje de
+  // plataforma): anula la nota a PENC 0. Si fue un falso positivo del modelo (ej.
+  // el usuario dejó de responder), NO se penaliza.
+  if (esCierreAbruptoReal) {
     nota = 0;
     tipoNota = "PENC";
   }
@@ -524,15 +553,22 @@ export async function eliminarAuditoria(idGestion: string): Promise<{ ok: boolea
 }
 
 // Devuelve la transcripción cruda (Transcripciones1) de una gestión, o "".
+// Optimizado: lee SOLO la columna de IDs (B) para ubicar la fila y luego trae
+// únicamente esa transcripción (C). Evita descargar las 2.600+ transcripciones
+// completas en cada consulta (lo que hacía que "nunca cargara").
 export async function obtenerTranscripcion(idGestion: string): Promise<string> {
   const id = sheetId();
   const clave = (idGestion ?? "").trim();
   if (!clave) return "";
-  const data = await readRange(id, "Transcripciones1!A:D", { unformatted: true });
-  for (let i = 1; i < data.length; i++) {
-    if (texto(data[i], 1).trim() === clave) return texto(data[i], 2);
+  const ids = await readRange(id, "Transcripciones1!B:B", { unformatted: true });
+  let fila = -1;
+  for (let i = 1; i < ids.length; i++) {
+    if (texto(ids[i], 0).trim() === clave) { fila = i; break; }
   }
-  return "";
+  if (fila === -1) return "";
+  const filaSheet = fila + 1; // índice 0-based i → fila de hoja i+1
+  const cel = await readRange(id, `Transcripciones1!C${filaSheet}:C${filaSheet}`, { unformatted: true });
+  return texto(cel[0], 0);
 }
 
 export interface EdicionAuditoria {
